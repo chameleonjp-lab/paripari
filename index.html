@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0a0a12">
+  <title>パリパリ - PariPari</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9A%94%EF%B8%8F%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="src/css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- ゲーム描画キャンバス -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- プレイ中HUD -->
+    <header id="hud" class="hud hidden">
+      <div class="hud-left">
+        <div id="hearts" class="hearts" aria-label="残ライフ"></div>
+      </div>
+      <div class="hud-center">
+        <div id="score" class="score">0</div>
+        <div id="combo" class="combo"></div>
+      </div>
+      <div class="hud-right">
+        <button id="btn-pause" class="icon-btn" aria-label="ポーズ">⏸</button>
+      </div>
+    </header>
+
+    <!-- 判定ポップ -->
+    <div id="judge-pop" class="judge-pop"></div>
+
+    <!-- 操作ボタン（下半分） -->
+    <div id="controls" class="controls hidden">
+      <button class="ctl ctl-l" data-dir="L" aria-label="左で受け流す">
+        <span class="ctl-arrow">◀</span>
+      </button>
+      <button class="ctl ctl-r" data-dir="R" aria-label="右で受け流す">
+        <span class="ctl-arrow">▶</span>
+      </button>
+      <!-- 上下（高難度で有効化） -->
+      <button class="ctl ctl-u hidden-dir" data-dir="U" aria-label="上で受け流す">
+        <span class="ctl-arrow">▲</span>
+      </button>
+      <button class="ctl ctl-d hidden-dir" data-dir="D" aria-label="下で受け流す">
+        <span class="ctl-arrow">▼</span>
+      </button>
+    </div>
+
+    <!-- タイトル -->
+    <section id="screen-title" class="screen">
+      <div class="title-wrap">
+        <h1 class="logo">パリパリ</h1>
+        <p class="tagline">来た方向と<b>反対</b>を、ちょうどで弾け。</p>
+        <div class="best">BEST <span id="title-best">0</span></div>
+        <button id="btn-play" class="btn btn-primary">プレイ</button>
+        <button id="btn-howto" class="btn">遊び方</button>
+        <button id="btn-settings" class="btn">設定</button>
+      </div>
+    </section>
+
+    <!-- 遊び方 -->
+    <section id="screen-howto" class="screen hidden">
+      <div class="panel">
+        <h2>遊び方</h2>
+        <ol class="howto-list">
+          <li>敵の攻撃が<b>来る方向</b>が光ります。</li>
+          <li>攻撃が線に届く<b>ちょうど</b>その瞬間に…</li>
+          <li>来た方向と<b>反対</b>のボタンを1回タップ！</li>
+          <li>早すぎ・遅すぎ・逆方向は失敗。3回ミスで終了。</li>
+        </ol>
+        <p class="howto-judge">
+          <span class="tag perfect">PERFECT</span> ど真ん中
+          <span class="tag good">GOOD</span> セーフ
+          <span class="tag miss">MISS</span> 失敗
+        </p>
+        <button id="btn-howto-try" class="btn btn-primary">練習してみる</button>
+        <button id="btn-howto-back" class="btn">もどる</button>
+      </div>
+    </section>
+
+    <!-- 設定 -->
+    <section id="screen-settings" class="screen hidden">
+      <div class="panel">
+        <h2>設定</h2>
+        <label class="toggle"><span>サウンド</span><input type="checkbox" id="set-sound"></label>
+        <label class="toggle"><span>振動（対応端末のみ）</span><input type="checkbox" id="set-vibrate"></label>
+        <label class="toggle"><span>モーション低減</span><input type="checkbox" id="set-motion"></label>
+        <button id="btn-settings-back" class="btn btn-primary">もどる</button>
+      </div>
+    </section>
+
+    <!-- カウントダウン -->
+    <section id="screen-ready" class="screen hidden">
+      <div id="countdown" class="countdown">3</div>
+      <p class="ready-hint">来た方向と<b>反対</b>を押す！</p>
+    </section>
+
+    <!-- ポーズ -->
+    <section id="screen-pause" class="screen hidden">
+      <div class="panel">
+        <h2>ポーズ</h2>
+        <button id="btn-resume" class="btn btn-primary">再開</button>
+        <button id="btn-pause-retry" class="btn">リトライ</button>
+        <button id="btn-pause-home" class="btn">ホーム</button>
+      </div>
+    </section>
+
+    <!-- リザルト -->
+    <section id="screen-result" class="screen hidden">
+      <div class="panel result-panel">
+        <div id="result-rank" class="result-rank">A</div>
+        <div class="result-score-label">SCORE</div>
+        <div id="result-score" class="result-score">0</div>
+        <div id="result-best-badge" class="best-badge hidden">★ ベスト更新！</div>
+        <div class="result-stats">
+          <div><span id="result-combo">0</span><small>最大コンボ</small></div>
+          <div><span id="result-perfect">0%</span><small>PERFECT率</small></div>
+          <div><span id="result-tier">1</span><small>到達ティア</small></div>
+        </div>
+        <button id="btn-retry" class="btn btn-primary">もう一回</button>
+        <button id="btn-result-home" class="btn">ホーム</button>
+      </div>
+    </section>
+
+    <div id="rotate-hint" class="rotate-hint hidden">📱 縦向きでプレイしてください</div>
+  </div>
+
+  <script type="module" src="src/js/main.js"></script>
+</body>
+</html>
