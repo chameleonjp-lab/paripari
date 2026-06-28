@@ -71,7 +71,6 @@ export function setBestLabel(best) {
 }
 
 export function reflectSettings(s) {
-  $('set-sound').checked = s.sound;
   $('set-vibrate').checked = s.vibrate;
   $('set-motion').checked = s.reducedMotion;
 }

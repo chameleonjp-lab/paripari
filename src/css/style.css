@@ -117,45 +117,66 @@ html, body {
   height: 38%;
   min-height: 220px;
   display: flex;
+  gap: 8px;
   z-index: 15;
-  padding-bottom: var(--safe-b);
+  padding: 8px 8px calc(8px + var(--safe-b));
 }
 .ctl {
   flex: 1;
-  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+  background:
+    radial-gradient(120% 80% at 50% 120%, rgba(91,220,255,.10), rgba(255,255,255,0) 60%),
+    linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02));
   border: 1px solid var(--line);
-  color: rgba(255,255,255,.5);
+  border-radius: 22px;
+  color: rgba(255,255,255,.55);
   font-size: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background .08s ease, transform .06s ease, color .08s ease;
+  transition: background .08s ease, transform .06s ease, color .08s ease, box-shadow .12s ease;
   position: relative;
   overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
 }
+.ctl-arrow { filter: drop-shadow(0 0 10px rgba(91,220,255,.35)); transition: transform .08s ease; }
 .ctl:active, .ctl.pressed {
-  background: rgba(91,220,255,.22);
+  background:
+    radial-gradient(120% 90% at 50% 120%, rgba(91,220,255,.45), rgba(91,220,255,.12) 60%),
+    linear-gradient(180deg, rgba(91,220,255,.22), rgba(91,220,255,.06));
   color: #fff;
-  transform: scale(.98);
+  transform: scale(.97);
+  box-shadow: inset 0 0 24px rgba(91,220,255,.35), 0 0 22px rgba(91,220,255,.25);
 }
-.ctl-l { border-top-right-radius: 24px; border-left: none; border-bottom: none; }
-.ctl-r { border-top-left-radius: 24px; border-right: none; border-bottom: none; }
-/* 上下ボタンは左右の上に重ねる小型バー（4方向モード） */
-.ctl-u, .ctl-d {
+.ctl.pressed .ctl-arrow { transform: scale(1.2); }
+
+/* タップ波紋 */
+.ripple {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 46%;
-  min-width: 150px;
-  height: 46%;
-  flex: none;
-  border-radius: 18px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,.7), rgba(91,220,255,.3) 60%, rgba(91,220,255,0));
+  transform: translate(-50%, -50%) scale(0);
+  pointer-events: none;
+  animation: ripple .5s ease-out forwards;
 }
-.ctl-u { top: -52%; }
-.ctl-d { bottom: 8px; }
-.hidden-dir { display: none; }
-.controls.four .ctl-u.hidden-dir,
-.controls.four .ctl-d.hidden-dir { display: flex; }
+@keyframes ripple {
+  to { transform: translate(-50%, -50%) scale(11); opacity: 0; }
+}
+
+/* 2方向: 左右のみ */
+.ctl-u, .ctl-d { display: none; }
+
+/* 4方向: Dパッド配置 */
+.controls.four {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1.15fr;
+  grid-template-rows: 1fr 1fr;
+}
+.controls.four .ctl-l { display: flex; grid-area: 1 / 1 / 3 / 2; }
+.controls.four .ctl-r { display: flex; grid-area: 1 / 3 / 3 / 4; }
+.controls.four .ctl-u { display: flex; grid-area: 1 / 2 / 2 / 3; }
+.controls.four .ctl-d { display: flex; grid-area: 2 / 2 / 3 / 3; }
+.controls.four .ctl { font-size: 32px; }
 
 /* ---------- 画面（オーバーレイ） ---------- */
 .screen {

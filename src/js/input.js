@@ -8,6 +8,21 @@ const KEY_DIR = {
   ArrowDown: 'D', s: 'D', S: 'D',
 };
 
+// タップ位置に波紋を発生（操作フィードバック）
+function spawnRipple(btn, e) {
+  const rect = btn.getBoundingClientRect();
+  const pt = (e.touches && e.touches[0]) || e;
+  const x = (pt.clientX != null ? pt.clientX : rect.left + rect.width / 2) - rect.left;
+  const y = (pt.clientY != null ? pt.clientY : rect.top + rect.height / 2) - rect.top;
+  const span = document.createElement('span');
+  span.className = 'ripple';
+  span.style.left = x + 'px';
+  span.style.top = y + 'px';
+  btn.appendChild(span);
+  span.addEventListener('animationend', () => span.remove());
+  setTimeout(() => span.remove(), 600);
+}
+
 export function setupInput({ onAction, onFirstGesture }) {
   let firstGestureDone = false;
   const fireFirst = () => {
@@ -27,6 +42,7 @@ export function setupInput({ onAction, onFirstGesture }) {
       const dir = btn.getAttribute('data-dir');
       const time = (e.timeStamp && e.timeStamp > 0) ? e.timeStamp : performance.now();
       btn.classList.add('pressed');
+      spawnRipple(btn, e);
       onAction({ dir, time });
     }, { passive: false });
 

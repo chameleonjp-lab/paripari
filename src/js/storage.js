@@ -3,7 +3,6 @@ const KEY_BEST = 'paripari.best';
 const KEY_SETTINGS = 'paripari.settings';
 
 const DEFAULT_SETTINGS = {
-  sound: true,
   vibrate: true,
   reducedMotion: false,
 };

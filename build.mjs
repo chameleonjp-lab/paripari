@@ -9,7 +9,7 @@ const r = (p) => resolve(root, p);
 
 // 依存順（require は遅延評価なので順不同でも動くが、可読性のため整列）
 const MODULES = [
-  'config', 'judge', 'scoring', 'storage', 'haptics', 'audio',
+  'config', 'judge', 'scoring', 'storage', 'haptics',
   'particles', 'input', 'enemy', 'renderer', 'ui', 'game', 'main',
 ];
 

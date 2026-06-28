@@ -127,45 +127,66 @@ html, body {
   height: 38%;
   min-height: 220px;
   display: flex;
+  gap: 8px;
   z-index: 15;
-  padding-bottom: var(--safe-b);
+  padding: 8px 8px calc(8px + var(--safe-b));
 }
 .ctl {
   flex: 1;
-  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+  background:
+    radial-gradient(120% 80% at 50% 120%, rgba(91,220,255,.10), rgba(255,255,255,0) 60%),
+    linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02));
   border: 1px solid var(--line);
-  color: rgba(255,255,255,.5);
+  border-radius: 22px;
+  color: rgba(255,255,255,.55);
   font-size: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background .08s ease, transform .06s ease, color .08s ease;
+  transition: background .08s ease, transform .06s ease, color .08s ease, box-shadow .12s ease;
   position: relative;
   overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
 }
+.ctl-arrow { filter: drop-shadow(0 0 10px rgba(91,220,255,.35)); transition: transform .08s ease; }
 .ctl:active, .ctl.pressed {
-  background: rgba(91,220,255,.22);
+  background:
+    radial-gradient(120% 90% at 50% 120%, rgba(91,220,255,.45), rgba(91,220,255,.12) 60%),
+    linear-gradient(180deg, rgba(91,220,255,.22), rgba(91,220,255,.06));
   color: #fff;
-  transform: scale(.98);
+  transform: scale(.97);
+  box-shadow: inset 0 0 24px rgba(91,220,255,.35), 0 0 22px rgba(91,220,255,.25);
 }
-.ctl-l { border-top-right-radius: 24px; border-left: none; border-bottom: none; }
-.ctl-r { border-top-left-radius: 24px; border-right: none; border-bottom: none; }
-/* 上下ボタンは左右の上に重ねる小型バー（4方向モード） */
-.ctl-u, .ctl-d {
+.ctl.pressed .ctl-arrow { transform: scale(1.2); }
+
+/* タップ波紋 */
+.ripple {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 46%;
-  min-width: 150px;
-  height: 46%;
-  flex: none;
-  border-radius: 18px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,.7), rgba(91,220,255,.3) 60%, rgba(91,220,255,0));
+  transform: translate(-50%, -50%) scale(0);
+  pointer-events: none;
+  animation: ripple .5s ease-out forwards;
 }
-.ctl-u { top: -52%; }
-.ctl-d { bottom: 8px; }
-.hidden-dir { display: none; }
-.controls.four .ctl-u.hidden-dir,
-.controls.four .ctl-d.hidden-dir { display: flex; }
+@keyframes ripple {
+  to { transform: translate(-50%, -50%) scale(11); opacity: 0; }
+}
+
+/* 2方向: 左右のみ */
+.ctl-u, .ctl-d { display: none; }
+
+/* 4方向: Dパッド配置 */
+.controls.four {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1.15fr;
+  grid-template-rows: 1fr 1fr;
+}
+.controls.four .ctl-l { display: flex; grid-area: 1 / 1 / 3 / 2; }
+.controls.four .ctl-r { display: flex; grid-area: 1 / 3 / 3 / 4; }
+.controls.four .ctl-u { display: flex; grid-area: 1 / 2 / 2 / 3; }
+.controls.four .ctl-d { display: flex; grid-area: 2 / 2 / 3 / 3; }
+.controls.four .ctl { font-size: 32px; }
 
 /* ---------- 画面（オーバーレイ） ---------- */
 .screen {
@@ -347,7 +368,6 @@ html, body {
     <section id="screen-settings" class="screen hidden">
       <div class="panel">
         <h2>設定</h2>
-        <label class="toggle"><span>サウンド</span><input type="checkbox" id="set-sound"></label>
         <label class="toggle"><span>振動（対応端末のみ）</span><input type="checkbox" id="set-vibrate"></label>
         <label class="toggle"><span>モーション低減</span><input type="checkbox" id="set-motion"></label>
         <button id="btn-settings-back" class="btn btn-primary">もどる</button>
@@ -533,7 +553,6 @@ const KEY_BEST = 'paripari.best';
 const KEY_SETTINGS = 'paripari.settings';
 
 const DEFAULT_SETTINGS = {
-  sound: true,
   vibrate: true,
   reducedMotion: false,
 };
@@ -594,98 +613,6 @@ const HAPTICS = {
 
 
   Object.assign(exports, { setHapticsEnabled, vibrate, HAPTICS });
-  });
-
-  def('audio', function(module, exports, require){
-// Web Audio による合成SE（アセット不要・軽量） 要件 §4.5 §6.5
-let ctx = null;
-let masterGain = null;
-let enabled = true;
-
-function setAudioEnabled(v) {
-  enabled = !!v;
-  if (masterGain) masterGain.gain.value = enabled ? 0.9 : 0;
-}
-
-// 初回ユーザー操作で呼ぶ（iOS 自動再生制限対策）
-function initAudio() {
-  if (ctx) {
-    if (ctx.state === 'suspended') ctx.resume();
-    return;
-  }
-  try {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    ctx = new AC();
-    masterGain = ctx.createGain();
-    masterGain.gain.value = enabled ? 0.9 : 0;
-    masterGain.connect(ctx.destination);
-  } catch { ctx = null; }
-}
-
-function tone({ freq, type = 'sine', dur = 0.12, gain = 0.3, slideTo = null, delay = 0 }) {
-  if (!ctx || !enabled) return;
-  const t0 = ctx.currentTime + delay;
-  const osc = ctx.createOscillator();
-  const g = ctx.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(freq, t0);
-  if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
-  g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(gain, t0 + 0.005);
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-  osc.connect(g);
-  g.connect(masterGain);
-  osc.start(t0);
-  osc.stop(t0 + dur + 0.02);
-}
-
-function noiseBurst({ dur = 0.12, gain = 0.25, hp = 800 }) {
-  if (!ctx || !enabled) return;
-  const t0 = ctx.currentTime;
-  const len = Math.floor(ctx.sampleRate * dur);
-  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-  const data = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
-  const src = ctx.createBufferSource();
-  src.buffer = buf;
-  const filt = ctx.createBiquadFilter();
-  filt.type = 'highpass';
-  filt.frequency.value = hp;
-  const g = ctx.createGain();
-  g.gain.value = gain;
-  src.connect(filt); filt.connect(g); g.connect(masterGain);
-  src.start(t0);
-}
-
-function play(name) {
-  if (!ctx || !enabled) return;
-  if (ctx.state === 'suspended') ctx.resume();
-  switch (name) {
-    case 'perfect':
-      tone({ freq: 1400, type: 'triangle', dur: 0.18, gain: 0.35, slideTo: 2200 });
-      tone({ freq: 2100, type: 'sine', dur: 0.22, gain: 0.18, delay: 0.02 });
-      noiseBurst({ dur: 0.08, gain: 0.12, hp: 4000 });
-      break;
-    case 'good':
-      tone({ freq: 880, type: 'triangle', dur: 0.12, gain: 0.3, slideTo: 1320 });
-      noiseBurst({ dur: 0.06, gain: 0.1, hp: 3000 });
-      break;
-    case 'miss':
-      tone({ freq: 180, type: 'sawtooth', dur: 0.18, gain: 0.3, slideTo: 90 });
-      noiseBurst({ dur: 0.12, gain: 0.18, hp: 400 });
-      break;
-    case 'tap':
-      tone({ freq: 440, type: 'square', dur: 0.04, gain: 0.08 });
-      break;
-    case 'combo':
-      tone({ freq: 1600, type: 'sine', dur: 0.1, gain: 0.2, slideTo: 2400 });
-      break;
-    default: break;
-  }
-}
-
-
-  Object.assign(exports, { setAudioEnabled, initAudio, play });
   });
 
   def('particles', function(module, exports, require){
@@ -771,6 +698,21 @@ const KEY_DIR = {
   ArrowDown: 'D', s: 'D', S: 'D',
 };
 
+// タップ位置に波紋を発生（操作フィードバック）
+function spawnRipple(btn, e) {
+  const rect = btn.getBoundingClientRect();
+  const pt = (e.touches && e.touches[0]) || e;
+  const x = (pt.clientX != null ? pt.clientX : rect.left + rect.width / 2) - rect.left;
+  const y = (pt.clientY != null ? pt.clientY : rect.top + rect.height / 2) - rect.top;
+  const span = document.createElement('span');
+  span.className = 'ripple';
+  span.style.left = x + 'px';
+  span.style.top = y + 'px';
+  btn.appendChild(span);
+  span.addEventListener('animationend', () => span.remove());
+  setTimeout(() => span.remove(), 600);
+}
+
 function setupInput({ onAction, onFirstGesture }) {
   let firstGestureDone = false;
   const fireFirst = () => {
@@ -790,6 +732,7 @@ function setupInput({ onAction, onFirstGesture }) {
       const dir = btn.getAttribute('data-dir');
       const time = (e.timeStamp && e.timeStamp > 0) ? e.timeStamp : performance.now();
       btn.classList.add('pressed');
+      spawnRipple(btn, e);
       onAction({ dir, time });
     }, { passive: false });
 
@@ -887,19 +830,35 @@ function nextInterval(tier) {
 
   def('renderer', function(module, exports, require){
 // Canvas 2D 描画 要件 §4.4 §6.4
+// ビジュアル/演出強化版: タイミングリング・方向受け流し・衝撃波・スコアポップ・
+// コンボオーラ・背景アンビエント。
 const {CONFIG} = require('config');
 const {attackProgress} = require('enemy');
+const PLAYER_R = 27;
+const DIR_ANGLE = { R: 0, D: Math.PI / 2, L: Math.PI, U: -Math.PI / 2 };
+
 class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.w = 0; this.h = 0; this.dpr = 1;
-    this.lineY = 0;       // パリィライン（プレイヤー）Y
-    this.flash = 0;       // 0..1 閃光
-    this.flashColor = '#fff';
-    this.shake = 0;       // px
-    this.t = 0;           // 累積時間（背景アニメ用）
+    this.lineY = 0;
+    this.t = 0;
+    this.reducedMotion = false;
+
+    // 全画面フラッシュ / シェイク
+    this.flash = 0; this.flashColor = '#fff';
+    this.shake = 0;
+    this.vignette = 0; this.vignetteColor = '60,90,160';
+
+    // 透過的な演出要素
+    this.shockwaves = [];   // {x,y,t,dur,max,color,width}
+    this.popups = [];       // {x,y,vy,t,dur,text,color,size}
+    this.deflect = null;    // {dir,t,dur,color,result}
+    this.embers = [];
+
     this.resize();
+    this._initEmbers();
   }
 
   resize() {
@@ -910,16 +869,214 @@ class Renderer {
     this.canvas.width = Math.round(this.w * this.dpr);
     this.canvas.height = Math.round(this.h * this.dpr);
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    this.lineY = this.h * 0.58;
+    this.lineY = this.h * 0.54;
   }
 
-  triggerFlash(color, intensity = 1) {
-    this.flash = Math.max(this.flash, intensity);
-    this.flashColor = color;
+  _initEmbers() {
+    const n = 30;
+    this.embers = [];
+    for (let i = 0; i < n; i++) {
+      this.embers.push({
+        x: Math.random() * this.w,
+        y: Math.random() * this.h,
+        vy: -8 - Math.random() * 16,
+        vx: (Math.random() - 0.5) * 6,
+        r: 0.6 + Math.random() * 1.8,
+        a: 0.15 + Math.random() * 0.35,
+        ph: Math.random() * Math.PI * 2,
+      });
+    }
   }
-  triggerShake(px) { this.shake = Math.max(this.shake, px); }
 
-  // 攻撃の出現座標（方向→画面端）
+  // ---- 演出トリガ（game から呼ばれる）----
+  triggerFlash(color, intensity = 1) { this.flash = Math.max(this.flash, intensity); this.flashColor = color; }
+  triggerShake(px) { if (!this.reducedMotion) this.shake = Math.max(this.shake, px); }
+  triggerVignette(color, intensity) { this.vignette = Math.max(this.vignette, intensity); this.vignetteColor = color; }
+
+  triggerShockwave(result) {
+    const color = result === 'PERFECT' ? '255,220,120' : result === 'GOOD' ? '120,220,255' : '255,70,90';
+    const max = result === 'PERFECT' ? this.w * 0.9 : result === 'GOOD' ? this.w * 0.6 : this.w * 0.5;
+    this.shockwaves.push({ x: this.w / 2, y: this.lineY, t: 0, dur: result === 'PERFECT' ? 0.6 : 0.42, max, color, width: result === 'MISS' ? 3 : 5 });
+    if (result === 'PERFECT') {
+      // 二重リング
+      this.shockwaves.push({ x: this.w / 2, y: this.lineY, t: -0.06, dur: 0.7, max: this.w * 1.15, color, width: 2 });
+    }
+  }
+
+  triggerDeflect(dir, result) {
+    this.deflect = { dir, t: 0, dur: 0.26, result, color: result === 'PERFECT' ? '#fff2c0' : '#bfefff' };
+  }
+
+  addScorePopup(amount, result) {
+    if (amount <= 0) return;
+    const color = result === 'PERFECT' ? '#ffd35b' : '#bfefff';
+    this.popups.push({
+      x: this.w / 2 + (Math.random() - 0.5) * 30,
+      y: this.lineY - PLAYER_R - 18,
+      vy: -64, t: 0, dur: 0.85,
+      text: '+' + amount, color,
+      size: result === 'PERFECT' ? 26 : 20,
+    });
+  }
+
+  // ---- メイン描画 ----
+  draw(dt, state, particles) {
+    const ctx = this.ctx;
+    this.t += dt;
+    this.flash = Math.max(0, this.flash - dt * 5.5);
+    this.shake = Math.max(0, this.shake - dt * 70);
+    this.vignette = Math.max(0, this.vignette - dt * 2.8);
+    this._updateTransients(dt);
+
+    ctx.save();
+    if (this.shake > 0.5) {
+      ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
+    }
+
+    this._drawBackground(ctx, dt);
+    this._drawParryLine(ctx);
+
+    const combo = state.combo || 0;
+    this._drawComboAura(ctx, combo);
+    this._drawShockwaves(ctx);
+
+    // 攻撃（タイミングリング＋接近する斬撃）
+    if (state.attack && !state.attack.resolved) {
+      this._drawTimingRing(ctx, state.attack, state.now);
+      this._drawAttack(ctx, state.attack, state.now);
+    } else if (state.attack && state.attack.resolved && state.now - state.attack.resolvedAt < 220) {
+      this._drawResolved(ctx, state.attack, state.now);
+    }
+
+    this._drawPlayer(ctx, combo);
+    this._drawDeflect(ctx);
+    particles.draw(ctx);
+    this._drawPopups(ctx);
+    ctx.restore();
+
+    this._drawVignette(ctx);
+    if (this.flash > 0.01) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(0.9, this.flash);
+      ctx.fillStyle = this.flashColor;
+      ctx.fillRect(0, 0, this.w, this.h);
+      ctx.restore();
+    }
+  }
+
+  _updateTransients(dt) {
+    for (let i = this.shockwaves.length - 1; i >= 0; i--) {
+      this.shockwaves[i].t += dt;
+      if (this.shockwaves[i].t >= this.shockwaves[i].dur) this.shockwaves.splice(i, 1);
+    }
+    for (let i = this.popups.length - 1; i >= 0; i--) {
+      const p = this.popups[i];
+      p.t += dt; p.y += p.vy * dt; p.vy *= (1 - dt * 1.6);
+      if (p.t >= p.dur) this.popups.splice(i, 1);
+    }
+    if (this.deflect) { this.deflect.t += dt; if (this.deflect.t >= this.deflect.dur) this.deflect = null; }
+  }
+
+  // ---- 背景 ----
+  _drawBackground(ctx, dt) {
+    const g = ctx.createLinearGradient(0, 0, 0, this.h);
+    g.addColorStop(0, '#0a0a18');
+    g.addColorStop(0.55, '#11152e');
+    g.addColorStop(1, '#06060e');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, this.w, this.h);
+
+    // 中央の墨だまり（呼吸）
+    const cx = this.w / 2, cy = this.lineY;
+    const breathe = 0.16 + Math.sin(this.t * 1.4) * 0.05;
+    const rg = ctx.createRadialGradient(cx, cy, 8, cx, cy, this.w * 0.75);
+    rg.addColorStop(0, `rgba(60,90,180,${breathe})`);
+    rg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = rg;
+    ctx.fillRect(0, 0, this.w, this.h);
+
+    // 漂う火の粉
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const e of this.embers) {
+      e.x += e.vx * dt; e.y += e.vy * dt; e.ph += dt * 2;
+      if (e.y < -10) { e.y = this.h + 10; e.x = Math.random() * this.w; }
+      if (e.x < -10) e.x = this.w + 10; else if (e.x > this.w + 10) e.x = -10;
+      const a = e.a * (0.6 + 0.4 * Math.sin(e.ph));
+      ctx.globalAlpha = a;
+      ctx.fillStyle = '#7fb0ff';
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  _drawParryLine(ctx) {
+    const y = this.lineY;
+    ctx.save();
+    const lg = ctx.createLinearGradient(0, 0, this.w, 0);
+    lg.addColorStop(0, 'rgba(255,255,255,0)');
+    lg.addColorStop(0.5, 'rgba(255,255,255,0.22)');
+    lg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.strokeStyle = lg;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, y); ctx.lineTo(this.w, y); ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---- コンボオーラ ----
+  _drawComboAura(ctx, combo) {
+    if (combo < 2) return;
+    const cx = this.w / 2, cy = this.lineY;
+    const lvl = Math.min(combo / 30, 1);
+    const hue = 190 - lvl * 150; // cyan → gold/orange
+    const pulse = 1 + Math.sin(this.t * 6) * 0.06 * lvl;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const r = (PLAYER_R + 16 + lvl * 40) * pulse;
+    const rg = ctx.createRadialGradient(cx, cy, PLAYER_R, cx, cy, r);
+    rg.addColorStop(0, `hsla(${hue},100%,65%,${0.05 + lvl * 0.22})`);
+    rg.addColorStop(1, `hsla(${hue},100%,55%,0)`);
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ---- タイミングリング（収束）----
+  _drawTimingRing(ctx, attack, now) {
+    const cx = this.w / 2, cy = this.lineY;
+    const p = attackProgress(attack, now); // 0..(>1)
+    const maxR = Math.min(this.w, this.h) * 0.42;
+    // p=1 でプレイヤー外周(PLAYER_R)にちょうど一致
+    const r = PLAYER_R + (maxR - PLAYER_R) * (1 - Math.min(p, 1));
+    // 中心に近づくほど白→金。GOOD窓相当(残時間)で色づく
+    const near = Math.max(0, 1 - Math.abs(1 - p) * 4);
+    const col = `rgba(${255},${Math.round(255 - near * 40)},${Math.round(255 - near * 175)},`;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = col + (0.5 + near * 0.5) + ')';
+    ctx.lineWidth = 2 + near * 2;
+    ctx.shadowColor = col + '1)';
+    ctx.shadowBlur = 10 + near * 16;
+    ctx.beginPath();
+    ctx.arc(cx, cy, Math.max(r, PLAYER_R), 0, Math.PI * 2);
+    ctx.stroke();
+    // ターゲットの薄い基準リング（PERFECT帯）
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, PLAYER_R + 4, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---- 攻撃（接近する斬撃＋トレイル）----
   attackStart(dir) {
     switch (dir) {
       case 'L': return { x: -40, y: this.lineY };
@@ -930,183 +1087,210 @@ class Renderer {
     }
   }
 
-  draw(dt, state, particles) {
-    const ctx = this.ctx;
-    this.t += dt;
-    // decay
-    this.flash = Math.max(0, this.flash - dt * 4.5);
-    this.shake = Math.max(0, this.shake - dt * 60);
-
-    ctx.save();
-    // シェイク
-    if (this.shake > 0.5) {
-      ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
-    }
-
-    this._drawBackground(ctx);
-    this._drawParryLine(ctx, state);
-    this._drawPlayer(ctx, state);
-
-    // 攻撃
-    if (state.attack && !state.attack.resolved) {
-      this._drawAttack(ctx, state.attack, state.now);
-    } else if (state.attack && state.attack.resolved && state.now - state.attack.resolvedAt < 180) {
-      // 受け流し後の余韻（弾かれた軌跡）
-      this._drawResolved(ctx, state.attack, state.now);
-    }
-
-    particles.draw(ctx);
-    ctx.restore();
-
-    // 閃光（全面）
-    if (this.flash > 0.01) {
-      ctx.save();
-      ctx.globalAlpha = Math.min(0.85, this.flash);
-      ctx.fillStyle = this.flashColor;
-      ctx.fillRect(0, 0, this.w, this.h);
-      ctx.restore();
-    }
-  }
-
-  _drawBackground(ctx) {
-    const g = ctx.createLinearGradient(0, 0, 0, this.h);
-    g.addColorStop(0, '#0a0a16');
-    g.addColorStop(0.6, '#0f1226');
-    g.addColorStop(1, '#07070d');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, this.w, this.h);
-
-    // ほのかな放射状の墨だまり
-    const cx = this.w / 2, cy = this.lineY;
-    const rg = ctx.createRadialGradient(cx, cy, 10, cx, cy, this.w * 0.7);
-    rg.addColorStop(0, 'rgba(40,60,120,0.18)');
-    rg.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = rg;
-    ctx.fillRect(0, 0, this.w, this.h);
-  }
-
-  _drawParryLine(ctx, state) {
-    const y = this.lineY;
-    ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(this.w, y);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  _drawPlayer(ctx, state) {
-    const cx = this.w / 2;
-    const cy = this.lineY;
-    const pulse = 1 + Math.sin(this.t * 3) * 0.04;
-    const r = 26 * pulse;
-    ctx.save();
-    // 守りの輪
-    ctx.strokeStyle = 'rgba(91,220,255,0.7)';
-    ctx.lineWidth = 3;
-    ctx.shadowColor = 'rgba(91,220,255,0.7)';
-    ctx.shadowBlur = 14;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.stroke();
-    // 中心
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(233,238,247,0.92)';
-    ctx.beginPath();
-    ctx.arc(cx, cy, 7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
   _drawAttack(ctx, attack, now) {
     const p = attackProgress(attack, now);
     const start = this.attackStart(attack.dir);
     const cx = this.w / 2, cy = this.lineY;
-    // ease-in 接近
-    const e = p * p;
+    const e = p * p; // ease-in
+
+    const telGlow = Math.max(0, 1 - p) * 0.5 + 0.18;
+    this._drawEdgeGlow(ctx, attack.dir, telGlow);
+    this._drawIncomingArrow(ctx, attack.dir, telGlow, p);
+
+    const angle = Math.atan2(cy - start.y, cx - start.x);
+    const danger = p > 0.68;
+    const col = danger ? '#ff3b54' : '#ff9a5b';
+
+    // トレイル（残像）
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let k = 1; k <= 3; k++) {
+      const pe = Math.max(0, e - k * 0.05);
+      const tx = start.x + (cx - start.x) * pe;
+      const ty = start.y + (cy - start.y) * pe;
+      ctx.globalAlpha = (0.12) * (1 - k / 4) * Math.min(1, p + 0.3);
+      this._slash(ctx, tx, ty, angle, 50 + 30 * pe, col, 4);
+    }
+    ctx.restore();
+
+    // 本体
     const x = start.x + (cx - start.x) * e;
     const y = start.y + (cy - start.y) * e;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, 0.4 + p);
+    ctx.shadowColor = col; ctx.shadowBlur = 18;
+    this._slash(ctx, x, y, angle, 62 + 42 * e, col, 5 + 6 * e);
+    ctx.restore();
+  }
 
-    // 予兆: 攻撃側エッジの発光（早期ほど強く）
-    const telGlow = Math.max(0, 1 - p) * 0.5 + 0.2;
-    this._drawEdgeGlow(ctx, attack.dir, telGlow);
-
-    // 斬撃本体
-    const angle = Math.atan2(cy - start.y, cx - start.x);
-    const len = 60 + 40 * e;
+  _slash(ctx, x, y, angle, len, color, width) {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
-    const danger = p > 0.7;
-    const col = danger ? '#ff3b54' : '#ff8a5b';
-    ctx.strokeStyle = col;
-    ctx.lineWidth = 5 + 6 * e;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
     ctx.lineCap = 'round';
-    ctx.shadowColor = col;
-    ctx.shadowBlur = 18;
-    ctx.globalAlpha = Math.min(1, 0.4 + p);
     ctx.beginPath();
     ctx.moveTo(-len / 2, 0);
     ctx.lineTo(len / 2, 0);
     ctx.stroke();
     ctx.restore();
-
-    // 方向アイコン（攻撃の来る方向）
-    this._drawDirArrow(ctx, attack.dir, telGlow);
   }
 
   _drawResolved(ctx, attack, now) {
-    const k = Math.max(0, Math.min(1, (now - attack.resolvedAt) / 180));
+    const k = Math.max(0, Math.min(1, (now - attack.resolvedAt) / 220));
     const cx = this.w / 2, cy = this.lineY;
     ctx.save();
-    ctx.globalAlpha = Math.max(0, 1 - k);
+    ctx.globalAlpha = Math.max(0, 1 - k) * 0.8;
     ctx.strokeStyle = attack.result === 'MISS' ? '#ff3b54' : '#ffd35b';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(cx, cy, 30 + k * 60, 0, Math.PI * 2);
+    ctx.arc(cx, cy, PLAYER_R + k * 50, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---- プレイヤー（守りの構え）----
+  _drawPlayer(ctx, combo) {
+    const cx = this.w / 2, cy = this.lineY;
+    const pulse = 1 + Math.sin(this.t * 3) * 0.04;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(120,210,255,0.85)';
+    ctx.lineWidth = 3;
+    ctx.shadowColor = 'rgba(120,210,255,0.8)';
+    ctx.shadowBlur = 16;
+    ctx.beginPath();
+    ctx.arc(cx, cy, PLAYER_R * pulse, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    // 内側コア
+    const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, 9);
+    cg.addColorStop(0, '#ffffff');
+    cg.addColorStop(1, 'rgba(180,230,255,0.6)');
+    ctx.fillStyle = cg;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 7.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ---- 方向受け流し（成功時、反対側へ刀をフリック）----
+  _drawDeflect(ctx) {
+    if (!this.deflect) return;
+    const d = this.deflect;
+    const k = d.t / d.dur;            // 0..1
+    const cx = this.w / 2, cy = this.lineY;
+    const ang = DIR_ANGLE[d.dir] != null ? DIR_ANGLE[d.dir] : 0;
+    const ease = 1 - Math.pow(1 - k, 3);
+    const reach = PLAYER_R + 8 + ease * 64;
+    const alpha = Math.max(0, 1 - k);
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(ang);
+    ctx.globalCompositeOperation = 'lighter';
+    // フリックする刀身
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = d.color;
+    ctx.lineWidth = d.result === 'PERFECT' ? 6 : 4;
+    ctx.lineCap = 'round';
+    ctx.shadowColor = d.color; ctx.shadowBlur = 18;
+    ctx.beginPath();
+    ctx.moveTo(PLAYER_R * 0.4, 0);
+    ctx.lineTo(reach, 0);
+    ctx.stroke();
+    // 弧（受け流しの軌跡）
+    ctx.globalAlpha = alpha * 0.8;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    const sweep = (0.5 + ease * 0.7);
+    ctx.arc(0, 0, reach * 0.82, -sweep, sweep);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  _drawShockwaves(ctx) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const s of this.shockwaves) {
+      const k = Math.max(0, s.t / s.dur);
+      if (k <= 0) continue;
+      const r = s.max * (1 - Math.pow(1 - k, 2));
+      ctx.globalAlpha = Math.max(0, 1 - k) * 0.7;
+      ctx.strokeStyle = `rgba(${s.color},1)`;
+      ctx.lineWidth = s.width * (1 - k) + 0.5;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  _drawPopups(ctx) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const p of this.popups) {
+      const k = p.t / p.dur;
+      ctx.globalAlpha = Math.max(0, 1 - k * k);
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color; ctx.shadowBlur = 12;
+      ctx.font = `800 ${p.size}px -apple-system, sans-serif`;
+      ctx.fillText(p.text, p.x, p.y);
+    }
+    ctx.restore();
+  }
+
+  _drawVignette(ctx) {
+    if (this.vignette <= 0.01) return;
+    const cx = this.w / 2, cy = this.h / 2;
+    const rg = ctx.createRadialGradient(cx, cy, this.h * 0.25, cx, cy, this.h * 0.72);
+    rg.addColorStop(0, `rgba(${this.vignetteColor},0)`);
+    rg.addColorStop(1, `rgba(${this.vignetteColor},${Math.min(0.7, this.vignette)})`);
+    ctx.save();
+    ctx.fillStyle = rg;
+    ctx.fillRect(0, 0, this.w, this.h);
     ctx.restore();
   }
 
   _drawEdgeGlow(ctx, dir, a) {
     ctx.save();
     ctx.globalAlpha = a;
-    let grad;
     const c = 'rgba(255,80,90,';
+    let grad;
     if (dir === 'L') {
-      grad = ctx.createLinearGradient(0, 0, this.w * 0.3, 0);
-      grad.addColorStop(0, c + '0.55)'); grad.addColorStop(1, c + '0)');
-      ctx.fillStyle = grad; ctx.fillRect(0, 0, this.w * 0.3, this.h);
+      grad = ctx.createLinearGradient(0, 0, this.w * 0.32, 0);
+      grad.addColorStop(0, c + '0.6)'); grad.addColorStop(1, c + '0)');
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, this.w * 0.32, this.h);
     } else if (dir === 'R') {
-      grad = ctx.createLinearGradient(this.w, 0, this.w * 0.7, 0);
-      grad.addColorStop(0, c + '0.55)'); grad.addColorStop(1, c + '0)');
-      ctx.fillStyle = grad; ctx.fillRect(this.w * 0.7, 0, this.w * 0.3, this.h);
+      grad = ctx.createLinearGradient(this.w, 0, this.w * 0.68, 0);
+      grad.addColorStop(0, c + '0.6)'); grad.addColorStop(1, c + '0)');
+      ctx.fillStyle = grad; ctx.fillRect(this.w * 0.68, 0, this.w * 0.32, this.h);
     } else if (dir === 'U') {
-      grad = ctx.createLinearGradient(0, 0, 0, this.h * 0.3);
-      grad.addColorStop(0, c + '0.55)'); grad.addColorStop(1, c + '0)');
-      ctx.fillStyle = grad; ctx.fillRect(0, 0, this.w, this.h * 0.3);
+      grad = ctx.createLinearGradient(0, 0, 0, this.h * 0.32);
+      grad.addColorStop(0, c + '0.6)'); grad.addColorStop(1, c + '0)');
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, this.w, this.h * 0.32);
     } else {
-      grad = ctx.createLinearGradient(0, this.h, 0, this.h * 0.7);
-      grad.addColorStop(0, c + '0.55)'); grad.addColorStop(1, c + '0)');
-      ctx.fillStyle = grad; ctx.fillRect(0, this.h * 0.7, this.w, this.h * 0.3);
+      grad = ctx.createLinearGradient(0, this.h, 0, this.h * 0.68);
+      grad.addColorStop(0, c + '0.6)'); grad.addColorStop(1, c + '0)');
+      ctx.fillStyle = grad; ctx.fillRect(0, this.h * 0.68, this.w, this.h * 0.32);
     }
     ctx.restore();
   }
 
-  _drawDirArrow(ctx, dir, a) {
+  // 攻撃が「来る方向」を示す矢印（答えではなく脅威の提示）
+  _drawIncomingArrow(ctx, dir, a, p) {
     const cx = this.w / 2, cy = this.lineY;
-    const off = 70;
+    const off = 96 + Math.sin(this.t * 8) * 4;
     let x = cx, y = cy, ch = '◀';
-    if (dir === 'L') { x = cx - off; ch = '▶'; }      // 左から来る→右へ受け流す方向の矢印
+    if (dir === 'L') { x = cx - off; ch = '▶'; }
     else if (dir === 'R') { x = cx + off; ch = '◀'; }
     else if (dir === 'U') { y = cy - off; ch = '▼'; }
     else { y = cy + off; ch = '▲'; }
     ctx.save();
-    ctx.globalAlpha = 0.3 + a;
-    ctx.fillStyle = '#ffd35b';
-    ctx.font = '700 20px sans-serif';
+    ctx.globalAlpha = 0.25 + a * 0.7;
+    ctx.fillStyle = p > 0.68 ? '#ff5566' : '#ffb05b';
+    ctx.font = '800 22px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(ch, x, y);
@@ -1117,6 +1301,13 @@ class Renderer {
     if (result === 'PERFECT') return ['#fff', '#ffd35b', '#5bdcff', '#ffea9e'];
     if (result === 'GOOD') return ['#fff', '#5bdcff'];
     return ['#ff3b54', '#ff8a5b'];
+  }
+
+  clearTransients() {
+    this.shockwaves.length = 0;
+    this.popups.length = 0;
+    this.deflect = null;
+    this.flash = 0; this.shake = 0; this.vignette = 0;
   }
 }
 
@@ -1197,7 +1388,6 @@ function setBestLabel(best) {
 }
 
 function reflectSettings(s) {
-  $('set-sound').checked = s.sound;
   $('set-vibrate').checked = s.vibrate;
   $('set-motion').checked = s.reducedMotion;
 }
@@ -1212,7 +1402,6 @@ const {CONFIG, tierForSuccess, rankForScore} = require('config');
 const {judgeTiming} = require('judge');
 const {calcGain} = require('scoring');
 const {createAttack, nextInterval} = require('enemy');
-const audio = require('audio');
 const {vibrate, HAPTICS} = require('haptics');
 const ui = require('ui');
 const {getBest, setBest} = require('storage');
@@ -1229,7 +1418,6 @@ class Game {
     this.mode = 'normal';      // normal | practice
     this.gameTime = 0;         // ms（main が進める）
 
-    // 演出タイマー（壁時計ms, main が減算）
     this.hitstopMs = 0;
     this.slowmoMs = 0;
 
@@ -1237,7 +1425,7 @@ class Game {
     this._resetStats();
   }
 
-  setSettings(s) { this.settings = s; }
+  setSettings(s) { this.settings = s; if (this.r) this.r.reducedMotion = !!s.reducedMotion; }
 
   _resetStats() {
     this.hp = CONFIG.MAX_HP;
@@ -1247,7 +1435,7 @@ class Game {
     this.successCount = 0;
     this.perfectCount = 0;
     this.perfectStreak = 0;
-    this.totalAttempts = 0;     // 成功＋失敗（判定された攻撃数）
+    this.totalAttempts = 0;
     this.attack = null;
     this.nextSpawnAt = 0;
     this._currentTierIndex = -1;
@@ -1257,6 +1445,9 @@ class Game {
     this.mode = mode;
     this.state = 'PLAYING';
     this._resetStats();
+    this.r.reducedMotion = !!this.settings.reducedMotion;
+    this.r.clearTransients();
+    this.particles.clear();
     this.nextSpawnAt = this.gameTime + 600;
     this._applyTierUI();
     ui.updateHUD(this);
@@ -1264,27 +1455,21 @@ class Game {
 
   isPlaying() { return this.state === 'PLAYING'; }
 
-  // --- 入力処理（main からプレイ中のみ呼ばれる）---
   handleAction(dir) {
     if (this.state !== 'PLAYING') return;
     const a = this.attack;
-    // 攻撃が未提示 / 既に判定済み → 空打ち（ペナルティなし）
-    if (!a || a.resolved || this.gameTime < a.spawnAt) {
-      audio.play('tap');
-      return;
-    }
+    if (!a || a.resolved || this.gameTime < a.spawnAt) return; // 空打ち（ペナルティなし）
     const delta = this.gameTime - a.impactAt;
     const dirOk = dir === a.needDir;
     const result = judgeTiming(delta, dirOk);
     this._resolve(a, result, delta);
   }
 
-  // --- フレーム更新（main からプレイ中のみ呼ばれる）---
   update(dtSec) {
     const now = this.gameTime;
     const a = this.attack;
     if (a && !a.resolved && now >= a.windowEnd) {
-      this._resolve(a, 'MISS', a.windowEnd - a.impactAt, true); // 無入力タイムアウト
+      this._resolve(a, 'MISS', a.windowEnd - a.impactAt, true);
     }
     if ((!this.attack || this.attack.resolved) && now >= this.nextSpawnAt && this.state === 'PLAYING') {
       this._spawn();
@@ -1307,7 +1492,7 @@ class Game {
     }
   }
 
-  _resolve(a, result, delta, timeout = false) {
+  _resolve(a, result, delta) {
     a.resolved = true;
     a.resolvedAt = this.gameTime;
     a.result = result;
@@ -1321,59 +1506,63 @@ class Game {
       this.combo = 0;
       this.perfectStreak = 0;
       if (this.mode === 'normal') this.hp = Math.max(0, this.hp - 1);
-      audio.play('miss');
       vibrate(HAPTICS.miss);
-      this.r.triggerFlash('#5a0a14', 0.5);
-      if (!reduced) this.r.triggerShake(CONFIG.SHAKE_MISS);
+      this.r.triggerFlash('#5a0a14', 0.45);
+      this.r.triggerVignette('150,20,40', 0.7);
+      this.r.triggerShake(CONFIG.SHAKE_MISS);
+      this.r.triggerShockwave('MISS');
       this.particles.spawnBurst(cx, cy, {
-        count: 14, speed: 220, colors: this.r.burstColors('MISS'), size: 3, life: 0.45, gravity: 700,
+        count: 16, speed: 240, colors: this.r.burstColors('MISS'), size: 3, life: 0.45, gravity: 700,
       });
       ui.popJudge('MISS', delta);
     } else {
-      // 成功
       this.combo++;
       this.successCount++;
       this.maxCombo = Math.max(this.maxCombo, this.combo);
       const gain = calcGain(result, this.combo, delta);
       this.score += gain;
 
+      this.r.triggerDeflect(a.needDir, result);
+      this.r.triggerShockwave(result);
+      this.r.addScorePopup(gain, result);
+
       if (result === 'PERFECT') {
         this.perfectCount++;
         this.perfectStreak++;
-        audio.play('perfect');
         vibrate(HAPTICS.perfect);
-        this.r.triggerFlash('#fff7df', 0.85);
+        this.r.triggerFlash('#fff7df', 0.5);
         this.hitstopMs = CONFIG.HITSTOP_PERFECT_MS;
         if (!reduced) this.slowmoMs = CONFIG.SLOWMO_MS;
         this.particles.spawnBurst(cx, cy, {
-          count: 30, speed: 420, colors: this.r.burstColors('PERFECT'), size: 4, life: 0.6, gravity: 500,
+          count: 34, speed: 460, colors: this.r.burstColors('PERFECT'), size: 4, life: 0.65, gravity: 480,
         });
-        // PERFECT連続で回復
+        // 反対側への放射（受け流し方向）
+        this.particles.spawnBurst(cx, cy, {
+          count: 12, speed: 520, spread: 0.7, angle: this._dirAngle(a.needDir),
+          colors: this.r.burstColors('PERFECT'), size: 3, life: 0.5, gravity: 300,
+        });
         if (this.perfectStreak > 0 && this.perfectStreak % CONFIG.HEAL_EVERY_PERFECT_STREAK === 0) {
           this.hp = Math.min(CONFIG.MAX_HP, this.hp + 1);
         }
       } else {
         this.perfectStreak = 0;
-        audio.play('good');
         vibrate(HAPTICS.good);
-        this.r.triggerFlash('#bfefff', 0.5);
+        this.r.triggerFlash('#bfefff', 0.3);
         this.hitstopMs = CONFIG.HITSTOP_GOOD_MS;
         this.particles.spawnBurst(cx, cy, {
-          count: 18, speed: 320, colors: this.r.burstColors('GOOD'), size: 3, life: 0.5, gravity: 600,
+          count: 20, speed: 340, spread: 1.4, angle: this._dirAngle(a.needDir),
+          colors: this.r.burstColors('GOOD'), size: 3, life: 0.5, gravity: 600,
         });
       }
       ui.popJudge(result, delta);
       if (this.combo >= 2) ui.bumpCombo();
-      if (this.combo > 0 && this.combo % CONFIG.COMBO_STEP === 0) audio.play('combo');
     }
 
     ui.updateHUD(this);
 
-    // 次の攻撃を予約
     const tier = this.mode === 'practice' ? CONFIG.TIERS[0] : tierForSuccess(this.successCount);
     this.nextSpawnAt = this.gameTime + nextInterval(tier);
 
-    // 終了判定
     if (this.mode === 'normal' && this.hp <= 0) {
       this._gameOver();
     } else if (this.mode === 'practice' && this.successCount >= PRACTICE_GOAL) {
@@ -1381,6 +1570,10 @@ class Game {
       this.attack = null;
       this.onGameOver({ practiceDone: true });
     }
+  }
+
+  _dirAngle(dir) {
+    return { R: 0, D: Math.PI / 2, L: Math.PI, U: -Math.PI / 2 }[dir] || 0;
   }
 
   _gameOver() {
@@ -1405,7 +1598,7 @@ class Game {
   }
 
   getRenderState() {
-    return { now: this.gameTime, attack: this.attack };
+    return { now: this.gameTime, attack: this.attack, combo: this.combo, hp: this.hp };
   }
 }
 
@@ -1420,7 +1613,6 @@ const {Renderer} = require('renderer');
 const {ParticlePool} = require('particles');
 const {Game} = require('game');
 const {setupInput, lockGestures} = require('input');
-const audio = require('audio');
 const {setHapticsEnabled} = require('haptics');
 const ui = require('ui');
 const storage = require('storage');
@@ -1431,8 +1623,8 @@ const renderer = new Renderer(canvas);
 const particles = new ParticlePool();
 
 let settings = storage.getSettings();
-audio.setAudioEnabled(settings.sound);
 setHapticsEnabled(settings.vibrate);
+renderer.reducedMotion = !!settings.reducedMotion;
 
 let pendingResult = null;   // リザルト表示用
 let countdownTimer = null;
@@ -1457,7 +1649,6 @@ setupInput({
   onAction: ({ dir }) => {
     if (game.isPlaying()) game.handleAction(dir);
   },
-  onFirstGesture: () => audio.initAudio(),
 });
 lockGestures();
 
@@ -1503,10 +1694,10 @@ function beginPractice() {
 }
 
 // ---------- DOM ボタン配線 ----------
-$('btn-play').addEventListener('click', () => { audio.initAudio(); beginNormalGame(); });
+$('btn-play').addEventListener('click', beginNormalGame);
 $('btn-howto').addEventListener('click', () => ui.showScreen('howto'));
 $('btn-howto-back').addEventListener('click', () => ui.showScreen('title'));
-$('btn-howto-try').addEventListener('click', () => { audio.initAudio(); beginPractice(); });
+$('btn-howto-try').addEventListener('click', beginPractice);
 $('btn-settings').addEventListener('click', () => { ui.reflectSettings(settings); ui.showScreen('settings'); });
 $('btn-settings-back').addEventListener('click', () => ui.showScreen('title'));
 
@@ -1527,9 +1718,8 @@ function bindToggle(id, key, apply) {
     apply && apply(e.target.checked);
   });
 }
-bindToggle('set-sound', 'sound', (v) => audio.setAudioEnabled(v));
 bindToggle('set-vibrate', 'vibrate', (v) => setHapticsEnabled(v));
-bindToggle('set-motion', 'reducedMotion');
+bindToggle('set-motion', 'reducedMotion', (v) => { renderer.reducedMotion = v; });
 
 // ---------- ポーズ ----------
 let pausedState = null;

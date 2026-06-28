@@ -4,7 +4,6 @@ import { Renderer } from './renderer.js';
 import { ParticlePool } from './particles.js';
 import { Game } from './game.js';
 import { setupInput, lockGestures } from './input.js';
-import * as audio from './audio.js';
 import { setHapticsEnabled } from './haptics.js';
 import * as ui from './ui.js';
 import * as storage from './storage.js';
@@ -16,8 +15,8 @@ const renderer = new Renderer(canvas);
 const particles = new ParticlePool();
 
 let settings = storage.getSettings();
-audio.setAudioEnabled(settings.sound);
 setHapticsEnabled(settings.vibrate);
+renderer.reducedMotion = !!settings.reducedMotion;
 
 let pendingResult = null;   // リザルト表示用
 let countdownTimer = null;
@@ -42,7 +41,6 @@ setupInput({
   onAction: ({ dir }) => {
     if (game.isPlaying()) game.handleAction(dir);
   },
-  onFirstGesture: () => audio.initAudio(),
 });
 lockGestures();
 
@@ -88,10 +86,10 @@ function beginPractice() {
 }
 
 // ---------- DOM ボタン配線 ----------
-$('btn-play').addEventListener('click', () => { audio.initAudio(); beginNormalGame(); });
+$('btn-play').addEventListener('click', beginNormalGame);
 $('btn-howto').addEventListener('click', () => ui.showScreen('howto'));
 $('btn-howto-back').addEventListener('click', () => ui.showScreen('title'));
-$('btn-howto-try').addEventListener('click', () => { audio.initAudio(); beginPractice(); });
+$('btn-howto-try').addEventListener('click', beginPractice);
 $('btn-settings').addEventListener('click', () => { ui.reflectSettings(settings); ui.showScreen('settings'); });
 $('btn-settings-back').addEventListener('click', () => ui.showScreen('title'));
 
@@ -112,9 +110,8 @@ function bindToggle(id, key, apply) {
     apply && apply(e.target.checked);
   });
 }
-bindToggle('set-sound', 'sound', (v) => audio.setAudioEnabled(v));
 bindToggle('set-vibrate', 'vibrate', (v) => setHapticsEnabled(v));
-bindToggle('set-motion', 'reducedMotion');
+bindToggle('set-motion', 'reducedMotion', (v) => { renderer.reducedMotion = v; });
 
 // ---------- ポーズ ----------
 let pausedState = null;

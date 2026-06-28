@@ -45,7 +45,8 @@ python3 -m http.server 8099
 
 ## 技術構成
 - 依存ゼロの Vanilla JS（ES Modules）+ Canvas 2D（ゲーム本体）+ DOM/CSS（HUD・メニュー）。
-- Web Audio API で効果音を合成（アセット不要）。`localStorage` にベストスコア/設定を保存。
+- **音は不採用**（BGM・効果音なし）。フィードバックは視覚中心＋触覚（振動）。
+- `localStorage` にベストスコア/設定を保存。
 - 時刻ベース判定（`performance.now()`）でフレームレート非依存。iPhone SE 最適化。
 
 ## テスト
@@ -59,7 +60,7 @@ npm test
 ```
 index.html
 src/css/style.css
-src/js/        # main, game, judge, scoring, enemy, input, renderer, particles, audio, ui, storage, haptics, config
+src/js/        # main, game, judge, scoring, enemy, input, renderer, particles, ui, storage, haptics, config
 docs/          # requirements.md / implementation-plan.md
 tests/         # judge / scoring の境界値テスト
 ```
