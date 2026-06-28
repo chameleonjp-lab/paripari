@@ -31,21 +31,19 @@
     <!-- 判定ポップ -->
     <div id="judge-pop" class="judge-pop"></div>
 
-    <!-- 操作ボタン（下半分） -->
+    <!-- 案内バナー（ウォームアップ/速度上昇など） -->
+    <div id="banner" class="banner hidden">
+      <div id="banner-main" class="banner-main"></div>
+      <div id="banner-sub" class="banner-sub"></div>
+    </div>
+
+    <!-- 操作ボタン（下部専用エリア・5方向の扇形） -->
     <div id="controls" class="controls hidden">
-      <button class="ctl ctl-l" data-dir="L" aria-label="左で受け流す">
-        <span class="ctl-arrow">◀</span>
-      </button>
-      <button class="ctl ctl-r" data-dir="R" aria-label="右で受け流す">
-        <span class="ctl-arrow">▶</span>
-      </button>
-      <!-- 上下（高難度で有効化） -->
-      <button class="ctl ctl-u hidden-dir" data-dir="U" aria-label="上で受け流す">
-        <span class="ctl-arrow">▲</span>
-      </button>
-      <button class="ctl ctl-d hidden-dir" data-dir="D" aria-label="下で受け流す">
-        <span class="ctl-arrow">▼</span>
-      </button>
+      <button class="ctl ctl-l"  data-dir="L"  aria-label="左へ受け流す"><span class="ctl-arrow">◀</span></button>
+      <button class="ctl ctl-dl" data-dir="DL" aria-label="左下へ受け流す"><span class="ctl-arrow">↙</span></button>
+      <button class="ctl ctl-d"  data-dir="D"  aria-label="下へ受け流す"><span class="ctl-arrow">▼</span></button>
+      <button class="ctl ctl-dr" data-dir="DR" aria-label="右下へ受け流す"><span class="ctl-arrow">↘</span></button>
+      <button class="ctl ctl-r"  data-dir="R"  aria-label="右へ受け流す"><span class="ctl-arrow">▶</span></button>
     </div>
 
     <!-- タイトル -->
@@ -65,10 +63,11 @@
       <div class="panel">
         <h2>遊び方</h2>
         <ol class="howto-list">
-          <li>敵の攻撃が<b>来る方向</b>が光ります。</li>
-          <li>攻撃が線に届く<b>ちょうど</b>その瞬間に…</li>
-          <li>来た方向と<b>反対</b>のボタンを1回タップ！</li>
+          <li>攻撃は上半分の<b>5方向</b>（左・右・上・左斜め上・右斜め上）から来ます。</li>
+          <li>線に届く<b>ちょうど</b>その瞬間に、来た方向と<b>反対</b>を1回タップ！</li>
+          <li>下部の5ボタンが受け流す向き：<br>左→<b>右</b> / 右→<b>左</b> / 上→<b>下</b> / 左斜め上→<b>右下</b> / 右斜め上→<b>左下</b></li>
           <li>早すぎ・遅すぎ・逆方向は失敗。3回ミスで終了。</li>
+          <li>開始時はノーダメージの<b>ウォームアップ</b>で慣らせます。</li>
         </ol>
         <p class="howto-judge">
           <span class="tag perfect">PERFECT</span> ど真ん中

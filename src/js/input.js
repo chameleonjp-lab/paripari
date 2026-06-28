@@ -1,11 +1,13 @@
 // 入力正規化（pointer/touch/key）と時刻記録 要件 §6.2 §6.3
 // 方向ボタンの押下を {dir, time} で通知する。
 
+// PC補助: 受け流し方向（=ボタン）に対応。L/R/D と斜め下DL/DR。
 const KEY_DIR = {
   ArrowLeft: 'L', a: 'L', A: 'L',
   ArrowRight: 'R', d: 'R', D: 'R',
-  ArrowUp: 'U', w: 'U', W: 'U',
   ArrowDown: 'D', s: 'D', S: 'D',
+  q: 'DL', Q: 'DL', z: 'DL', Z: 'DL',
+  e: 'DR', E: 'DR', c: 'DR', C: 'DR',
 };
 
 // タップ位置に波紋を発生（操作フィードバック）

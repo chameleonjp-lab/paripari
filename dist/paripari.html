@@ -124,22 +124,23 @@ html, body {
 .controls {
   position: absolute;
   left: 0; right: 0; bottom: 0;
-  height: 38%;
-  min-height: 220px;
+  height: 34%;
+  min-height: 180px;
   display: flex;
-  gap: 8px;
+  gap: 6px;
   z-index: 15;
-  padding: 8px 8px calc(8px + var(--safe-b));
+  padding: 6px 6px calc(6px + var(--safe-b));
 }
 .ctl {
   flex: 1;
+  min-width: 0;
   background:
     radial-gradient(120% 80% at 50% 120%, rgba(91,220,255,.10), rgba(255,255,255,0) 60%),
     linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02));
   border: 1px solid var(--line);
-  border-radius: 22px;
+  border-radius: 18px;
   color: rgba(255,255,255,.55);
-  font-size: 40px;
+  font-size: clamp(26px, 8vw, 38px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -148,6 +149,9 @@ html, body {
   overflow: hidden;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
 }
+/* 中央寄り（下方向系）はやや低く配置して扇形を感じさせる */
+.ctl-dl, .ctl-dr { align-self: flex-end; height: 82%; }
+.ctl-d { align-self: flex-end; height: 70%; }
 .ctl-arrow { filter: drop-shadow(0 0 10px rgba(91,220,255,.35)); transition: transform .08s ease; }
 .ctl:active, .ctl.pressed {
   background:
@@ -173,20 +177,37 @@ html, body {
   to { transform: translate(-50%, -50%) scale(11); opacity: 0; }
 }
 
-/* 2方向: 左右のみ */
-.ctl-u, .ctl-d { display: none; }
-
-/* 4方向: Dパッド配置 */
-.controls.four {
-  display: grid;
-  grid-template-columns: 1.15fr 1fr 1.15fr;
-  grid-template-rows: 1fr 1fr;
+/* ---------- 案内バナー（ウォームアップ/速度上昇など）---------- */
+.banner {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 24;
+  text-align: center;
+  pointer-events: none;
+  width: 100%;
 }
-.controls.four .ctl-l { display: flex; grid-area: 1 / 1 / 3 / 2; }
-.controls.four .ctl-r { display: flex; grid-area: 1 / 3 / 3 / 4; }
-.controls.four .ctl-u { display: flex; grid-area: 1 / 2 / 2 / 3; }
-.controls.four .ctl-d { display: flex; grid-area: 2 / 2 / 3 / 3; }
-.controls.four .ctl { font-size: 32px; }
+.banner.show { animation: bannerIn .4s ease-out; }
+.banner-main {
+  font-size: clamp(26px, 9vw, 40px);
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: #fff;
+  text-shadow: 0 0 24px var(--cyan), 0 0 8px var(--cyan);
+}
+.banner-sub {
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(255,211,91,.4);
+}
+@keyframes bannerIn {
+  0% { opacity: 0; transform: translateX(-50%) scale(.7); }
+  60% { opacity: 1; transform: translateX(-50%) scale(1.08); }
+  100% { opacity: 1; transform: translateX(-50%) scale(1); }
+}
 
 /* ---------- 画面（オーバーレイ） ---------- */
 .screen {
@@ -315,21 +336,19 @@ html, body {
     <!-- 判定ポップ -->
     <div id="judge-pop" class="judge-pop"></div>
 
-    <!-- 操作ボタン（下半分） -->
+    <!-- 案内バナー（ウォームアップ/速度上昇など） -->
+    <div id="banner" class="banner hidden">
+      <div id="banner-main" class="banner-main"></div>
+      <div id="banner-sub" class="banner-sub"></div>
+    </div>
+
+    <!-- 操作ボタン（下部専用エリア・5方向の扇形） -->
     <div id="controls" class="controls hidden">
-      <button class="ctl ctl-l" data-dir="L" aria-label="左で受け流す">
-        <span class="ctl-arrow">◀</span>
-      </button>
-      <button class="ctl ctl-r" data-dir="R" aria-label="右で受け流す">
-        <span class="ctl-arrow">▶</span>
-      </button>
-      <!-- 上下（高難度で有効化） -->
-      <button class="ctl ctl-u hidden-dir" data-dir="U" aria-label="上で受け流す">
-        <span class="ctl-arrow">▲</span>
-      </button>
-      <button class="ctl ctl-d hidden-dir" data-dir="D" aria-label="下で受け流す">
-        <span class="ctl-arrow">▼</span>
-      </button>
+      <button class="ctl ctl-l"  data-dir="L"  aria-label="左へ受け流す"><span class="ctl-arrow">◀</span></button>
+      <button class="ctl ctl-dl" data-dir="DL" aria-label="左下へ受け流す"><span class="ctl-arrow">↙</span></button>
+      <button class="ctl ctl-d"  data-dir="D"  aria-label="下へ受け流す"><span class="ctl-arrow">▼</span></button>
+      <button class="ctl ctl-dr" data-dir="DR" aria-label="右下へ受け流す"><span class="ctl-arrow">↘</span></button>
+      <button class="ctl ctl-r"  data-dir="R"  aria-label="右へ受け流す"><span class="ctl-arrow">▶</span></button>
     </div>
 
     <!-- タイトル -->
@@ -349,10 +368,11 @@ html, body {
       <div class="panel">
         <h2>遊び方</h2>
         <ol class="howto-list">
-          <li>敵の攻撃が<b>来る方向</b>が光ります。</li>
-          <li>攻撃が線に届く<b>ちょうど</b>その瞬間に…</li>
-          <li>来た方向と<b>反対</b>のボタンを1回タップ！</li>
+          <li>攻撃は上半分の<b>5方向</b>（左・右・上・左斜め上・右斜め上）から来ます。</li>
+          <li>線に届く<b>ちょうど</b>その瞬間に、来た方向と<b>反対</b>を1回タップ！</li>
+          <li>下部の5ボタンが受け流す向き：<br>左→<b>右</b> / 右→<b>左</b> / 上→<b>下</b> / 左斜め上→<b>右下</b> / 右斜め上→<b>左下</b></li>
           <li>早すぎ・遅すぎ・逆方向は失敗。3回ミスで終了。</li>
+          <li>開始時はノーダメージの<b>ウォームアップ</b>で慣らせます。</li>
         </ol>
         <p class="howto-judge">
           <span class="tag perfect">PERFECT</span> ど真ん中
@@ -426,27 +446,27 @@ html, body {
 
 const CONFIG = {
   // --- 判定窓 (ms) ---
-  PERFECT_WINDOW: 60,   // |Δ| <= これ → PERFECT
-  GOOD_WINDOW: 140,     // |Δ| <= これ → GOOD（超過は MISS）
+  PERFECT_WINDOW: 60,
+  GOOD_WINDOW: 140,
 
   // --- スコア ---
   BASE_PERFECT: 300,
   BASE_GOOD: 100,
-  COMBO_STEP: 5,        // この連数ごとに倍率+COMBO_STEP_BONUS
+  COMBO_STEP: 5,
   COMBO_STEP_BONUS: 0.5,
   COMBO_MAX_MULT: 4.0,
   TIMING_BONUS_MAX: 50,
 
   // --- ライフ ---
   MAX_HP: 3,
-  HEAL_EVERY_PERFECT_STREAK: 10, // PERFECT連続でハート回復
+  HEAL_EVERY_PERFECT_STREAK: 10,
 
   // --- 演出 ---
   HITSTOP_PERFECT_MS: 110,
   HITSTOP_GOOD_MS: 50,
-  SLOWMO_SCALE: 0.25,        // PERFECT時のdtスケール
+  SLOWMO_SCALE: 0.25,
   SLOWMO_MS: 140,
-  SHAKE_MISS: 14,            // px
+  SHAKE_MISS: 14,
   DPR_CAP: 3,
 
   // --- ランクしきい値（総スコア）---
@@ -457,23 +477,38 @@ const CONFIG = {
     { rank: 'C', min: 0 },
   ],
 
-  // --- 難易度ティア（要件 §5.3）---
-  // visibleMs: 予兆+接近の合計可視時間 / intervalMs: 次攻撃までの基準間隔
-  // directions: 出現方向 / feint: フェイント確率 / doubleRate: 2連確率
+  // 攻撃は上半分から来る5方向（下部はボタン専用エリア）
+  // L=左, R=右, U=上, UL=左斜め上, UR=右斜め上
+  DIRECTIONS: ['L', 'R', 'U', 'UL', 'UR'],
+
+  // --- ウォームアップ（開始時の案内＋低速ノーダメージ準備）---
+  WARMUP: { count: 5, visibleMs: 1200, intervalMs: 1150 },
+
+  // --- 難易度ティア（方向は常に5方向。速度・密度のみで難化）---
   TIERS: [
-    { successAt: 0,  visibleMs: 1000, intervalMs: 1100, directions: ['L', 'R'], feint: 0,    doubleRate: 0 },
-    { successAt: 8,  visibleMs: 850,  intervalMs: 950,  directions: ['L', 'R'], feint: 0,    doubleRate: 0 },
-    { successAt: 20, visibleMs: 700,  intervalMs: 800,  directions: ['L', 'R'], feint: 0,    doubleRate: 0.2 },
-    { successAt: 36, visibleMs: 600,  intervalMs: 720,  directions: ['L', 'R', 'U', 'D'], feint: 0, doubleRate: 0.25 },
-    { successAt: 56, visibleMs: 520,  intervalMs: 640,  directions: ['L', 'R', 'U', 'D'], feint: 0.12, doubleRate: 0.3 },
-    { successAt: 80, visibleMs: 450,  intervalMs: 560,  directions: ['L', 'R', 'U', 'D'], feint: 0.2,  doubleRate: 0.35 },
+    { successAt: 0,  visibleMs: 980, intervalMs: 1080 },
+    { successAt: 8,  visibleMs: 850, intervalMs: 950 },
+    { successAt: 20, visibleMs: 720, intervalMs: 820 },
+    { successAt: 34, visibleMs: 620, intervalMs: 720 },
+    { successAt: 50, visibleMs: 540, intervalMs: 640 },
+    { successAt: 70, visibleMs: 470, intervalMs: 560 },
   ],
 
-  INTERVAL_JITTER: 0.18, // ±18% 間隔ゆらぎ
+  INTERVAL_JITTER: 0.18,
 };
 
-// 攻撃方向 → 受け流しに必要な入力方向（反対側）
-const OPPOSITE = { L: 'R', R: 'L', U: 'D', D: 'U' };
+// 攻撃方向 → 受け流しに必要な入力（反対側）
+// 上半分の攻撃 ↔ 下半分のボタン が対応する
+const OPPOSITE = { L: 'R', R: 'L', U: 'D', UL: 'DR', UR: 'DL' };
+
+// 受け流し方向（=ボタン）の角度（screen座標: 0=右, +y=下）
+const NEED_ANGLE = {
+  R: 0,
+  DR: Math.PI / 4,
+  D: Math.PI / 2,
+  DL: (3 * Math.PI) / 4,
+  L: Math.PI,
+};
 
 function tierForSuccess(successCount) {
   const tiers = CONFIG.TIERS;
@@ -493,7 +528,7 @@ function rankForScore(score) {
 }
 
 
-  Object.assign(exports, { CONFIG, OPPOSITE, tierForSuccess, rankForScore });
+  Object.assign(exports, { CONFIG, OPPOSITE, NEED_ANGLE, tierForSuccess, rankForScore });
   });
 
   def('judge', function(module, exports, require){
@@ -691,11 +726,13 @@ class ParticlePool {
 // 入力正規化（pointer/touch/key）と時刻記録 要件 §6.2 §6.3
 // 方向ボタンの押下を {dir, time} で通知する。
 
+// PC補助: 受け流し方向（=ボタン）に対応。L/R/D と斜め下DL/DR。
 const KEY_DIR = {
   ArrowLeft: 'L', a: 'L', A: 'L',
   ArrowRight: 'R', d: 'R', D: 'R',
-  ArrowUp: 'U', w: 'U', W: 'U',
   ArrowDown: 'D', s: 'D', S: 'D',
+  q: 'DL', Q: 'DL', z: 'DL', Z: 'DL',
+  e: 'DR', E: 'DR', c: 'DR', C: 'DR',
 };
 
 // タップ位置に波紋を発生（操作フィードバック）
@@ -791,37 +828,35 @@ let _id = 0;
 /**
  * 攻撃を生成する。
  * @param {number} now performance.now()
- * @param {object} tier CONFIG.TIERS の1要素
+ * @param {number} visibleMs 予兆+接近の合計可視時間
+ * @param {string[]} dirs 出現方向の候補（既定 CONFIG.DIRECTIONS）
  */
-function createAttack(now, tier) {
-  const dirs = tier.directions;
+function createAttack(now, visibleMs, dirs = CONFIG.DIRECTIONS) {
   const dir = dirs[(Math.random() * dirs.length) | 0];
-  const visibleMs = tier.visibleMs;
   return {
     id: ++_id,
-    dir,                          // 攻撃の来る方向 L/R/U/D
+    dir,                          // 攻撃の来る方向 L/R/U/UL/UR
     needDir: OPPOSITE[dir],       // 受け流しに必要な入力（反対側）
-    spawnAt: now,                 // 予兆開始
-    impactAt: now + visibleMs,    // T（パリィライン到達）
-    windowEnd: now + visibleMs + CONFIG.GOOD_WINDOW, // 無入力MISS確定
+    spawnAt: now,
+    impactAt: now + visibleMs,
+    windowEnd: now + visibleMs + CONFIG.GOOD_WINDOW,
     visibleMs,
     resolved: false,
-    resolvedAt: 0,                // 判定が確定した gameTime
-    result: null,                 // 'PERFECT'|'GOOD'|'MISS'
-    feint: false,                 // 将来拡張
+    resolvedAt: 0,
+    result: null,
   };
 }
 
-// 接近の進捗 0..1（予兆開始→インパクト）。ease-in。
+// 接近の進捗 0..1（予兆開始→インパクト）。
 function attackProgress(attack, now) {
   const p = (now - attack.spawnAt) / (attack.impactAt - attack.spawnAt);
   return Math.max(0, Math.min(1.4, p));
 }
 
-function nextInterval(tier) {
+function nextInterval(intervalMs) {
   const j = CONFIG.INTERVAL_JITTER;
   const factor = 1 + (Math.random() * 2 - 1) * j;
-  return tier.intervalMs * factor;
+  return intervalMs * factor;
 }
 
 
@@ -832,10 +867,9 @@ function nextInterval(tier) {
 // Canvas 2D 描画 要件 §4.4 §6.4
 // ビジュアル/演出強化版: タイミングリング・方向受け流し・衝撃波・スコアポップ・
 // コンボオーラ・背景アンビエント。
-const {CONFIG} = require('config');
+const {CONFIG, NEED_ANGLE} = require('config');
 const {attackProgress} = require('enemy');
 const PLAYER_R = 27;
-const DIR_ANGLE = { R: 0, D: Math.PI / 2, L: Math.PI, U: -Math.PI / 2 };
 
 class Renderer {
   constructor(canvas) {
@@ -1077,13 +1111,15 @@ class Renderer {
   }
 
   // ---- 攻撃（接近する斬撃＋トレイル）----
+  // 攻撃は上半分の5方向から（下部はボタン専用のため下からは来ない）
   attackStart(dir) {
     switch (dir) {
       case 'L': return { x: -40, y: this.lineY };
       case 'R': return { x: this.w + 40, y: this.lineY };
-      case 'U': return { x: this.w / 2, y: -40 };
-      case 'D': return { x: this.w / 2, y: this.h + 40 };
-      default: return { x: this.w / 2, y: -40 };
+      case 'U': return { x: this.w / 2, y: -50 };
+      case 'UL': return { x: -30, y: -40 };
+      case 'UR': return { x: this.w + 30, y: -40 };
+      default: return { x: this.w / 2, y: -50 };
     }
   }
 
@@ -1180,7 +1216,7 @@ class Renderer {
     const d = this.deflect;
     const k = d.t / d.dur;            // 0..1
     const cx = this.w / 2, cy = this.lineY;
-    const ang = DIR_ANGLE[d.dir] != null ? DIR_ANGLE[d.dir] : 0;
+    const ang = NEED_ANGLE[d.dir] != null ? NEED_ANGLE[d.dir] : 0;
     const ease = 1 - Math.pow(1 - k, 3);
     const reach = PLAYER_R + 8 + ease * 64;
     const alpha = Math.max(0, 1 - k);
@@ -1271,22 +1307,26 @@ class Renderer {
       grad.addColorStop(0, c + '0.6)'); grad.addColorStop(1, c + '0)');
       ctx.fillStyle = grad; ctx.fillRect(0, 0, this.w, this.h * 0.32);
     } else {
-      grad = ctx.createLinearGradient(0, this.h, 0, this.h * 0.68);
+      // UL / UR: 上のコーナーから放射状に発光
+      const cxg = dir === 'UL' ? 0 : this.w;
+      grad = ctx.createRadialGradient(cxg, 0, 10, cxg, 0, this.w * 0.55);
       grad.addColorStop(0, c + '0.6)'); grad.addColorStop(1, c + '0)');
-      ctx.fillStyle = grad; ctx.fillRect(0, this.h * 0.68, this.w, this.h * 0.32);
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, this.w, this.h * 0.6);
     }
     ctx.restore();
   }
 
-  // 攻撃が「来る方向」を示す矢印（答えではなく脅威の提示）
+  // 攻撃が「来る方向」を示す矢印（脅威の提示。進行方向＝プレイヤーへ向かう向き）
   _drawIncomingArrow(ctx, dir, a, p) {
     const cx = this.w / 2, cy = this.lineY;
     const off = 96 + Math.sin(this.t * 8) * 4;
-    let x = cx, y = cy, ch = '◀';
+    const d = off * 0.72;
+    let x = cx, y = cy, ch = '▼';
     if (dir === 'L') { x = cx - off; ch = '▶'; }
     else if (dir === 'R') { x = cx + off; ch = '◀'; }
     else if (dir === 'U') { y = cy - off; ch = '▼'; }
-    else { y = cy + off; ch = '▲'; }
+    else if (dir === 'UL') { x = cx - d; y = cy - d; ch = '↘'; }
+    else if (dir === 'UR') { x = cx + d; y = cy - d; ch = '↙'; }
     ctx.save();
     ctx.globalAlpha = 0.25 + a * 0.7;
     ctx.fillStyle = p > 0.68 ? '#ff5566' : '#ffb05b';
@@ -1334,8 +1374,26 @@ function setPlayUIVisible(visible) {
   $('controls').classList.toggle('hidden', !visible);
 }
 
-function setFourDir(four) {
-  $('controls').classList.toggle('four', four);
+let _bannerTimer = null;
+function showBanner(main, sub, duration = 1500) {
+  const el = $('banner');
+  $('banner-main').textContent = main || '';
+  $('banner-sub').textContent = sub || '';
+  $('banner-sub').style.display = sub ? '' : 'none';
+  el.classList.remove('hidden');
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+  if (_bannerTimer) clearTimeout(_bannerTimer);
+  _bannerTimer = setTimeout(() => {
+    el.classList.remove('show');
+    el.classList.add('hidden');
+  }, duration);
+}
+function hideBanner() {
+  if (_bannerTimer) clearTimeout(_bannerTimer);
+  $('banner').classList.add('hidden');
+  $('banner').classList.remove('show');
 }
 
 function updateHUD({ hp, score, combo }) {
@@ -1393,19 +1451,19 @@ function reflectSettings(s) {
 }
 
 
-  Object.assign(exports, { showScreen, hideAllScreens, setPlayUIVisible, setFourDir, updateHUD, bumpCombo, popJudge, setCountdown, showResult, setBestLabel, reflectSettings });
+  Object.assign(exports, { showScreen, hideAllScreens, setPlayUIVisible, showBanner, hideBanner, updateHUD, bumpCombo, popJudge, setCountdown, showResult, setBestLabel, reflectSettings });
   });
 
   def('game', function(module, exports, require){
 // ゲーム状態機械・進行制御 要件 §2 §3 §5
-const {CONFIG, tierForSuccess, rankForScore} = require('config');
+const {CONFIG, NEED_ANGLE, tierForSuccess, rankForScore} = require('config');
 const {judgeTiming} = require('judge');
 const {calcGain} = require('scoring');
 const {createAttack, nextInterval} = require('enemy');
 const {vibrate, HAPTICS} = require('haptics');
 const ui = require('ui');
 const {getBest, setBest} = require('storage');
-const PRACTICE_GOAL = 3;
+const PRACTICE_GOAL = 5;
 
 class Game {
   constructor({ renderer, particles, settings, onGameOver }) {
@@ -1416,12 +1474,12 @@ class Game {
 
     this.state = 'IDLE';       // IDLE | PLAYING | OVER
     this.mode = 'normal';      // normal | practice
-    this.gameTime = 0;         // ms（main が進める）
+    this.gameTime = 0;
 
     this.hitstopMs = 0;
     this.slowmoMs = 0;
 
-    this._currentTierIndex = -1;
+    this._tierIndex = -1;
     this._resetStats();
   }
 
@@ -1438,7 +1496,8 @@ class Game {
     this.totalAttempts = 0;
     this.attack = null;
     this.nextSpawnAt = 0;
-    this._currentTierIndex = -1;
+    this.warmupRemaining = 0;   // >0 の間はノーダメージ・低速の準備フェーズ
+    this._tierIndex = -1;
   }
 
   start(mode = 'normal') {
@@ -1448,17 +1507,20 @@ class Game {
     this.r.reducedMotion = !!this.settings.reducedMotion;
     this.r.clearTransients();
     this.particles.clear();
-    this.nextSpawnAt = this.gameTime + 600;
-    this._applyTierUI();
+    // 開始時のウォームアップ（案内＋低速ノーダメージ）
+    this.warmupRemaining = mode === 'normal' ? CONFIG.WARMUP.count : PRACTICE_GOAL;
+    this.nextSpawnAt = this.gameTime + 500;
+    if (mode === 'normal') ui.showBanner('WARM UP', '来た方向の【反対】を押す');
     ui.updateHUD(this);
   }
 
   isPlaying() { return this.state === 'PLAYING'; }
+  inWarmup() { return this.warmupRemaining > 0; }
 
   handleAction(dir) {
     if (this.state !== 'PLAYING') return;
     const a = this.attack;
-    if (!a || a.resolved || this.gameTime < a.spawnAt) return; // 空打ち（ペナルティなし）
+    if (!a || a.resolved || this.gameTime < a.spawnAt) return; // 空打ち
     const delta = this.gameTime - a.impactAt;
     const dirOk = dir === a.needDir;
     const result = judgeTiming(delta, dirOk);
@@ -1469,7 +1531,7 @@ class Game {
     const now = this.gameTime;
     const a = this.attack;
     if (a && !a.resolved && now >= a.windowEnd) {
-      this._resolve(a, 'MISS', a.windowEnd - a.impactAt, true);
+      this._resolve(a, 'MISS', a.windowEnd - a.impactAt);
     }
     if ((!this.attack || this.attack.resolved) && now >= this.nextSpawnAt && this.state === 'PLAYING') {
       this._spawn();
@@ -1478,26 +1540,30 @@ class Game {
   }
 
   _spawn() {
-    const tier = this.mode === 'practice' ? CONFIG.TIERS[0] : tierForSuccess(this.successCount);
-    this.attack = createAttack(this.gameTime, tier);
-    this._applyTierUI();
+    const visibleMs = this.inWarmup() ? CONFIG.WARMUP.visibleMs : this._tier().visibleMs;
+    this.attack = createAttack(this.gameTime, visibleMs);
+    this._checkTierUp();
   }
 
-  _applyTierUI() {
-    const tier = this.mode === 'practice' ? CONFIG.TIERS[0] : tierForSuccess(this.successCount);
-    const idx = CONFIG.TIERS.indexOf(tier);
-    if (idx !== this._currentTierIndex) {
-      this._currentTierIndex = idx;
-      ui.setFourDir(tier.directions.length > 2);
+  _tier() {
+    return this.mode === 'practice' ? CONFIG.TIERS[0] : tierForSuccess(this.successCount);
+  }
+
+  _checkTierUp() {
+    if (this.inWarmup() || this.mode !== 'normal') return;
+    const idx = CONFIG.TIERS.indexOf(tierForSuccess(this.successCount));
+    if (this._tierIndex >= 0 && idx > this._tierIndex) {
+      ui.showBanner('SPEED UP', null, 900); // 認知のための変化サイン
     }
+    this._tierIndex = idx;
   }
 
   _resolve(a, result, delta) {
     a.resolved = true;
     a.resolvedAt = this.gameTime;
     a.result = result;
-    this.totalAttempts++;
 
+    const warmup = this.inWarmup();
     const cx = this.r.w / 2;
     const cy = this.r.lineY;
     const reduced = this.settings.reducedMotion;
@@ -1505,10 +1571,11 @@ class Game {
     if (result === 'MISS') {
       this.combo = 0;
       this.perfectStreak = 0;
-      if (this.mode === 'normal') this.hp = Math.max(0, this.hp - 1);
+      // ウォームアップ/練習中はノーダメージ
+      if (this.mode === 'normal' && !warmup) this.hp = Math.max(0, this.hp - 1);
       vibrate(HAPTICS.miss);
       this.r.triggerFlash('#5a0a14', 0.45);
-      this.r.triggerVignette('150,20,40', 0.7);
+      this.r.triggerVignette('150,20,40', warmup ? 0.4 : 0.7);
       this.r.triggerShake(CONFIG.SHAKE_MISS);
       this.r.triggerShockwave('MISS');
       this.particles.spawnBurst(cx, cy, {
@@ -1517,17 +1584,19 @@ class Game {
       ui.popJudge('MISS', delta);
     } else {
       this.combo++;
-      this.successCount++;
       this.maxCombo = Math.max(this.maxCombo, this.combo);
-      const gain = calcGain(result, this.combo, delta);
-      this.score += gain;
-
+      if (!warmup) {
+        this.successCount++;
+        this.totalAttempts++;
+        const gain = calcGain(result, this.combo, delta);
+        this.score += gain;
+        this.r.addScorePopup(gain, result);
+      }
       this.r.triggerDeflect(a.needDir, result);
       this.r.triggerShockwave(result);
-      this.r.addScorePopup(gain, result);
 
       if (result === 'PERFECT') {
-        this.perfectCount++;
+        this.perfectCount += warmup ? 0 : 1;
         this.perfectStreak++;
         vibrate(HAPTICS.perfect);
         this.r.triggerFlash('#fff7df', 0.5);
@@ -1536,12 +1605,11 @@ class Game {
         this.particles.spawnBurst(cx, cy, {
           count: 34, speed: 460, colors: this.r.burstColors('PERFECT'), size: 4, life: 0.65, gravity: 480,
         });
-        // 反対側への放射（受け流し方向）
         this.particles.spawnBurst(cx, cy, {
           count: 12, speed: 520, spread: 0.7, angle: this._dirAngle(a.needDir),
           colors: this.r.burstColors('PERFECT'), size: 3, life: 0.5, gravity: 300,
         });
-        if (this.perfectStreak > 0 && this.perfectStreak % CONFIG.HEAL_EVERY_PERFECT_STREAK === 0) {
+        if (!warmup && this.perfectStreak > 0 && this.perfectStreak % CONFIG.HEAL_EVERY_PERFECT_STREAK === 0) {
           this.hp = Math.min(CONFIG.MAX_HP, this.hp + 1);
         }
       } else {
@@ -1558,14 +1626,25 @@ class Game {
       if (this.combo >= 2) ui.bumpCombo();
     }
 
+    // ウォームアップ消化 → 本番開始
+    if (warmup) {
+      this.warmupRemaining--;
+      if (this.warmupRemaining <= 0 && this.mode === 'normal') {
+        this.combo = 0;
+        this.perfectStreak = 0;
+        this._tierIndex = CONFIG.TIERS.indexOf(tierForSuccess(0));
+        ui.showBanner('START!', null, 800);
+      }
+    }
+
     ui.updateHUD(this);
 
-    const tier = this.mode === 'practice' ? CONFIG.TIERS[0] : tierForSuccess(this.successCount);
-    this.nextSpawnAt = this.gameTime + nextInterval(tier);
+    const intervalMs = this.inWarmup() ? CONFIG.WARMUP.intervalMs : this._tier().intervalMs;
+    this.nextSpawnAt = this.gameTime + nextInterval(intervalMs);
 
     if (this.mode === 'normal' && this.hp <= 0) {
       this._gameOver();
-    } else if (this.mode === 'practice' && this.successCount >= PRACTICE_GOAL) {
+    } else if (this.mode === 'practice' && this.warmupRemaining <= 0) {
       this.state = 'IDLE';
       this.attack = null;
       this.onGameOver({ practiceDone: true });
@@ -1573,7 +1652,7 @@ class Game {
   }
 
   _dirAngle(dir) {
-    return { R: 0, D: Math.PI / 2, L: Math.PI, U: -Math.PI / 2 }[dir] || 0;
+    return NEED_ANGLE[dir] != null ? NEED_ANGLE[dir] : 0;
   }
 
   _gameOver() {
@@ -1598,7 +1677,7 @@ class Game {
   }
 
   getRenderState() {
-    return { now: this.gameTime, attack: this.attack, combo: this.combo, hp: this.hp };
+    return { now: this.gameTime, attack: this.attack, combo: this.combo, hp: this.hp, warmup: this.inWarmup() };
   }
 }
 
@@ -1638,6 +1717,7 @@ const game = new Game({
       return;
     }
     pendingResult = data;
+    ui.hideBanner();
     ui.setPlayUIVisible(false);
     ui.setBestLabel(data.best);
     ui.showResult(data);
@@ -1657,6 +1737,7 @@ function gotoTitle() {
   if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
   game.state = 'IDLE';
   game.attack = null;
+  ui.hideBanner();
   ui.setPlayUIVisible(false);
   ui.setBestLabel(storage.getBest());
   ui.showScreen('title');

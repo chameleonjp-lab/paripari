@@ -114,22 +114,23 @@ html, body {
 .controls {
   position: absolute;
   left: 0; right: 0; bottom: 0;
-  height: 38%;
-  min-height: 220px;
+  height: 34%;
+  min-height: 180px;
   display: flex;
-  gap: 8px;
+  gap: 6px;
   z-index: 15;
-  padding: 8px 8px calc(8px + var(--safe-b));
+  padding: 6px 6px calc(6px + var(--safe-b));
 }
 .ctl {
   flex: 1;
+  min-width: 0;
   background:
     radial-gradient(120% 80% at 50% 120%, rgba(91,220,255,.10), rgba(255,255,255,0) 60%),
     linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02));
   border: 1px solid var(--line);
-  border-radius: 22px;
+  border-radius: 18px;
   color: rgba(255,255,255,.55);
-  font-size: 40px;
+  font-size: clamp(26px, 8vw, 38px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -138,6 +139,9 @@ html, body {
   overflow: hidden;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
 }
+/* 中央寄り（下方向系）はやや低く配置して扇形を感じさせる */
+.ctl-dl, .ctl-dr { align-self: flex-end; height: 82%; }
+.ctl-d { align-self: flex-end; height: 70%; }
 .ctl-arrow { filter: drop-shadow(0 0 10px rgba(91,220,255,.35)); transition: transform .08s ease; }
 .ctl:active, .ctl.pressed {
   background:
@@ -163,20 +167,37 @@ html, body {
   to { transform: translate(-50%, -50%) scale(11); opacity: 0; }
 }
 
-/* 2方向: 左右のみ */
-.ctl-u, .ctl-d { display: none; }
-
-/* 4方向: Dパッド配置 */
-.controls.four {
-  display: grid;
-  grid-template-columns: 1.15fr 1fr 1.15fr;
-  grid-template-rows: 1fr 1fr;
+/* ---------- 案内バナー（ウォームアップ/速度上昇など）---------- */
+.banner {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 24;
+  text-align: center;
+  pointer-events: none;
+  width: 100%;
 }
-.controls.four .ctl-l { display: flex; grid-area: 1 / 1 / 3 / 2; }
-.controls.four .ctl-r { display: flex; grid-area: 1 / 3 / 3 / 4; }
-.controls.four .ctl-u { display: flex; grid-area: 1 / 2 / 2 / 3; }
-.controls.four .ctl-d { display: flex; grid-area: 2 / 2 / 3 / 3; }
-.controls.four .ctl { font-size: 32px; }
+.banner.show { animation: bannerIn .4s ease-out; }
+.banner-main {
+  font-size: clamp(26px, 9vw, 40px);
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: #fff;
+  text-shadow: 0 0 24px var(--cyan), 0 0 8px var(--cyan);
+}
+.banner-sub {
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(255,211,91,.4);
+}
+@keyframes bannerIn {
+  0% { opacity: 0; transform: translateX(-50%) scale(.7); }
+  60% { opacity: 1; transform: translateX(-50%) scale(1.08); }
+  100% { opacity: 1; transform: translateX(-50%) scale(1); }
+}
 
 /* ---------- 画面（オーバーレイ） ---------- */
 .screen {

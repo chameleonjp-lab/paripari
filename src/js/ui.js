@@ -17,8 +17,26 @@ export function setPlayUIVisible(visible) {
   $('controls').classList.toggle('hidden', !visible);
 }
 
-export function setFourDir(four) {
-  $('controls').classList.toggle('four', four);
+let _bannerTimer = null;
+export function showBanner(main, sub, duration = 1500) {
+  const el = $('banner');
+  $('banner-main').textContent = main || '';
+  $('banner-sub').textContent = sub || '';
+  $('banner-sub').style.display = sub ? '' : 'none';
+  el.classList.remove('hidden');
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+  if (_bannerTimer) clearTimeout(_bannerTimer);
+  _bannerTimer = setTimeout(() => {
+    el.classList.remove('show');
+    el.classList.add('hidden');
+  }, duration);
+}
+export function hideBanner() {
+  if (_bannerTimer) clearTimeout(_bannerTimer);
+  $('banner').classList.add('hidden');
+  $('banner').classList.remove('show');
 }
 
 export function updateHUD({ hp, score, combo }) {
