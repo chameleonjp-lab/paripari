@@ -10,15 +10,30 @@
 中心に近いほどタイミングボーナスが入る。
 
 ## 遊び方
-ブラウザで `index.html` を開くだけ。ビルド不要・依存ゼロ。
+
+### A. 単一ファイル版（サーバー不要・いちばん手軽）
+[`dist/paripari.html`](dist/paripari.html) は HTML/CSS/JS をすべて1ファイルに同梱した
+自己完結版です。**このファイルを開く / iPhone に送って Safari で開くだけ**で遊べます。
 
 ```
-# ローカル確認（任意の静的サーバで可）
+npm run build   # src/ から dist/paripari.html を生成（再ビルドする場合）
+```
+
+### B. 開発（分割ソース）
+`index.html` ＋ `src/`（ES Modules）構成。モジュールは `file://` だと読めないため、
+ローカルの静的サーバー経由で開きます。
+
+```
 python3 -m http.server 8099
 # → http://localhost:8099/index.html
 ```
 
 スマホ実機では同じURLを Safari/Chrome で開く（縦持ち推奨）。
+
+## ゲームプレイに必要なファイル
+- **配布用（これ1つでプレイ可）**: `dist/paripari.html`
+- **分割ソース（開発用）**: `index.html` ＋ `src/css/style.css` ＋ `src/js/*.js`
+  （`docs/` `tests/` `build.mjs` はプレイには不要）
 
 ## 操作
 - 左右の大きなボタン（高難度では上下も解禁）。

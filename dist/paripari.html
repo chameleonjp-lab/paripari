@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0a0a12">
+  <title>パリパリ - PariPari</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9A%94%EF%B8%8F%3C/text%3E%3C/svg%3E">
+  <style>
+/* パリパリ スタイル — 和ネオン墨 / iPhone SE 最適化 (要件 §4) */
+:root {
+  --bg0: #07070d;
+  --bg1: #0f1020;
+  --ink: #e9eef7;
+  --gold: #ffd35b;
+  --crimson: #ff3b54;
+  --cyan: #5bdcff;
+  --line: rgba(255,255,255,0.18);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  width: 100%; height: 100%;
+  background: var(--bg0);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  overflow: hidden;
+  overscroll-behavior: none;
+  position: fixed;
+  inset: 0;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+#game-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.hidden { display: none !important; }
+
+/* ---------- HUD ---------- */
+.hud {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: max(12px, env(safe-area-inset-top)) 16px 0;
+  z-index: 20;
+  pointer-events: none;
+}
+.hud .icon-btn { pointer-events: auto; }
+.hud-center { text-align: center; flex: 1; }
+.hearts { font-size: 22px; letter-spacing: 2px; filter: drop-shadow(0 0 6px rgba(255,59,84,.6)); }
+.score {
+  font-size: clamp(28px, 9vw, 40px);
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 0 18px rgba(91,220,255,.35);
+}
+.combo {
+  font-size: clamp(13px, 4.2vw, 18px);
+  font-weight: 800;
+  color: var(--gold);
+  height: 20px;
+  letter-spacing: 1px;
+  transition: transform .12s ease;
+}
+.combo.bump { transform: scale(1.35); }
+.icon-btn {
+  background: rgba(255,255,255,.08);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  font-size: 16px;
+}
+
+/* ---------- 判定ポップ ---------- */
+.judge-pop {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  font-size: clamp(30px, 11vw, 52px);
+  font-weight: 900;
+  letter-spacing: 2px;
+  opacity: 0;
+  pointer-events: none;
+  text-align: center;
+  white-space: nowrap;
+}
+.judge-pop.show { animation: pop .55s ease-out; }
+.judge-pop.perfect { color: var(--gold); text-shadow: 0 0 24px var(--gold), 0 0 8px #fff; }
+.judge-pop.good { color: var(--cyan); text-shadow: 0 0 20px var(--cyan); }
+.judge-pop.miss { color: var(--crimson); text-shadow: 0 0 18px var(--crimson); }
+@keyframes pop {
+  0% { opacity: 0; transform: translateX(-50%) scale(.5) translateY(8px); }
+  25% { opacity: 1; transform: translateX(-50%) scale(1.15) translateY(0); }
+  70% { opacity: 1; transform: translateX(-50%) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) scale(1) translateY(-14px); }
+}
+
+/* ---------- 操作ボタン ---------- */
+.controls {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 38%;
+  min-height: 220px;
+  display: flex;
+  z-index: 15;
+  padding-bottom: var(--safe-b);
+}
+.ctl {
+  flex: 1;
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+  border: 1px solid var(--line);
+  color: rgba(255,255,255,.5);
+  font-size: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .08s ease, transform .06s ease, color .08s ease;
+  position: relative;
+  overflow: hidden;
+}
+.ctl:active, .ctl.pressed {
+  background: rgba(91,220,255,.22);
+  color: #fff;
+  transform: scale(.98);
+}
+.ctl-l { border-top-right-radius: 24px; border-left: none; border-bottom: none; }
+.ctl-r { border-top-left-radius: 24px; border-right: none; border-bottom: none; }
+/* 上下ボタンは左右の上に重ねる小型バー（4方向モード） */
+.ctl-u, .ctl-d {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 46%;
+  min-width: 150px;
+  height: 46%;
+  flex: none;
+  border-radius: 18px;
+}
+.ctl-u { top: -52%; }
+.ctl-d { bottom: 8px; }
+.hidden-dir { display: none; }
+.controls.four .ctl-u.hidden-dir,
+.controls.four .ctl-d.hidden-dir { display: flex; }
+
+/* ---------- 画面（オーバーレイ） ---------- */
+.screen {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 30%, rgba(20,22,44,.86), rgba(5,5,11,.96));
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  padding: 24px;
+  text-align: center;
+}
+.title-wrap, .panel { width: 100%; max-width: 340px; }
+.logo {
+  font-size: clamp(48px, 18vw, 76px);
+  margin: 0 0 8px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  background: linear-gradient(180deg, #fff, var(--gold));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 40px rgba(255,211,91,.25);
+}
+.tagline { color: rgba(233,238,247,.8); margin: 0 0 18px; font-size: 15px; }
+.tagline b, .ready-hint b { color: var(--gold); }
+.best { color: var(--cyan); font-weight: 800; margin-bottom: 22px; letter-spacing: 2px; }
+
+.btn {
+  display: block;
+  width: 100%;
+  margin: 10px 0;
+  padding: 15px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.06);
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 700;
+}
+.btn:active { transform: scale(.98); }
+.btn-primary {
+  background: linear-gradient(135deg, var(--cyan), #2b7cff);
+  border: none;
+  color: #04121e;
+  box-shadow: 0 8px 24px rgba(43,124,255,.35);
+}
+
+.panel h2 { font-size: 24px; margin-top: 0; }
+.howto-list { text-align: left; line-height: 1.8; padding-left: 20px; }
+.howto-list b { color: var(--gold); }
+.howto-judge { display: flex; flex-wrap: wrap; gap: 6px 10px; justify-content: center; font-size: 13px; align-items: center; }
+.tag { padding: 2px 8px; border-radius: 8px; font-weight: 800; font-size: 12px; }
+.tag.perfect { background: var(--gold); color: #2a1d00; }
+.tag.good { background: var(--cyan); color: #04121e; }
+.tag.miss { background: var(--crimson); color: #2a0008; }
+
+.toggle {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 4px; border-bottom: 1px solid var(--line); font-size: 16px;
+}
+.toggle input { width: 26px; height: 26px; accent-color: var(--cyan); }
+
+/* カウントダウン */
+.countdown {
+  font-size: 30vw;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 40px var(--cyan);
+  animation: cd 1s ease-in-out;
+}
+.ready-hint { position: absolute; bottom: 42%; font-size: 18px; }
+@keyframes cd { 0% { transform: scale(1.8); opacity: 0; } 30% { opacity: 1; } 100% { transform: scale(.7); opacity: 0; } }
+
+/* リザルト */
+.result-rank {
+  font-size: 90px; font-weight: 900; line-height: 1;
+  background: linear-gradient(180deg, #fff, var(--gold));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 40px rgba(255,211,91,.4);
+}
+.result-score-label { letter-spacing: 4px; color: rgba(255,255,255,.6); font-size: 13px; margin-top: 6px; }
+.result-score { font-size: 52px; font-weight: 900; margin-bottom: 6px; }
+.best-badge { color: var(--gold); font-weight: 800; margin-bottom: 12px; animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: .5; } }
+.result-stats { display: flex; justify-content: space-around; margin: 14px 0 22px; }
+.result-stats span { display: block; font-size: 24px; font-weight: 800; color: var(--cyan); }
+.result-stats small { color: rgba(255,255,255,.6); font-size: 11px; }
+
+.rotate-hint {
+  position: absolute; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg0); font-size: 20px; text-align: center; padding: 24px;
+}
+
+/* 320px 幅（SE1）調整 */
+@media (max-width: 340px) {
+  .controls { min-height: 200px; }
+  .ctl { font-size: 34px; }
+}
+
+</style>
+</head>
+<body>
+  <div id="app">
+    <!-- ゲーム描画キャンバス -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- プレイ中HUD -->
+    <header id="hud" class="hud hidden">
+      <div class="hud-left">
+        <div id="hearts" class="hearts" aria-label="残ライフ"></div>
+      </div>
+      <div class="hud-center">
+        <div id="score" class="score">0</div>
+        <div id="combo" class="combo"></div>
+      </div>
+      <div class="hud-right">
+        <button id="btn-pause" class="icon-btn" aria-label="ポーズ">⏸</button>
+      </div>
+    </header>
+
+    <!-- 判定ポップ -->
+    <div id="judge-pop" class="judge-pop"></div>
+
+    <!-- 操作ボタン（下半分） -->
+    <div id="controls" class="controls hidden">
+      <button class="ctl ctl-l" data-dir="L" aria-label="左で受け流す">
+        <span class="ctl-arrow">◀</span>
+      </button>
+      <button class="ctl ctl-r" data-dir="R" aria-label="右で受け流す">
+        <span class="ctl-arrow">▶</span>
+      </button>
+      <!-- 上下（高難度で有効化） -->
+      <button class="ctl ctl-u hidden-dir" data-dir="U" aria-label="上で受け流す">
+        <span class="ctl-arrow">▲</span>
+      </button>
+      <button class="ctl ctl-d hidden-dir" data-dir="D" aria-label="下で受け流す">
+        <span class="ctl-arrow">▼</span>
+      </button>
+    </div>
+
+    <!-- タイトル -->
+    <section id="screen-title" class="screen">
+      <div class="title-wrap">
+        <h1 class="logo">パリパリ</h1>
+        <p class="tagline">来た方向と<b>反対</b>を、ちょうどで弾け。</p>
+        <div class="best">BEST <span id="title-best">0</span></div>
+        <button id="btn-play" class="btn btn-primary">プレイ</button>
+        <button id="btn-howto" class="btn">遊び方</button>
+        <button id="btn-settings" class="btn">設定</button>
+      </div>
+    </section>
+
+    <!-- 遊び方 -->
+    <section id="screen-howto" class="screen hidden">
+      <div class="panel">
+        <h2>遊び方</h2>
+        <ol class="howto-list">
+          <li>敵の攻撃が<b>来る方向</b>が光ります。</li>
+          <li>攻撃が線に届く<b>ちょうど</b>その瞬間に…</li>
+          <li>来た方向と<b>反対</b>のボタンを1回タップ！</li>
+          <li>早すぎ・遅すぎ・逆方向は失敗。3回ミスで終了。</li>
+        </ol>
+        <p class="howto-judge">
+          <span class="tag perfect">PERFECT</span> ど真ん中
+          <span class="tag good">GOOD</span> セーフ
+          <span class="tag miss">MISS</span> 失敗
+        </p>
+        <button id="btn-howto-try" class="btn btn-primary">練習してみる</button>
+        <button id="btn-howto-back" class="btn">もどる</button>
+      </div>
+    </section>
+
+    <!-- 設定 -->
+    <section id="screen-settings" class="screen hidden">
+      <div class="panel">
+        <h2>設定</h2>
+        <label class="toggle"><span>サウンド</span><input type="checkbox" id="set-sound"></label>
+        <label class="toggle"><span>振動（対応端末のみ）</span><input type="checkbox" id="set-vibrate"></label>
+        <label class="toggle"><span>モーション低減</span><input type="checkbox" id="set-motion"></label>
+        <button id="btn-settings-back" class="btn btn-primary">もどる</button>
+      </div>
+    </section>
+
+    <!-- カウントダウン -->
+    <section id="screen-ready" class="screen hidden">
+      <div id="countdown" class="countdown">3</div>
+      <p class="ready-hint">来た方向と<b>反対</b>を押す！</p>
+    </section>
+
+    <!-- ポーズ -->
+    <section id="screen-pause" class="screen hidden">
+      <div class="panel">
+        <h2>ポーズ</h2>
+        <button id="btn-resume" class="btn btn-primary">再開</button>
+        <button id="btn-pause-retry" class="btn">リトライ</button>
+        <button id="btn-pause-home" class="btn">ホーム</button>
+      </div>
+    </section>
+
+    <!-- リザルト -->
+    <section id="screen-result" class="screen hidden">
+      <div class="panel result-panel">
+        <div id="result-rank" class="result-rank">A</div>
+        <div class="result-score-label">SCORE</div>
+        <div id="result-score" class="result-score">0</div>
+        <div id="result-best-badge" class="best-badge hidden">★ ベスト更新！</div>
+        <div class="result-stats">
+          <div><span id="result-combo">0</span><small>最大コンボ</small></div>
+          <div><span id="result-perfect">0%</span><small>PERFECT率</small></div>
+          <div><span id="result-tier">1</span><small>到達ティア</small></div>
+        </div>
+        <button id="btn-retry" class="btn btn-primary">もう一回</button>
+        <button id="btn-result-home" class="btn">ホーム</button>
+      </div>
+    </section>
+
+    <div id="rotate-hint" class="rotate-hint hidden">📱 縦向きでプレイしてください</div>
+  </div>
+
+  <script>
+(function(){
+  var reg = {};
+  function def(name, fn){ reg[name] = { fn: fn, mod: null }; }
+  function require(name){
+    var e = reg[name];
+    if (!e) throw new Error('module not found: ' + name);
+    if (!e.mod){ e.mod = { exports: {} }; e.fn(e.mod, e.mod.exports, require); }
+    return e.mod.exports;
+  }
+  def('config', function(module, exports, require){
+// パリパリ チューニング定数（要件 §2.4 §3 §5）
+// すべてのバランス調整はこのファイルで完結する。
+
+const CONFIG = {
+  // --- 判定窓 (ms) ---
+  PERFECT_WINDOW: 60,   // |Δ| <= これ → PERFECT
+  GOOD_WINDOW: 140,     // |Δ| <= これ → GOOD（超過は MISS）
+
+  // --- スコア ---
+  BASE_PERFECT: 300,
+  BASE_GOOD: 100,
+  COMBO_STEP: 5,        // この連数ごとに倍率+COMBO_STEP_BONUS
+  COMBO_STEP_BONUS: 0.5,
+  COMBO_MAX_MULT: 4.0,
+  TIMING_BONUS_MAX: 50,
+
+  // --- ライフ ---
+  MAX_HP: 3,
+  HEAL_EVERY_PERFECT_STREAK: 10, // PERFECT連続でハート回復
+
+  // --- 演出 ---
+  HITSTOP_PERFECT_MS: 110,
+  HITSTOP_GOOD_MS: 50,
+  SLOWMO_SCALE: 0.25,        // PERFECT時のdtスケール
+  SLOWMO_MS: 140,
+  SHAKE_MISS: 14,            // px
+  DPR_CAP: 3,
+
+  // --- ランクしきい値（総スコア）---
+  RANKS: [
+    { rank: 'S', min: 12000 },
+    { rank: 'A', min: 7000 },
+    { rank: 'B', min: 3500 },
+    { rank: 'C', min: 0 },
+  ],
+
+  // --- 難易度ティア（要件 §5.3）---
+  // visibleMs: 予兆+接近の合計可視時間 / intervalMs: 次攻撃までの基準間隔
+  // directions: 出現方向 / feint: フェイント確率 / doubleRate: 2連確率
+  TIERS: [
+    { successAt: 0,  visibleMs: 1000, intervalMs: 1100, directions: ['L', 'R'], feint: 0,    doubleRate: 0 },
+    { successAt: 8,  visibleMs: 850,  intervalMs: 950,  directions: ['L', 'R'], feint: 0,    doubleRate: 0 },
+    { successAt: 20, visibleMs: 700,  intervalMs: 800,  directions: ['L', 'R'], feint: 0,    doubleRate: 0.2 },
+    { successAt: 36, visibleMs: 600,  intervalMs: 720,  directions: ['L', 'R', 'U', 'D'], feint: 0, doubleRate: 0.25 },
+    { successAt: 56, visibleMs: 520,  intervalMs: 640,  directions: ['L', 'R', 'U', 'D'], feint: 0.12, doubleRate: 0.3 },
+    { successAt: 80, visibleMs: 450,  intervalMs: 560,  directions: ['L', 'R', 'U', 'D'], feint: 0.2,  doubleRate: 0.35 },
+  ],
+
+  INTERVAL_JITTER: 0.18, // ±18% 間隔ゆらぎ
+};
+
+// 攻撃方向 → 受け流しに必要な入力方向（反対側）
+const OPPOSITE = { L: 'R', R: 'L', U: 'D', D: 'U' };
+
+function tierForSuccess(successCount) {
+  const tiers = CONFIG.TIERS;
+  let current = tiers[0];
+  for (const t of tiers) {
+    if (successCount >= t.successAt) current = t;
+    else break;
+  }
+  return current;
+}
+
+function rankForScore(score) {
+  for (const r of CONFIG.RANKS) {
+    if (score >= r.min) return r.rank;
+  }
+  return 'C';
+}
+
+
+  Object.assign(exports, { CONFIG, OPPOSITE, tierForSuccess, rankForScore });
+  });
+
+  def('judge', function(module, exports, require){
+// 3段階判定（純粋関数・テスト対象） 要件 §2.4
+const {CONFIG} = require('config');
+/**
+ * @param {number} deltaMs  入力時刻 - インパクト時刻T（負=早い, 正=遅い）
+ * @param {boolean} dirOk    入力方向が正しい（攻撃の反対側）か
+ * @param {object} cfg       判定窓を持つ設定（既定 CONFIG）
+ * @returns {'PERFECT'|'GOOD'|'MISS'}
+ */
+function judgeTiming(deltaMs, dirOk, cfg = CONFIG) {
+  if (!dirOk) return 'MISS';
+  const a = Math.abs(deltaMs);
+  if (a <= cfg.PERFECT_WINDOW) return 'PERFECT';
+  if (a <= cfg.GOOD_WINDOW) return 'GOOD';
+  return 'MISS';
+}
+
+
+  Object.assign(exports, { judgeTiming });
+  });
+
+  def('scoring', function(module, exports, require){
+// スコア/コンボ計算（純粋関数・テスト対象） 要件 §3
+const {CONFIG} = require('config');
+function comboMultiplier(combo, cfg = CONFIG) {
+  const mult = 1 + Math.floor(combo / cfg.COMBO_STEP) * cfg.COMBO_STEP_BONUS;
+  return Math.min(mult, cfg.COMBO_MAX_MULT);
+}
+
+function timingBonus(deltaMs, cfg = CONFIG) {
+  const ratio = 1 - Math.abs(deltaMs) / cfg.GOOD_WINDOW;
+  const bonus = Math.round(ratio * cfg.TIMING_BONUS_MAX);
+  return Math.max(0, Math.min(cfg.TIMING_BONUS_MAX, bonus));
+}
+
+/**
+ * 1攻撃あたりの獲得点。
+ * @param {'PERFECT'|'GOOD'|'MISS'} judge
+ * @param {number} combo  この成功時点のコンボ（加点前/この成功を含む値を渡す側で統一）
+ * @param {number} deltaMs
+ */
+function calcGain(judge, combo, deltaMs, cfg = CONFIG) {
+  const base = judge === 'PERFECT' ? cfg.BASE_PERFECT : judge === 'GOOD' ? cfg.BASE_GOOD : 0;
+  if (base === 0) return 0;
+  return Math.round(base * comboMultiplier(combo, cfg) + timingBonus(deltaMs, cfg));
+}
+
+
+  Object.assign(exports, { comboMultiplier, timingBonus, calcGain });
+  });
+
+  def('storage', function(module, exports, require){
+// localStorage ラッパ（ベストスコア・設定） 要件 §3.2 §4.6
+const KEY_BEST = 'paripari.best';
+const KEY_SETTINGS = 'paripari.settings';
+
+const DEFAULT_SETTINGS = {
+  sound: true,
+  vibrate: true,
+  reducedMotion: false,
+};
+
+function safeGet(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function safeSet(key, val) {
+  try { localStorage.setItem(key, val); } catch { /* ignore */ }
+}
+
+function getBest() {
+  return parseInt(safeGet(KEY_BEST) || '0', 10) || 0;
+}
+function setBest(n) {
+  safeSet(KEY_BEST, String(Math.max(0, Math.floor(n))));
+}
+
+function getSettings() {
+  try {
+    const raw = safeGet(KEY_SETTINGS);
+    if (!raw) {
+      const prefersReduced = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      return { ...DEFAULT_SETTINGS, reducedMotion: !!prefersReduced };
+    }
+    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+function setSettings(s) {
+  safeSet(KEY_SETTINGS, JSON.stringify(s));
+}
+
+
+  Object.assign(exports, { getBest, setBest, getSettings, setSettings });
+  });
+
+  def('haptics', function(module, exports, require){
+// 触覚フィードバック（要件 §4.5）。iOS Safari は vibrate 非対応のため安全に無視される。
+let enabled = true;
+
+function setHapticsEnabled(v) { enabled = !!v; }
+
+function vibrate(pattern) {
+  if (!enabled) return;
+  try {
+    if (navigator.vibrate) navigator.vibrate(pattern);
+  } catch { /* ignore */ }
+}
+
+const HAPTICS = {
+  perfect: [10, 10, 10],
+  good: [15],
+  miss: [40],
+};
+
+
+  Object.assign(exports, { setHapticsEnabled, vibrate, HAPTICS });
+  });
+
+  def('audio', function(module, exports, require){
+// Web Audio による合成SE（アセット不要・軽量） 要件 §4.5 §6.5
+let ctx = null;
+let masterGain = null;
+let enabled = true;
+
+function setAudioEnabled(v) {
+  enabled = !!v;
+  if (masterGain) masterGain.gain.value = enabled ? 0.9 : 0;
+}
+
+// 初回ユーザー操作で呼ぶ（iOS 自動再生制限対策）
+function initAudio() {
+  if (ctx) {
+    if (ctx.state === 'suspended') ctx.resume();
+    return;
+  }
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC();
+    masterGain = ctx.createGain();
+    masterGain.gain.value = enabled ? 0.9 : 0;
+    masterGain.connect(ctx.destination);
+  } catch { ctx = null; }
+}
+
+function tone({ freq, type = 'sine', dur = 0.12, gain = 0.3, slideTo = null, delay = 0 }) {
+  if (!ctx || !enabled) return;
+  const t0 = ctx.currentTime + delay;
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(g);
+  g.connect(masterGain);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.02);
+}
+
+function noiseBurst({ dur = 0.12, gain = 0.25, hp = 800 }) {
+  if (!ctx || !enabled) return;
+  const t0 = ctx.currentTime;
+  const len = Math.floor(ctx.sampleRate * dur);
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const filt = ctx.createBiquadFilter();
+  filt.type = 'highpass';
+  filt.frequency.value = hp;
+  const g = ctx.createGain();
+  g.gain.value = gain;
+  src.connect(filt); filt.connect(g); g.connect(masterGain);
+  src.start(t0);
+}
+
+function play(name) {
+  if (!ctx || !enabled) return;
+  if (ctx.state === 'suspended') ctx.resume();
+  switch (name) {
+    case 'perfect':
+      tone({ freq: 1400, type: 'triangle', dur: 0.18, gain: 0.35, slideTo: 2200 });
+      tone({ freq: 2100, type: 'sine', dur: 0.22, gain: 0.18, delay: 0.02 });
+      noiseBurst({ dur: 0.08, gain: 0.12, hp: 4000 });
+      break;
+    case 'good':
+      tone({ freq: 880, type: 'triangle', dur: 0.12, gain: 0.3, slideTo: 1320 });
+      noiseBurst({ dur: 0.06, gain: 0.1, hp: 3000 });
+      break;
+    case 'miss':
+      tone({ freq: 180, type: 'sawtooth', dur: 0.18, gain: 0.3, slideTo: 90 });
+      noiseBurst({ dur: 0.12, gain: 0.18, hp: 400 });
+      break;
+    case 'tap':
+      tone({ freq: 440, type: 'square', dur: 0.04, gain: 0.08 });
+      break;
+    case 'combo':
+      tone({ freq: 1600, type: 'sine', dur: 0.1, gain: 0.2, slideTo: 2400 });
+      break;
+    default: break;
+  }
+}
+
+
+  Object.assign(exports, { setAudioEnabled, initAudio, play });
+  });
+
+  def('particles', function(module, exports, require){
+// パーティクルプール（GCスパイク回避） 要件 §6.6
+const MAX = 220;
+
+class ParticlePool {
+  constructor() {
+    this.pool = new Array(MAX).fill(null).map(() => ({
+      active: false, x: 0, y: 0, vx: 0, vy: 0, life: 0, maxLife: 1,
+      size: 2, color: '#fff', gravity: 0,
+    }));
+  }
+
+  spawnBurst(x, y, opts = {}) {
+    const {
+      count = 16, speed = 320, spread = Math.PI * 2, angle = 0,
+      colors = ['#fff'], size = 3, life = 0.5, gravity = 600,
+    } = opts;
+    let spawned = 0;
+    for (let i = 0; i < this.pool.length && spawned < count; i++) {
+      const p = this.pool[i];
+      if (p.active) continue;
+      const a = angle + (Math.random() - 0.5) * spread;
+      const sp = speed * (0.4 + Math.random() * 0.6);
+      p.active = true;
+      p.x = x; p.y = y;
+      p.vx = Math.cos(a) * sp;
+      p.vy = Math.sin(a) * sp;
+      p.maxLife = life * (0.6 + Math.random() * 0.6);
+      p.life = p.maxLife;
+      p.size = size * (0.6 + Math.random() * 0.8);
+      p.color = colors[(Math.random() * colors.length) | 0];
+      p.gravity = gravity;
+      spawned++;
+    }
+  }
+
+  update(dt) {
+    for (const p of this.pool) {
+      if (!p.active) continue;
+      p.life -= dt;
+      if (p.life <= 0) { p.active = false; continue; }
+      p.vy += p.gravity * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+    }
+  }
+
+  draw(ctx) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const p of this.pool) {
+      if (!p.active) continue;
+      const t = p.life / p.maxLife;
+      ctx.globalAlpha = Math.max(0, t);
+      ctx.fillStyle = p.color;
+      const s = p.size * (0.4 + t * 0.6);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, s, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  clear() {
+    for (const p of this.pool) p.active = false;
+  }
+}
+
+
+  Object.assign(exports, { ParticlePool });
+  });
+
+  def('input', function(module, exports, require){
+// 入力正規化（pointer/touch/key）と時刻記録 要件 §6.2 §6.3
+// 方向ボタンの押下を {dir, time} で通知する。
+
+const KEY_DIR = {
+  ArrowLeft: 'L', a: 'L', A: 'L',
+  ArrowRight: 'R', d: 'R', D: 'R',
+  ArrowUp: 'U', w: 'U', W: 'U',
+  ArrowDown: 'D', s: 'D', S: 'D',
+};
+
+function setupInput({ onAction, onFirstGesture }) {
+  let firstGestureDone = false;
+  const fireFirst = () => {
+    if (firstGestureDone) return;
+    firstGestureDone = true;
+    onFirstGesture && onFirstGesture();
+  };
+
+  const buttons = document.querySelectorAll('[data-dir]');
+  const pointerSupported = 'PointerEvent' in window;
+  const downEvent = pointerSupported ? 'pointerdown' : 'touchstart';
+
+  buttons.forEach((btn) => {
+    btn.addEventListener(downEvent, (e) => {
+      e.preventDefault();
+      fireFirst();
+      const dir = btn.getAttribute('data-dir');
+      const time = (e.timeStamp && e.timeStamp > 0) ? e.timeStamp : performance.now();
+      btn.classList.add('pressed');
+      onAction({ dir, time });
+    }, { passive: false });
+
+    btn.addEventListener(pointerSupported ? 'pointerup' : 'touchend', () => {
+      btn.classList.remove('pressed');
+    });
+    btn.addEventListener(pointerSupported ? 'pointercancel' : 'touchcancel', () => {
+      btn.classList.remove('pressed');
+    });
+    btn.addEventListener('pointerleave', () => btn.classList.remove('pressed'));
+  });
+
+  // キーボード（PC）
+  window.addEventListener('keydown', (e) => {
+    if (e.repeat) return;
+    const dir = KEY_DIR[e.key];
+    if (!dir) return;
+    e.preventDefault();
+    fireFirst();
+    onAction({ dir, time: e.timeStamp || performance.now() });
+  });
+
+  // 任意の最初のタッチでも音声初期化フックを発火
+  window.addEventListener(downEvent, fireFirst, { passive: true, once: false });
+}
+
+// ズーム/スクロール/バウンス抑止（要件 §6.3 §6.4）
+function lockGestures() {
+  // ダブルタップズーム抑止
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+
+  // ピンチズーム抑止
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+  document.addEventListener('gesturechange', (e) => e.preventDefault());
+
+  // スクロール/バウンス抑止
+  document.addEventListener('touchmove', (e) => {
+    if (e.scale && e.scale !== 1) e.preventDefault();
+  }, { passive: false });
+}
+
+
+  Object.assign(exports, { setupInput, lockGestures });
+  });
+
+  def('enemy', function(module, exports, require){
+// 攻撃のライフサイクルと時間モデル 要件 §2.2 §5
+const {CONFIG, OPPOSITE} = require('config');
+let _id = 0;
+
+/**
+ * 攻撃を生成する。
+ * @param {number} now performance.now()
+ * @param {object} tier CONFIG.TIERS の1要素
+ */
+function createAttack(now, tier) {
+  const dirs = tier.directions;
+  const dir = dirs[(Math.random() * dirs.length) | 0];
+  const visibleMs = tier.visibleMs;
+  return {
+    id: ++_id,
+    dir,                          // 攻撃の来る方向 L/R/U/D
+    needDir: OPPOSITE[dir],       // 受け流しに必要な入力（反対側）
+    spawnAt: now,                 // 予兆開始
+    impactAt: now + visibleMs,    // T（パリィライン到達）
+    windowEnd: now + visibleMs + CONFIG.GOOD_WINDOW, // 無入力MISS確定
+    visibleMs,
+    resolved: false,
+    resolvedAt: 0,                // 判定が確定した gameTime
+    result: null,                 // 'PERFECT'|'GOOD'|'MISS'
+    feint: false,                 // 将来拡張
+  };
+}
+
+// 接近の進捗 0..1（予兆開始→インパクト）。ease-in。
+function attackProgress(attack, now) {
+  const p = (now - attack.spawnAt) / (attack.impactAt - attack.spawnAt);
+  return Math.max(0, Math.min(1.4, p));
+}
+
+function nextInterval(tier) {
+  const j = CONFIG.INTERVAL_JITTER;
+  const factor = 1 + (Math.random() * 2 - 1) * j;
+  return tier.intervalMs * factor;
+}
+
+
+  Object.assign(exports, { createAttack, attackProgress, nextInterval });
+  });
+
+  def('renderer', function(module, exports, require){
+// Canvas 2D 描画 要件 §4.4 §6.4
+const {CONFIG} = require('config');
+const {attackProgress} = require('enemy');
+class Renderer {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.w = 0; this.h = 0; this.dpr = 1;
+    this.lineY = 0;       // パリィライン（プレイヤー）Y
+    this.flash = 0;       // 0..1 閃光
+    this.flashColor = '#fff';
+    this.shake = 0;       // px
+    this.t = 0;           // 累積時間（背景アニメ用）
+    this.resize();
+  }
+
+  resize() {
+    this.dpr = Math.min(window.devicePixelRatio || 1, CONFIG.DPR_CAP);
+    const rect = this.canvas.getBoundingClientRect();
+    this.w = rect.width;
+    this.h = rect.height;
+    this.canvas.width = Math.round(this.w * this.dpr);
+    this.canvas.height = Math.round(this.h * this.dpr);
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.lineY = this.h * 0.58;
+  }
+
+  triggerFlash(color, intensity = 1) {
+    this.flash = Math.max(this.flash, intensity);
+    this.flashColor = color;
+  }
+  triggerShake(px) { this.shake = Math.max(this.shake, px); }
+
+  // 攻撃の出現座標（方向→画面端）
+  attackStart(dir) {
+    switch (dir) {
+      case 'L': return { x: -40, y: this.lineY };
+      case 'R': return { x: this.w + 40, y: this.lineY };
+      case 'U': return { x: this.w / 2, y: -40 };
+      case 'D': return { x: this.w / 2, y: this.h + 40 };
+      default: return { x: this.w / 2, y: -40 };
+    }
+  }
+
+  draw(dt, state, particles) {
+    const ctx = this.ctx;
+    this.t += dt;
+    // decay
+    this.flash = Math.max(0, this.flash - dt * 4.5);
+    this.shake = Math.max(0, this.shake - dt * 60);
+
+    ctx.save();
+    // シェイク
+    if (this.shake > 0.5) {
+      ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
+    }
+
+    this._drawBackground(ctx);
+    this._drawParryLine(ctx, state);
+    this._drawPlayer(ctx, state);
+
+    // 攻撃
+    if (state.attack && !state.attack.resolved) {
+      this._drawAttack(ctx, state.attack, state.now);
+    } else if (state.attack && state.attack.resolved && state.now - state.attack.resolvedAt < 180) {
+      // 受け流し後の余韻（弾かれた軌跡）
+      this._drawResolved(ctx, state.attack, state.now);
+    }
+
+    particles.draw(ctx);
+    ctx.restore();
+
+    // 閃光（全面）
+    if (this.flash > 0.01) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(0.85, this.flash);
+      ctx.fillStyle = this.flashColor;
+      ctx.fillRect(0, 0, this.w, this.h);
+      ctx.restore();
+    }
+  }
+
+  _drawBackground(ctx) {
+    const g = ctx.createLinearGradient(0, 0, 0, this.h);
+    g.addColorStop(0, '#0a0a16');
+    g.addColorStop(0.6, '#0f1226');
+    g.addColorStop(1, '#07070d');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, this.w, this.h);
+
+    // ほのかな放射状の墨だまり
+    const cx = this.w / 2, cy = this.lineY;
+    const rg = ctx.createRadialGradient(cx, cy, 10, cx, cy, this.w * 0.7);
+    rg.addColorStop(0, 'rgba(40,60,120,0.18)');
+    rg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = rg;
+    ctx.fillRect(0, 0, this.w, this.h);
+  }
+
+  _drawParryLine(ctx, state) {
+    const y = this.lineY;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(this.w, y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  _drawPlayer(ctx, state) {
+    const cx = this.w / 2;
+    const cy = this.lineY;
+    const pulse = 1 + Math.sin(this.t * 3) * 0.04;
+    const r = 26 * pulse;
+    ctx.save();
+    // 守りの輪
+    ctx.strokeStyle = 'rgba(91,220,255,0.7)';
+    ctx.lineWidth = 3;
+    ctx.shadowColor = 'rgba(91,220,255,0.7)';
+    ctx.shadowBlur = 14;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+    // 中心
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(233,238,247,0.92)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  _drawAttack(ctx, attack, now) {
+    const p = attackProgress(attack, now);
+    const start = this.attackStart(attack.dir);
+    const cx = this.w / 2, cy = this.lineY;
+    // ease-in 接近
+    const e = p * p;
+    const x = start.x + (cx - start.x) * e;
+    const y = start.y + (cy - start.y) * e;
+
+    // 予兆: 攻撃側エッジの発光（早期ほど強く）
+    const telGlow = Math.max(0, 1 - p) * 0.5 + 0.2;
+    this._drawEdgeGlow(ctx, attack.dir, telGlow);
+
+    // 斬撃本体
+    const angle = Math.atan2(cy - start.y, cx - start.x);
+    const len = 60 + 40 * e;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    const danger = p > 0.7;
+    const col = danger ? '#ff3b54' : '#ff8a5b';
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 5 + 6 * e;
+    ctx.lineCap = 'round';
+    ctx.shadowColor = col;
+    ctx.shadowBlur = 18;
+    ctx.globalAlpha = Math.min(1, 0.4 + p);
+    ctx.beginPath();
+    ctx.moveTo(-len / 2, 0);
+    ctx.lineTo(len / 2, 0);
+    ctx.stroke();
+    ctx.restore();
+
+    // 方向アイコン（攻撃の来る方向）
+    this._drawDirArrow(ctx, attack.dir, telGlow);
+  }
+
+  _drawResolved(ctx, attack, now) {
+    const k = Math.max(0, Math.min(1, (now - attack.resolvedAt) / 180));
+    const cx = this.w / 2, cy = this.lineY;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - k);
+    ctx.strokeStyle = attack.result === 'MISS' ? '#ff3b54' : '#ffd35b';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 30 + k * 60, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  _drawEdgeGlow(ctx, dir, a) {
+    ctx.save();
+    ctx.globalAlpha = a;
+    let grad;
+    const c = 'rgba(255,80,90,';
+    if (dir === 'L') {
+      grad = ctx.createLinearGradient(0, 0, this.w * 0.3, 0);
+      grad.addColorStop(0, c + '0.55)'); grad.addColorStop(1, c + '0)');
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, this.w * 0.3, this.h);
+    } else if (dir === 'R') {
+      grad = ctx.createLinearGradient(this.w, 0, this.w * 0.7, 0);
+      grad.addColorStop(0, c + '0.55)'); grad.addColorStop(1, c + '0)');
+      ctx.fillStyle = grad; ctx.fillRect(this.w * 0.7, 0, this.w * 0.3, this.h);
+    } else if (dir === 'U') {
+      grad = ctx.createLinearGradient(0, 0, 0, this.h * 0.3);
+      grad.addColorStop(0, c + '0.55)'); grad.addColorStop(1, c + '0)');
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, this.w, this.h * 0.3);
+    } else {
+      grad = ctx.createLinearGradient(0, this.h, 0, this.h * 0.7);
+      grad.addColorStop(0, c + '0.55)'); grad.addColorStop(1, c + '0)');
+      ctx.fillStyle = grad; ctx.fillRect(0, this.h * 0.7, this.w, this.h * 0.3);
+    }
+    ctx.restore();
+  }
+
+  _drawDirArrow(ctx, dir, a) {
+    const cx = this.w / 2, cy = this.lineY;
+    const off = 70;
+    let x = cx, y = cy, ch = '◀';
+    if (dir === 'L') { x = cx - off; ch = '▶'; }      // 左から来る→右へ受け流す方向の矢印
+    else if (dir === 'R') { x = cx + off; ch = '◀'; }
+    else if (dir === 'U') { y = cy - off; ch = '▼'; }
+    else { y = cy + off; ch = '▲'; }
+    ctx.save();
+    ctx.globalAlpha = 0.3 + a;
+    ctx.fillStyle = '#ffd35b';
+    ctx.font = '700 20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ch, x, y);
+    ctx.restore();
+  }
+
+  burstColors(result) {
+    if (result === 'PERFECT') return ['#fff', '#ffd35b', '#5bdcff', '#ffea9e'];
+    if (result === 'GOOD') return ['#fff', '#5bdcff'];
+    return ['#ff3b54', '#ff8a5b'];
+  }
+}
+
+
+  Object.assign(exports, { Renderer });
+  });
+
+  def('ui', function(module, exports, require){
+// DOM HUD / メニュー更新 要件 §4.1 §4.3
+const {CONFIG} = require('config');
+const $ = (id) => document.getElementById(id);
+
+const SCREENS = ['title', 'howto', 'settings', 'ready', 'pause', 'result'];
+
+function showScreen(name) {
+  SCREENS.forEach((s) => $('screen-' + s).classList.toggle('hidden', s !== name));
+}
+function hideAllScreens() {
+  SCREENS.forEach((s) => $('screen-' + s).classList.add('hidden'));
+}
+
+function setPlayUIVisible(visible) {
+  $('hud').classList.toggle('hidden', !visible);
+  $('controls').classList.toggle('hidden', !visible);
+}
+
+function setFourDir(four) {
+  $('controls').classList.toggle('four', four);
+}
+
+function updateHUD({ hp, score, combo }) {
+  const hearts = '♥'.repeat(hp) + '<span style="opacity:.25">♥</span>'.repeat(CONFIG.MAX_HP - hp);
+  $('hearts').innerHTML = hearts;
+  $('score').textContent = score.toLocaleString();
+  const comboEl = $('combo');
+  comboEl.textContent = combo >= 2 ? `${combo} COMBO` : '';
+}
+
+function bumpCombo() {
+  const el = $('combo');
+  el.classList.remove('bump');
+  void el.offsetWidth;
+  el.classList.add('bump');
+}
+
+function popJudge(result, delta) {
+  const el = $('judge-pop');
+  el.className = 'judge-pop';
+  void el.offsetWidth;
+  let text = result;
+  if (result === 'PERFECT') text = 'PERFECT!';
+  else if (result === 'GOOD') text = delta < 0 ? 'GOOD (早)' : delta > 0 ? 'GOOD (遅)' : 'GOOD';
+  else text = 'MISS';
+  el.textContent = text;
+  el.classList.add('show', result.toLowerCase());
+}
+
+function setCountdown(n) {
+  const el = $('countdown');
+  el.textContent = n > 0 ? n : 'START';
+  el.style.animation = 'none';
+  void el.offsetWidth;
+  el.style.animation = '';
+}
+
+function showResult({ score, best, isBest, maxCombo, perfectRate, tier, rank }) {
+  $('result-rank').textContent = rank;
+  $('result-score').textContent = score.toLocaleString();
+  $('result-best-badge').classList.toggle('hidden', !isBest);
+  $('result-combo').textContent = maxCombo;
+  $('result-perfect').textContent = `${perfectRate}%`;
+  $('result-tier').textContent = tier;
+  showScreen('result');
+}
+
+function setBestLabel(best) {
+  $('title-best').textContent = best.toLocaleString();
+}
+
+function reflectSettings(s) {
+  $('set-sound').checked = s.sound;
+  $('set-vibrate').checked = s.vibrate;
+  $('set-motion').checked = s.reducedMotion;
+}
+
+
+  Object.assign(exports, { showScreen, hideAllScreens, setPlayUIVisible, setFourDir, updateHUD, bumpCombo, popJudge, setCountdown, showResult, setBestLabel, reflectSettings });
+  });
+
+  def('game', function(module, exports, require){
+// ゲーム状態機械・進行制御 要件 §2 §3 §5
+const {CONFIG, tierForSuccess, rankForScore} = require('config');
+const {judgeTiming} = require('judge');
+const {calcGain} = require('scoring');
+const {createAttack, nextInterval} = require('enemy');
+const audio = require('audio');
+const {vibrate, HAPTICS} = require('haptics');
+const ui = require('ui');
+const {getBest, setBest} = require('storage');
+const PRACTICE_GOAL = 3;
+
+class Game {
+  constructor({ renderer, particles, settings, onGameOver }) {
+    this.r = renderer;
+    this.particles = particles;
+    this.settings = settings;
+    this.onGameOver = onGameOver || (() => {});
+
+    this.state = 'IDLE';       // IDLE | PLAYING | OVER
+    this.mode = 'normal';      // normal | practice
+    this.gameTime = 0;         // ms（main が進める）
+
+    // 演出タイマー（壁時計ms, main が減算）
+    this.hitstopMs = 0;
+    this.slowmoMs = 0;
+
+    this._currentTierIndex = -1;
+    this._resetStats();
+  }
+
+  setSettings(s) { this.settings = s; }
+
+  _resetStats() {
+    this.hp = CONFIG.MAX_HP;
+    this.score = 0;
+    this.combo = 0;
+    this.maxCombo = 0;
+    this.successCount = 0;
+    this.perfectCount = 0;
+    this.perfectStreak = 0;
+    this.totalAttempts = 0;     // 成功＋失敗（判定された攻撃数）
+    this.attack = null;
+    this.nextSpawnAt = 0;
+    this._currentTierIndex = -1;
+  }
+
+  start(mode = 'normal') {
+    this.mode = mode;
+    this.state = 'PLAYING';
+    this._resetStats();
+    this.nextSpawnAt = this.gameTime + 600;
+    this._applyTierUI();
+    ui.updateHUD(this);
+  }
+
+  isPlaying() { return this.state === 'PLAYING'; }
+
+  // --- 入力処理（main からプレイ中のみ呼ばれる）---
+  handleAction(dir) {
+    if (this.state !== 'PLAYING') return;
+    const a = this.attack;
+    // 攻撃が未提示 / 既に判定済み → 空打ち（ペナルティなし）
+    if (!a || a.resolved || this.gameTime < a.spawnAt) {
+      audio.play('tap');
+      return;
+    }
+    const delta = this.gameTime - a.impactAt;
+    const dirOk = dir === a.needDir;
+    const result = judgeTiming(delta, dirOk);
+    this._resolve(a, result, delta);
+  }
+
+  // --- フレーム更新（main からプレイ中のみ呼ばれる）---
+  update(dtSec) {
+    const now = this.gameTime;
+    const a = this.attack;
+    if (a && !a.resolved && now >= a.windowEnd) {
+      this._resolve(a, 'MISS', a.windowEnd - a.impactAt, true); // 無入力タイムアウト
+    }
+    if ((!this.attack || this.attack.resolved) && now >= this.nextSpawnAt && this.state === 'PLAYING') {
+      this._spawn();
+    }
+    this.particles.update(dtSec);
+  }
+
+  _spawn() {
+    const tier = this.mode === 'practice' ? CONFIG.TIERS[0] : tierForSuccess(this.successCount);
+    this.attack = createAttack(this.gameTime, tier);
+    this._applyTierUI();
+  }
+
+  _applyTierUI() {
+    const tier = this.mode === 'practice' ? CONFIG.TIERS[0] : tierForSuccess(this.successCount);
+    const idx = CONFIG.TIERS.indexOf(tier);
+    if (idx !== this._currentTierIndex) {
+      this._currentTierIndex = idx;
+      ui.setFourDir(tier.directions.length > 2);
+    }
+  }
+
+  _resolve(a, result, delta, timeout = false) {
+    a.resolved = true;
+    a.resolvedAt = this.gameTime;
+    a.result = result;
+    this.totalAttempts++;
+
+    const cx = this.r.w / 2;
+    const cy = this.r.lineY;
+    const reduced = this.settings.reducedMotion;
+
+    if (result === 'MISS') {
+      this.combo = 0;
+      this.perfectStreak = 0;
+      if (this.mode === 'normal') this.hp = Math.max(0, this.hp - 1);
+      audio.play('miss');
+      vibrate(HAPTICS.miss);
+      this.r.triggerFlash('#5a0a14', 0.5);
+      if (!reduced) this.r.triggerShake(CONFIG.SHAKE_MISS);
+      this.particles.spawnBurst(cx, cy, {
+        count: 14, speed: 220, colors: this.r.burstColors('MISS'), size: 3, life: 0.45, gravity: 700,
+      });
+      ui.popJudge('MISS', delta);
+    } else {
+      // 成功
+      this.combo++;
+      this.successCount++;
+      this.maxCombo = Math.max(this.maxCombo, this.combo);
+      const gain = calcGain(result, this.combo, delta);
+      this.score += gain;
+
+      if (result === 'PERFECT') {
+        this.perfectCount++;
+        this.perfectStreak++;
+        audio.play('perfect');
+        vibrate(HAPTICS.perfect);
+        this.r.triggerFlash('#fff7df', 0.85);
+        this.hitstopMs = CONFIG.HITSTOP_PERFECT_MS;
+        if (!reduced) this.slowmoMs = CONFIG.SLOWMO_MS;
+        this.particles.spawnBurst(cx, cy, {
+          count: 30, speed: 420, colors: this.r.burstColors('PERFECT'), size: 4, life: 0.6, gravity: 500,
+        });
+        // PERFECT連続で回復
+        if (this.perfectStreak > 0 && this.perfectStreak % CONFIG.HEAL_EVERY_PERFECT_STREAK === 0) {
+          this.hp = Math.min(CONFIG.MAX_HP, this.hp + 1);
+        }
+      } else {
+        this.perfectStreak = 0;
+        audio.play('good');
+        vibrate(HAPTICS.good);
+        this.r.triggerFlash('#bfefff', 0.5);
+        this.hitstopMs = CONFIG.HITSTOP_GOOD_MS;
+        this.particles.spawnBurst(cx, cy, {
+          count: 18, speed: 320, colors: this.r.burstColors('GOOD'), size: 3, life: 0.5, gravity: 600,
+        });
+      }
+      ui.popJudge(result, delta);
+      if (this.combo >= 2) ui.bumpCombo();
+      if (this.combo > 0 && this.combo % CONFIG.COMBO_STEP === 0) audio.play('combo');
+    }
+
+    ui.updateHUD(this);
+
+    // 次の攻撃を予約
+    const tier = this.mode === 'practice' ? CONFIG.TIERS[0] : tierForSuccess(this.successCount);
+    this.nextSpawnAt = this.gameTime + nextInterval(tier);
+
+    // 終了判定
+    if (this.mode === 'normal' && this.hp <= 0) {
+      this._gameOver();
+    } else if (this.mode === 'practice' && this.successCount >= PRACTICE_GOAL) {
+      this.state = 'IDLE';
+      this.attack = null;
+      this.onGameOver({ practiceDone: true });
+    }
+  }
+
+  _gameOver() {
+    this.state = 'OVER';
+    this.attack = null;
+    const best = getBest();
+    const isBest = this.score > best;
+    if (isBest) setBest(this.score);
+    const perfectRate = this.totalAttempts > 0
+      ? Math.round((this.perfectCount / Math.max(1, this.successCount)) * 100) : 0;
+    const tierNum = CONFIG.TIERS.indexOf(tierForSuccess(this.successCount)) + 1;
+    this.onGameOver({
+      practiceDone: false,
+      score: this.score,
+      best: Math.max(best, this.score),
+      isBest,
+      maxCombo: this.maxCombo,
+      perfectRate,
+      tier: tierNum,
+      rank: rankForScore(this.score),
+    });
+  }
+
+  getRenderState() {
+    return { now: this.gameTime, attack: this.attack };
+  }
+}
+
+
+  Object.assign(exports, { Game });
+  });
+
+  def('main', function(module, exports, require){
+// エントリポイント: 起動・rAFループ・状態遷移の配線 要件 §4.1 §6.2
+const {CONFIG} = require('config');
+const {Renderer} = require('renderer');
+const {ParticlePool} = require('particles');
+const {Game} = require('game');
+const {setupInput, lockGestures} = require('input');
+const audio = require('audio');
+const {setHapticsEnabled} = require('haptics');
+const ui = require('ui');
+const storage = require('storage');
+const $ = (id) => document.getElementById(id);
+
+const canvas = $('game-canvas');
+const renderer = new Renderer(canvas);
+const particles = new ParticlePool();
+
+let settings = storage.getSettings();
+audio.setAudioEnabled(settings.sound);
+setHapticsEnabled(settings.vibrate);
+
+let pendingResult = null;   // リザルト表示用
+let countdownTimer = null;
+
+const game = new Game({
+  renderer, particles, settings,
+  onGameOver: (data) => {
+    if (data.practiceDone) {
+      // 練習完了 → 本番カウントダウンへ
+      startCountdown(() => game.start('normal'));
+      return;
+    }
+    pendingResult = data;
+    ui.setPlayUIVisible(false);
+    ui.setBestLabel(data.best);
+    ui.showResult(data);
+  },
+});
+
+// ---------- 入力 ----------
+setupInput({
+  onAction: ({ dir }) => {
+    if (game.isPlaying()) game.handleAction(dir);
+  },
+  onFirstGesture: () => audio.initAudio(),
+});
+lockGestures();
+
+// ---------- 画面遷移ヘルパ ----------
+function gotoTitle() {
+  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+  game.state = 'IDLE';
+  game.attack = null;
+  ui.setPlayUIVisible(false);
+  ui.setBestLabel(storage.getBest());
+  ui.showScreen('title');
+}
+
+function startCountdown(onDone) {
+  ui.hideAllScreens();
+  ui.setPlayUIVisible(false);
+  ui.showScreen('ready');
+  let n = 3;
+  ui.setCountdown(n);
+  if (countdownTimer) clearInterval(countdownTimer);
+  countdownTimer = setInterval(() => {
+    n--;
+    if (n <= 0) {
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+      ui.hideAllScreens();
+      ui.setPlayUIVisible(true);
+      onDone();
+    } else {
+      ui.setCountdown(n);
+    }
+  }, 700);
+}
+
+function beginNormalGame() {
+  startCountdown(() => game.start('normal'));
+}
+
+function beginPractice() {
+  ui.hideAllScreens();
+  ui.setPlayUIVisible(true);
+  game.start('practice');
+}
+
+// ---------- DOM ボタン配線 ----------
+$('btn-play').addEventListener('click', () => { audio.initAudio(); beginNormalGame(); });
+$('btn-howto').addEventListener('click', () => ui.showScreen('howto'));
+$('btn-howto-back').addEventListener('click', () => ui.showScreen('title'));
+$('btn-howto-try').addEventListener('click', () => { audio.initAudio(); beginPractice(); });
+$('btn-settings').addEventListener('click', () => { ui.reflectSettings(settings); ui.showScreen('settings'); });
+$('btn-settings-back').addEventListener('click', () => ui.showScreen('title'));
+
+$('btn-pause').addEventListener('click', pauseGame);
+$('btn-resume').addEventListener('click', resumeGame);
+$('btn-pause-retry').addEventListener('click', () => { ui.showScreen('ready'); beginNormalGame(); });
+$('btn-pause-home').addEventListener('click', gotoTitle);
+
+$('btn-retry').addEventListener('click', beginNormalGame);
+$('btn-result-home').addEventListener('click', gotoTitle);
+
+// 設定トグル
+function bindToggle(id, key, apply) {
+  $(id).addEventListener('change', (e) => {
+    settings = { ...settings, [key]: e.target.checked };
+    storage.setSettings(settings);
+    game.setSettings(settings);
+    apply && apply(e.target.checked);
+  });
+}
+bindToggle('set-sound', 'sound', (v) => audio.setAudioEnabled(v));
+bindToggle('set-vibrate', 'vibrate', (v) => setHapticsEnabled(v));
+bindToggle('set-motion', 'reducedMotion');
+
+// ---------- ポーズ ----------
+let pausedState = null;
+function pauseGame() {
+  if (!game.isPlaying()) return;
+  pausedState = 'PLAYING';
+  game.state = 'IDLE'; // ループ更新を止める（描画は継続）
+  ui.showScreen('pause');
+}
+function resumeGame() {
+  if (pausedState === 'PLAYING') {
+    ui.hideAllScreens();
+    game.state = 'PLAYING';
+    // 中断時間ぶん次攻撃を後ろ倒し（理不尽防止）
+    pausedState = null;
+  }
+}
+
+// タブ離脱で自動ポーズ
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && game.isPlaying()) pauseGame();
+});
+
+// ---------- リサイズ / 回転 ----------
+function handleResize() {
+  renderer.resize();
+  checkOrientation();
+}
+function checkOrientation() {
+  const landscape = window.innerWidth > window.innerHeight && window.innerWidth > 480;
+  $('rotate-hint').classList.toggle('hidden', !landscape);
+  if (landscape && game.isPlaying()) pauseGame();
+}
+window.addEventListener('resize', handleResize);
+window.addEventListener('orientationchange', () => setTimeout(handleResize, 200));
+if (window.visualViewport) window.visualViewport.addEventListener('resize', handleResize);
+
+// ---------- メインループ ----------
+let last = performance.now();
+function loop(now) {
+  let dtMs = now - last;
+  last = now;
+  if (dtMs > 50) dtMs = 50; // 大きなフレーム飛びをクランプ
+
+  // 演出タイマー（壁時計）と時間スケール
+  let scale = 1;
+  if (game.hitstopMs > 0) { game.hitstopMs -= dtMs; scale = 0; }
+  else if (game.slowmoMs > 0) { game.slowmoMs -= dtMs; scale = CONFIG.SLOWMO_SCALE; }
+
+  const playing = game.isPlaying();
+  const dtScaled = dtMs * scale;
+  // ゲーム時間はプレイ中のみ進める（ポーズ中の即時タイムアウトを防止）
+  if (playing) {
+    game.gameTime += dtScaled;
+    game.update(dtScaled / 1000);
+  }
+  // 描画はメニュー/ポーズ中も継続（背景アニメ・余韻）
+  const renderDtSec = (playing ? dtScaled : dtMs) / 1000;
+  renderer.draw(renderDtSec, game.getRenderState(), particles);
+
+  requestAnimationFrame(loop);
+}
+
+// ---------- 起動 ----------
+handleResize();
+gotoTitle();
+requestAnimationFrame(loop);
+
+// デバッグ/自動テスト用ハンドル（本番動作には影響しない）
+window.PariPari = { game, renderer };
+
+
+  });
+
+  require('main');
+})();
+</script>
+</body>
+</html>
