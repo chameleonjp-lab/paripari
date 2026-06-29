@@ -1,5 +1,5 @@
 // ゲーム状態機械・進行制御 要件 §2 §3 §5
-import { CONFIG, tierForSuccess, rankForScore } from './config.js';
+import { CONFIG, NEED_ANGLE, tierForSuccess, rankForScore } from './config.js';
 import { judgeTiming } from './judge.js';
 import { calcGain } from './scoring.js';
 import { createAttack, nextInterval } from './enemy.js';
@@ -7,7 +7,7 @@ import { vibrate, HAPTICS } from './haptics.js';
 import * as ui from './ui.js';
 import { getBest, setBest } from './storage.js';
 
-const PRACTICE_GOAL = 3;
+const PRACTICE_GOAL = 5;
 
 export class Game {
   constructor({ renderer, particles, settings, onGameOver }) {
@@ -18,12 +18,12 @@ export class Game {
 
     this.state = 'IDLE';       // IDLE | PLAYING | OVER
     this.mode = 'normal';      // normal | practice
-    this.gameTime = 0;         // ms（main が進める）
+    this.gameTime = 0;
 
     this.hitstopMs = 0;
     this.slowmoMs = 0;
 
-    this._currentTierIndex = -1;
+    this._tierIndex = -1;
     this._resetStats();
   }
 
@@ -40,7 +40,8 @@ export class Game {
     this.totalAttempts = 0;
     this.attack = null;
     this.nextSpawnAt = 0;
-    this._currentTierIndex = -1;
+    this.warmupRemaining = 0;   // >0 の間はノーダメージ・低速の準備フェーズ
+    this._tierIndex = -1;
   }
 
   start(mode = 'normal') {
@@ -50,17 +51,20 @@ export class Game {
     this.r.reducedMotion = !!this.settings.reducedMotion;
     this.r.clearTransients();
     this.particles.clear();
-    this.nextSpawnAt = this.gameTime + 600;
-    this._applyTierUI();
+    // 開始時のウォームアップ（案内＋低速ノーダメージ）
+    this.warmupRemaining = mode === 'normal' ? CONFIG.WARMUP.count : PRACTICE_GOAL;
+    this.nextSpawnAt = this.gameTime + 500;
+    if (mode === 'normal') ui.showBanner('WARM UP', '来た方向の【反対】を押す');
     ui.updateHUD(this);
   }
 
   isPlaying() { return this.state === 'PLAYING'; }
+  inWarmup() { return this.warmupRemaining > 0; }
 
   handleAction(dir) {
     if (this.state !== 'PLAYING') return;
     const a = this.attack;
-    if (!a || a.resolved || this.gameTime < a.spawnAt) return; // 空打ち（ペナルティなし）
+    if (!a || a.resolved || this.gameTime < a.spawnAt) return; // 空打ち
     const delta = this.gameTime - a.impactAt;
     const dirOk = dir === a.needDir;
     const result = judgeTiming(delta, dirOk);
@@ -71,7 +75,7 @@ export class Game {
     const now = this.gameTime;
     const a = this.attack;
     if (a && !a.resolved && now >= a.windowEnd) {
-      this._resolve(a, 'MISS', a.windowEnd - a.impactAt, true);
+      this._resolve(a, 'MISS', a.windowEnd - a.impactAt);
     }
     if ((!this.attack || this.attack.resolved) && now >= this.nextSpawnAt && this.state === 'PLAYING') {
       this._spawn();
@@ -80,26 +84,30 @@ export class Game {
   }
 
   _spawn() {
-    const tier = this.mode === 'practice' ? CONFIG.TIERS[0] : tierForSuccess(this.successCount);
-    this.attack = createAttack(this.gameTime, tier);
-    this._applyTierUI();
+    const visibleMs = this.inWarmup() ? CONFIG.WARMUP.visibleMs : this._tier().visibleMs;
+    this.attack = createAttack(this.gameTime, visibleMs);
+    this._checkTierUp();
   }
 
-  _applyTierUI() {
-    const tier = this.mode === 'practice' ? CONFIG.TIERS[0] : tierForSuccess(this.successCount);
-    const idx = CONFIG.TIERS.indexOf(tier);
-    if (idx !== this._currentTierIndex) {
-      this._currentTierIndex = idx;
-      ui.setFourDir(tier.directions.length > 2);
+  _tier() {
+    return this.mode === 'practice' ? CONFIG.TIERS[0] : tierForSuccess(this.successCount);
+  }
+
+  _checkTierUp() {
+    if (this.inWarmup() || this.mode !== 'normal') return;
+    const idx = CONFIG.TIERS.indexOf(tierForSuccess(this.successCount));
+    if (this._tierIndex >= 0 && idx > this._tierIndex) {
+      ui.showBanner('SPEED UP', null, 900); // 認知のための変化サイン
     }
+    this._tierIndex = idx;
   }
 
   _resolve(a, result, delta) {
     a.resolved = true;
     a.resolvedAt = this.gameTime;
     a.result = result;
-    this.totalAttempts++;
 
+    const warmup = this.inWarmup();
     const cx = this.r.w / 2;
     const cy = this.r.lineY;
     const reduced = this.settings.reducedMotion;
@@ -107,10 +115,11 @@ export class Game {
     if (result === 'MISS') {
       this.combo = 0;
       this.perfectStreak = 0;
-      if (this.mode === 'normal') this.hp = Math.max(0, this.hp - 1);
+      // ウォームアップ/練習中はノーダメージ
+      if (this.mode === 'normal' && !warmup) this.hp = Math.max(0, this.hp - 1);
       vibrate(HAPTICS.miss);
       this.r.triggerFlash('#5a0a14', 0.45);
-      this.r.triggerVignette('150,20,40', 0.7);
+      this.r.triggerVignette('150,20,40', warmup ? 0.4 : 0.7);
       this.r.triggerShake(CONFIG.SHAKE_MISS);
       this.r.triggerShockwave('MISS');
       this.particles.spawnBurst(cx, cy, {
@@ -119,17 +128,19 @@ export class Game {
       ui.popJudge('MISS', delta);
     } else {
       this.combo++;
-      this.successCount++;
       this.maxCombo = Math.max(this.maxCombo, this.combo);
-      const gain = calcGain(result, this.combo, delta);
-      this.score += gain;
-
+      if (!warmup) {
+        this.successCount++;
+        this.totalAttempts++;
+        const gain = calcGain(result, this.combo, delta);
+        this.score += gain;
+        this.r.addScorePopup(gain, result);
+      }
       this.r.triggerDeflect(a.needDir, result);
       this.r.triggerShockwave(result);
-      this.r.addScorePopup(gain, result);
 
       if (result === 'PERFECT') {
-        this.perfectCount++;
+        this.perfectCount += warmup ? 0 : 1;
         this.perfectStreak++;
         vibrate(HAPTICS.perfect);
         this.r.triggerFlash('#fff7df', 0.5);
@@ -138,12 +149,11 @@ export class Game {
         this.particles.spawnBurst(cx, cy, {
           count: 34, speed: 460, colors: this.r.burstColors('PERFECT'), size: 4, life: 0.65, gravity: 480,
         });
-        // 反対側への放射（受け流し方向）
         this.particles.spawnBurst(cx, cy, {
           count: 12, speed: 520, spread: 0.7, angle: this._dirAngle(a.needDir),
           colors: this.r.burstColors('PERFECT'), size: 3, life: 0.5, gravity: 300,
         });
-        if (this.perfectStreak > 0 && this.perfectStreak % CONFIG.HEAL_EVERY_PERFECT_STREAK === 0) {
+        if (!warmup && this.perfectStreak > 0 && this.perfectStreak % CONFIG.HEAL_EVERY_PERFECT_STREAK === 0) {
           this.hp = Math.min(CONFIG.MAX_HP, this.hp + 1);
         }
       } else {
@@ -160,14 +170,25 @@ export class Game {
       if (this.combo >= 2) ui.bumpCombo();
     }
 
+    // ウォームアップ消化 → 本番開始
+    if (warmup) {
+      this.warmupRemaining--;
+      if (this.warmupRemaining <= 0 && this.mode === 'normal') {
+        this.combo = 0;
+        this.perfectStreak = 0;
+        this._tierIndex = CONFIG.TIERS.indexOf(tierForSuccess(0));
+        ui.showBanner('START!', null, 800);
+      }
+    }
+
     ui.updateHUD(this);
 
-    const tier = this.mode === 'practice' ? CONFIG.TIERS[0] : tierForSuccess(this.successCount);
-    this.nextSpawnAt = this.gameTime + nextInterval(tier);
+    const intervalMs = this.inWarmup() ? CONFIG.WARMUP.intervalMs : this._tier().intervalMs;
+    this.nextSpawnAt = this.gameTime + nextInterval(intervalMs);
 
     if (this.mode === 'normal' && this.hp <= 0) {
       this._gameOver();
-    } else if (this.mode === 'practice' && this.successCount >= PRACTICE_GOAL) {
+    } else if (this.mode === 'practice' && this.warmupRemaining <= 0) {
       this.state = 'IDLE';
       this.attack = null;
       this.onGameOver({ practiceDone: true });
@@ -175,7 +196,7 @@ export class Game {
   }
 
   _dirAngle(dir) {
-    return { R: 0, D: Math.PI / 2, L: Math.PI, U: -Math.PI / 2 }[dir] || 0;
+    return NEED_ANGLE[dir] != null ? NEED_ANGLE[dir] : 0;
   }
 
   _gameOver() {
@@ -200,6 +221,6 @@ export class Game {
   }
 
   getRenderState() {
-    return { now: this.gameTime, attack: this.attack, combo: this.combo, hp: this.hp };
+    return { now: this.gameTime, attack: this.attack, combo: this.combo, hp: this.hp, warmup: this.inWarmup() };
   }
 }

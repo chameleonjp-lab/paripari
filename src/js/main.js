@@ -30,6 +30,7 @@ const game = new Game({
       return;
     }
     pendingResult = data;
+    ui.hideBanner();
     ui.setPlayUIVisible(false);
     ui.setBestLabel(data.best);
     ui.showResult(data);
@@ -49,6 +50,7 @@ function gotoTitle() {
   if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
   game.state = 'IDLE';
   game.attack = null;
+  ui.hideBanner();
   ui.setPlayUIVisible(false);
   ui.setBestLabel(storage.getBest());
   ui.showScreen('title');

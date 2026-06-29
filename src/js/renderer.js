@@ -1,11 +1,10 @@
 // Canvas 2D 描画 要件 §4.4 §6.4
 // ビジュアル/演出強化版: タイミングリング・方向受け流し・衝撃波・スコアポップ・
 // コンボオーラ・背景アンビエント。
-import { CONFIG } from './config.js';
+import { CONFIG, NEED_ANGLE } from './config.js';
 import { attackProgress } from './enemy.js';
 
 const PLAYER_R = 27;
-const DIR_ANGLE = { R: 0, D: Math.PI / 2, L: Math.PI, U: -Math.PI / 2 };
 
 export class Renderer {
   constructor(canvas) {
@@ -247,13 +246,15 @@ export class Renderer {
   }
 
   // ---- 攻撃（接近する斬撃＋トレイル）----
+  // 攻撃は上半分の5方向から（下部はボタン専用のため下からは来ない）
   attackStart(dir) {
     switch (dir) {
       case 'L': return { x: -40, y: this.lineY };
       case 'R': return { x: this.w + 40, y: this.lineY };
-      case 'U': return { x: this.w / 2, y: -40 };
-      case 'D': return { x: this.w / 2, y: this.h + 40 };
-      default: return { x: this.w / 2, y: -40 };
+      case 'U': return { x: this.w / 2, y: -50 };
+      case 'UL': return { x: -30, y: -40 };
+      case 'UR': return { x: this.w + 30, y: -40 };
+      default: return { x: this.w / 2, y: -50 };
     }
   }
 
@@ -350,7 +351,7 @@ export class Renderer {
     const d = this.deflect;
     const k = d.t / d.dur;            // 0..1
     const cx = this.w / 2, cy = this.lineY;
-    const ang = DIR_ANGLE[d.dir] != null ? DIR_ANGLE[d.dir] : 0;
+    const ang = NEED_ANGLE[d.dir] != null ? NEED_ANGLE[d.dir] : 0;
     const ease = 1 - Math.pow(1 - k, 3);
     const reach = PLAYER_R + 8 + ease * 64;
     const alpha = Math.max(0, 1 - k);
@@ -441,22 +442,26 @@ export class Renderer {
       grad.addColorStop(0, c + '0.6)'); grad.addColorStop(1, c + '0)');
       ctx.fillStyle = grad; ctx.fillRect(0, 0, this.w, this.h * 0.32);
     } else {
-      grad = ctx.createLinearGradient(0, this.h, 0, this.h * 0.68);
+      // UL / UR: 上のコーナーから放射状に発光
+      const cxg = dir === 'UL' ? 0 : this.w;
+      grad = ctx.createRadialGradient(cxg, 0, 10, cxg, 0, this.w * 0.55);
       grad.addColorStop(0, c + '0.6)'); grad.addColorStop(1, c + '0)');
-      ctx.fillStyle = grad; ctx.fillRect(0, this.h * 0.68, this.w, this.h * 0.32);
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, this.w, this.h * 0.6);
     }
     ctx.restore();
   }
 
-  // 攻撃が「来る方向」を示す矢印（答えではなく脅威の提示）
+  // 攻撃が「来る方向」を示す矢印（脅威の提示。進行方向＝プレイヤーへ向かう向き）
   _drawIncomingArrow(ctx, dir, a, p) {
     const cx = this.w / 2, cy = this.lineY;
     const off = 96 + Math.sin(this.t * 8) * 4;
-    let x = cx, y = cy, ch = '◀';
+    const d = off * 0.72;
+    let x = cx, y = cy, ch = '▼';
     if (dir === 'L') { x = cx - off; ch = '▶'; }
     else if (dir === 'R') { x = cx + off; ch = '◀'; }
     else if (dir === 'U') { y = cy - off; ch = '▼'; }
-    else { y = cy + off; ch = '▲'; }
+    else if (dir === 'UL') { x = cx - d; y = cy - d; ch = '↘'; }
+    else if (dir === 'UR') { x = cx + d; y = cy - d; ch = '↙'; }
     ctx.save();
     ctx.globalAlpha = 0.25 + a * 0.7;
     ctx.fillStyle = p > 0.68 ? '#ff5566' : '#ffb05b';
