@@ -2,7 +2,7 @@
 import { CONFIG, NEED_ANGLE, tierForSuccess, rankForScore } from './config.js';
 import { judgeTiming } from './judge.js';
 import { calcGain } from './scoring.js';
-import { createAttack, nextInterval } from './enemy.js';
+import { createAttack, nextInterval, pickTaps, currentSegment } from './enemy.js';
 import { vibrate, HAPTICS } from './haptics.js';
 import * as ui from './ui.js';
 import { getBest, setBest } from './storage.js';
@@ -16,14 +16,15 @@ export class Game {
     this.settings = settings;
     this.onGameOver = onGameOver || (() => {});
 
-    this.state = 'IDLE';       // IDLE | PLAYING | OVER
-    this.mode = 'normal';      // normal | practice
+    this.state = 'IDLE';
+    this.mode = 'normal';
     this.gameTime = 0;
 
     this.hitstopMs = 0;
     this.slowmoMs = 0;
 
     this._tierIndex = -1;
+    this._maxTaps = 1;
     this._resetStats();
   }
 
@@ -40,8 +41,9 @@ export class Game {
     this.totalAttempts = 0;
     this.attack = null;
     this.nextSpawnAt = 0;
-    this.warmupRemaining = 0;   // >0 の間はノーダメージ・低速の準備フェーズ
+    this.warmupRemaining = 0;
     this._tierIndex = -1;
+    this._maxTaps = 1;
   }
 
   start(mode = 'normal') {
@@ -51,7 +53,6 @@ export class Game {
     this.r.reducedMotion = !!this.settings.reducedMotion;
     this.r.clearTransients();
     this.particles.clear();
-    // 開始時のウォームアップ（案内＋低速ノーダメージ）
     this.warmupRemaining = mode === 'normal' ? CONFIG.WARMUP.count : PRACTICE_GOAL;
     this.nextSpawnAt = this.gameTime + 500;
     if (mode === 'normal') ui.showBanner('WARM UP', '来た方向の【反対】を押す');
@@ -65,17 +66,22 @@ export class Game {
     if (this.state !== 'PLAYING') return;
     const a = this.attack;
     if (!a || a.resolved || this.gameTime < a.spawnAt) return; // 空打ち
-    const delta = this.gameTime - a.impactAt;
+    const seg = currentSegment(a);
+    if (!seg || seg.resolved) return;
+    const delta = this.gameTime - seg.impactAt;
     const dirOk = dir === a.needDir;
     const result = judgeTiming(delta, dirOk);
-    this._resolve(a, result, delta);
+    this._resolveSegment(a, seg, result, delta);
   }
 
   update(dtSec) {
     const now = this.gameTime;
     const a = this.attack;
-    if (a && !a.resolved && now >= a.windowEnd) {
-      this._resolve(a, 'MISS', a.windowEnd - a.impactAt);
+    if (a && !a.resolved) {
+      const seg = currentSegment(a);
+      if (seg && !seg.resolved && now >= seg.impactAt + CONFIG.GOOD_WINDOW) {
+        this._resolveSegment(a, seg, 'MISS', CONFIG.GOOD_WINDOW);
+      }
     }
     if ((!this.attack || this.attack.resolved) && now >= this.nextSpawnAt && this.state === 'PLAYING') {
       this._spawn();
@@ -83,31 +89,43 @@ export class Game {
     this.particles.update(dtSec);
   }
 
-  _spawn() {
-    const visibleMs = this.inWarmup() ? CONFIG.WARMUP.visibleMs : this._tier().visibleMs;
-    this.attack = createAttack(this.gameTime, visibleMs);
-    this._checkTierUp();
-  }
-
   _tier() {
     return this.mode === 'practice' ? CONFIG.TIERS[0] : tierForSuccess(this.successCount);
   }
 
-  _checkTierUp() {
-    if (this.inWarmup() || this.mode !== 'normal') return;
-    const idx = CONFIG.TIERS.indexOf(tierForSuccess(this.successCount));
-    if (this._tierIndex >= 0 && idx > this._tierIndex) {
-      ui.showBanner('SPEED UP', null, 900); // 認知のための変化サイン
-    }
-    this._tierIndex = idx;
+  _spawn() {
+    const warm = this.inWarmup();
+    const tier = this._tier();
+    const opts = warm
+      ? { baseVisibleMs: CONFIG.WARMUP.visibleMs, speedJitter: 0, taps: 1 }
+      : { baseVisibleMs: tier.visibleMs, speedJitter: tier.speedJitter, taps: pickTaps(tier.tapWeights) };
+    this.attack = createAttack(this.gameTime, opts);
+    this.attack.warmup = warm;
+    this._checkTierUp();
   }
 
-  _resolve(a, result, delta) {
-    a.resolved = true;
+  _checkTierUp() {
+    if (this.inWarmup() || this.mode !== 'normal') return;
+    const tier = tierForSuccess(this.successCount);
+    const idx = CONFIG.TIERS.indexOf(tier);
+    if (this._tierIndex >= 0 && idx > this._tierIndex) {
+      if (tier.maxTaps > this._maxTaps && tier.maxTaps >= 2) {
+        ui.showBanner(`${tier.maxTaps}連 受け流し！`, '同じ向きに連続タップ', 1500);
+      } else {
+        ui.showBanner('SPEED UP', null, 900);
+      }
+    }
+    this._tierIndex = idx;
+    this._maxTaps = tier.maxTaps;
+  }
+
+  _resolveSegment(a, seg, result, delta) {
+    seg.resolved = true;
+    seg.result = result;
     a.resolvedAt = this.gameTime;
     a.result = result;
 
-    const warmup = this.inWarmup();
+    const warmup = a.warmup;
     const cx = this.r.w / 2;
     const cy = this.r.lineY;
     const reduced = this.settings.reducedMotion;
@@ -115,8 +133,11 @@ export class Game {
     if (result === 'MISS') {
       this.combo = 0;
       this.perfectStreak = 0;
-      // ウォームアップ/練習中はノーダメージ
-      if (this.mode === 'normal' && !warmup) this.hp = Math.max(0, this.hp - 1);
+      // 1攻撃あたりのHP減は最大1（分割を全部外しても即死しない）
+      if (this.mode === 'normal' && !warmup && !a.hpLost) {
+        this.hp = Math.max(0, this.hp - 1);
+        a.hpLost = true;
+      }
       vibrate(HAPTICS.miss);
       this.r.triggerFlash('#5a0a14', 0.45);
       this.r.triggerVignette('150,20,40', warmup ? 0.4 : 0.7);
@@ -140,7 +161,7 @@ export class Game {
       this.r.triggerShockwave(result);
 
       if (result === 'PERFECT') {
-        this.perfectCount += warmup ? 0 : 1;
+        if (!warmup) this.perfectCount++;
         this.perfectStreak++;
         vibrate(HAPTICS.perfect);
         this.r.triggerFlash('#fff7df', 0.5);
@@ -170,18 +191,26 @@ export class Game {
       if (this.combo >= 2) ui.bumpCombo();
     }
 
-    // ウォームアップ消化 → 本番開始
-    if (warmup) {
+    ui.updateHUD(this);
+
+    a.segIndex++;
+    if (a.segIndex >= a.segments.length) this._onAttackResolved(a);
+  }
+
+  _onAttackResolved(a) {
+    a.resolved = true;
+
+    if (a.warmup) {
       this.warmupRemaining--;
       if (this.warmupRemaining <= 0 && this.mode === 'normal') {
         this.combo = 0;
         this.perfectStreak = 0;
-        this._tierIndex = CONFIG.TIERS.indexOf(tierForSuccess(0));
+        const t0 = tierForSuccess(0);
+        this._tierIndex = CONFIG.TIERS.indexOf(t0);
+        this._maxTaps = t0.maxTaps;
         ui.showBanner('START!', null, 800);
       }
     }
-
-    ui.updateHUD(this);
 
     const intervalMs = this.inWarmup() ? CONFIG.WARMUP.intervalMs : this._tier().intervalMs;
     this.nextSpawnAt = this.gameTime + nextInterval(intervalMs);
