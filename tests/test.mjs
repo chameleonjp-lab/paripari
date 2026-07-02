@@ -46,5 +46,30 @@ eq(calcGain('GOOD', 0, GW), CONFIG.BASE_GOOD,
 eq(calcGain('PERFECT', 5, 0), Math.round(CONFIG.BASE_PERFECT * 1.5) + CONFIG.TIMING_BONUS_MAX,
   'PERFECT combo5 → 倍率1.5適用');
 
+// --- ティア生成（20段階・速度ランダム性→マルチタップ） ---
+const T = CONFIG.TIERS;
+eq(T.length, 20, 'ティアは20段階');
+let inc = true, jit = true;
+for (let i = 1; i < T.length; i++) {
+  if (T[i].successAt <= T[i - 1].successAt) inc = false;
+  if (T[i].speedJitter < T[i - 1].speedJitter - 1e-9) jit = false;
+}
+eq(inc, true, 'successAt は厳密増加');
+eq(jit, true, 'speedJitter は単調非減少');
+eq(T[0].speedJitter, 0, '最初のティアは速度ランダム性なし');
+eq(T[0].maxTaps, 1, '序盤は単発(1タップ)');
+eq(T.some((t) => t.maxTaps === 2), true, '途中で2連が登場');
+eq(T.some((t) => t.maxTaps === 3), true, '終盤で3連が登場');
+// 速度ランダム性が出揃った後にマルチタップが始まる
+const firstMulti = T.findIndex((t) => t.maxTaps >= 2);
+eq(T[firstMulti].speedJitter >= 0.34, true, 'マルチタップ開始時には速度ランダム性が最大付近');
+// tapWeights は確率分布（合計≈1, 非負）
+let distOk = true;
+for (const t of T) {
+  const sum = t.tapWeights.reduce((a, b) => a + b, 0);
+  if (Math.abs(sum - 1) > 1e-6 || t.tapWeights.some((w) => w < -1e-9)) distOk = false;
+}
+eq(distOk, true, 'tapWeights は合計1の確率分布');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

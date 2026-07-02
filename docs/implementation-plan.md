@@ -51,18 +51,19 @@ function judgeTiming(deltaMs, dirOk, cfg):
 
 ### 3.2 攻撃の時間モデル（enemy.js / game.js）
 ```
-spawnAttack(now, tier):
-  dir = randomDir(tier.directions)        # 攻撃の来る方向
-  telegraphAt = now                        # 予兆開始
-  impactAt   = now + tier.visibleMs        # T（パリィライン到達）
-  windowEnd  = impactAt + cfg.GOOD_WINDOW   # 無入力MISS確定
-  state = 'TELEGRAPH'
+spawnAttack(now, tier, warmup):
+  dir       = randomDir(CONFIG.DIRECTIONS)            # 上半分5方向
+  visibleMs = baseVisible * (1 ± tier.speedJitter)    # 速度ランダム性(前半で増加)
+  taps      = warmup ? 1 : pickTaps(tier.tapWeights)  # 分割数 1..3(後半で増加)
+  gap       = clamp(visibleMs*0.30, 155, 260)
+  segments  = [ {impactAt: now+visibleMs + k*gap} for k in 0..taps-1 ]
+  segIndex  = 0; hpLost = false
 ```
-- 各フレーム: `now >= windowEnd` かつ未判定 → 強制 MISS。
-- 入力時: 予兆中(now>=telegraphAt) の最初の1回のみ受理。
-  - `delta = inputTime - impactAt`
-  - `dirOk = (inputDir == opposite(dir))`  # 反対側を押す
-  - `result = judgeTiming(delta, dirOk, cfg)`
+- 各フレーム: 現分割の `now >= impactAt+GOOD_WINDOW` かつ未判定 → 強制 MISS して次分割へ。
+- 入力時: 現分割(`segments[segIndex]`)に対し判定。
+  - `delta = now - seg.impactAt` / `dirOk = (inputDir == opposite(dir))`（反対側）
+  - `result = judgeTiming(delta, dirOk)` → 解決して `segIndex++`
+  - 全分割解決で攻撃完了。**1攻撃のHP減は最大1**（`hpLost`でガード）。
 
 ### 3.3 進行・ティア昇格（game.js）
 ```

@@ -471,34 +471,31 @@ const CONFIG = {
 
   // --- ランクしきい値（総スコア）---
   RANKS: [
-    { rank: 'S', min: 12000 },
-    { rank: 'A', min: 7000 },
-    { rank: 'B', min: 3500 },
+    { rank: 'S', min: 18000 },
+    { rank: 'A', min: 10000 },
+    { rank: 'B', min: 5000 },
     { rank: 'C', min: 0 },
   ],
 
   // 攻撃は上半分から来る5方向（下部はボタン専用エリア）
-  // L=左, R=右, U=上, UL=左斜め上, UR=右斜め上
   DIRECTIONS: ['L', 'R', 'U', 'UL', 'UR'],
 
   // --- ウォームアップ（開始時の案内＋低速ノーダメージ準備）---
   WARMUP: { count: 5, visibleMs: 1200, intervalMs: 1150 },
 
-  // --- 難易度ティア（方向は常に5方向。速度・密度のみで難化）---
-  TIERS: [
-    { successAt: 0,  visibleMs: 980, intervalMs: 1080 },
-    { successAt: 8,  visibleMs: 850, intervalMs: 950 },
-    { successAt: 20, visibleMs: 720, intervalMs: 820 },
-    { successAt: 34, visibleMs: 620, intervalMs: 720 },
-    { successAt: 50, visibleMs: 540, intervalMs: 640 },
-    { successAt: 70, visibleMs: 470, intervalMs: 560 },
-  ],
+  // --- 分割バー（マルチタップ）の各分割の到達間隔 ---
+  SEGMENT_GAP: { ratio: 0.30, min: 155, max: 260 },
 
-  INTERVAL_JITTER: 0.18,
+  // --- 最大ティア ---
+  MAX_TIER: 20,
+
+  INTERVAL_JITTER: 0.12, // 攻撃間隔の基本ゆらぎ（速度ジッタとは別）
+
+  // TIERS は下で生成（20段階）
+  TIERS: [],
 };
 
 // 攻撃方向 → 受け流しに必要な入力（反対側）
-// 上半分の攻撃 ↔ 下半分のボタン が対応する
 const OPPOSITE = { L: 'R', R: 'L', U: 'D', UL: 'DR', UR: 'DL' };
 
 // 受け流し方向（=ボタン）の角度（screen座標: 0=右, +y=下）
@@ -509,6 +506,44 @@ const NEED_ANGLE = {
   DL: (3 * Math.PI) / 4,
   L: Math.PI,
 };
+
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (t) => t * t * (3 - 2 * t);
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+/**
+ * 20段階のティアを生成する。
+ * 前半(〜ティア10): 速度を詰めつつ「速度ランダム性(speedJitter)」を 0→最大 へ。
+ * 後半(ティア11〜): 速度ランダム性は出揃い、必要タップ数を 1→最大3 へ段階的に。
+ * tapWeights: [p(1回), p(2回), p(3回)] の確率分布。
+ */
+function buildTiers() {
+  const out = [];
+  for (let n = 0; n < CONFIG.MAX_TIER; n++) {
+    const speedT = smooth(clamp(n / 9, 0, 1));      // ティア10で速度は床に到達
+    const visibleMs = Math.round(lerp(980, 440, speedT));
+    const intervalMs = Math.round(lerp(1080, 540, speedT));
+    const speedJitter = +clamp((n / 9) * 0.35, 0, 0.35).toFixed(3); // ±割合。ティア10で最大0.35
+
+    // マルチタップの確率（ティア11〜で2回、ティア16〜で3回が混ざる）
+    const p2 = clamp((n - 9) * 0.07, 0, 0.5);
+    const p3 = clamp((n - 14) * 0.06, 0, 0.3);
+    const p1 = Math.max(0, 1 - p2 - p3);
+    const maxTaps = p3 > 0 ? 3 : p2 > 0 ? 2 : 1;
+
+    out.push({
+      successAt: Math.round(5 * n + 0.5 * n * n),
+      visibleMs,
+      intervalMs,
+      speedJitter,
+      tapWeights: [p1, p2, p3],
+      maxTaps,
+    });
+  }
+  return out;
+}
+
+CONFIG.TIERS = buildTiers();
 
 function tierForSuccess(successCount) {
   const tiers = CONFIG.TIERS;
@@ -825,32 +860,71 @@ function lockGestures() {
 const {CONFIG, OPPOSITE} = require('config');
 let _id = 0;
 
+// tapWeights から必要タップ数(1..3)を抽選
+function pickTaps(weights) {
+  const r = Math.random();
+  let acc = 0;
+  for (let i = 0; i < weights.length; i++) {
+    acc += weights[i];
+    if (r < acc) return i + 1;
+  }
+  return 1;
+}
+
 /**
  * 攻撃を生成する。
  * @param {number} now performance.now()
- * @param {number} visibleMs 予兆+接近の合計可視時間
- * @param {string[]} dirs 出現方向の候補（既定 CONFIG.DIRECTIONS）
+ * @param {object} opts { baseVisibleMs, speedJitter, taps, dirs }
  */
-function createAttack(now, visibleMs, dirs = CONFIG.DIRECTIONS) {
+function createAttack(now, opts) {
+  const {
+    baseVisibleMs,
+    speedJitter = 0,
+    taps = 1,
+    dirs = CONFIG.DIRECTIONS,
+  } = opts;
+
   const dir = dirs[(Math.random() * dirs.length) | 0];
+  // 速度ランダム性: バーごとに可視時間を ±speedJitter で揺らす
+  const jitter = 1 + (Math.random() * 2 - 1) * speedJitter;
+  const visibleMs = Math.max(300, Math.round(baseVisibleMs * jitter));
+
+  const g = CONFIG.SEGMENT_GAP;
+  const gap = Math.min(g.max, Math.max(g.min, visibleMs * g.ratio));
+
+  const segments = [];
+  for (let k = 0; k < taps; k++) {
+    segments.push({ impactAt: now + visibleMs + k * gap, resolved: false, result: null });
+  }
+
   return {
     id: ++_id,
-    dir,                          // 攻撃の来る方向 L/R/U/UL/UR
-    needDir: OPPOSITE[dir],       // 受け流しに必要な入力（反対側）
+    dir,
+    needDir: OPPOSITE[dir],
     spawnAt: now,
-    impactAt: now + visibleMs,
-    windowEnd: now + visibleMs + CONFIG.GOOD_WINDOW,
     visibleMs,
-    resolved: false,
+    taps,
+    segments,
+    segIndex: 0,        // 次に判定すべき分割
+    hpLost: false,      // この攻撃で既にHPを失ったか（1攻撃あたりHP減は最大1）
+    warmup: false,
+    resolved: false,    // 全分割が解決済みか
     resolvedAt: 0,
-    result: null,
+    result: null,       // 直近の分割結果（余韻演出用）
   };
 }
 
-// 接近の進捗 0..1（予兆開始→インパクト）。
-function attackProgress(attack, now) {
-  const p = (now - attack.spawnAt) / (attack.impactAt - attack.spawnAt);
-  return Math.max(0, Math.min(1.4, p));
+function currentSegment(attack) {
+  return attack.segments[Math.min(attack.segIndex, attack.segments.length - 1)];
+}
+
+// 次に叩くべき分割への収束進捗 0..1（分割ごとにリングが再収束する）
+function ringProgress(attack, now) {
+  const i = attack.segIndex;
+  const to = currentSegment(attack).impactAt;
+  const from = i > 0 ? attack.segments[i - 1].impactAt : attack.spawnAt;
+  const span = Math.max(1, to - from);
+  return Math.max(0, Math.min(1.4, (now - from) / span));
 }
 
 function nextInterval(intervalMs) {
@@ -860,7 +934,7 @@ function nextInterval(intervalMs) {
 }
 
 
-  Object.assign(exports, { createAttack, attackProgress, nextInterval });
+  Object.assign(exports, { pickTaps, createAttack, currentSegment, ringProgress, nextInterval });
   });
 
   def('renderer', function(module, exports, require){
@@ -868,7 +942,7 @@ function nextInterval(intervalMs) {
 // ビジュアル/演出強化版: タイミングリング・方向受け流し・衝撃波・スコアポップ・
 // コンボオーラ・背景アンビエント。
 const {CONFIG, NEED_ANGLE} = require('config');
-const {attackProgress} = require('enemy');
+const {ringProgress} = require('enemy');
 const PLAYER_R = 27;
 
 class Renderer {
@@ -1083,7 +1157,7 @@ class Renderer {
   // ---- タイミングリング（収束）----
   _drawTimingRing(ctx, attack, now) {
     const cx = this.w / 2, cy = this.lineY;
-    const p = attackProgress(attack, now); // 0..(>1)
+    const p = ringProgress(attack, now); // 0..(>1) 次の分割への収束
     const maxR = Math.min(this.w, this.h) * 0.42;
     // p=1 でプレイヤー外周(PLAYER_R)にちょうど一致
     const r = PLAYER_R + (maxR - PLAYER_R) * (1 - Math.min(p, 1));
@@ -1124,7 +1198,7 @@ class Renderer {
   }
 
   _drawAttack(ctx, attack, now) {
-    const p = attackProgress(attack, now);
+    const p = ringProgress(attack, now);
     const start = this.attackStart(attack.dir);
     const cx = this.w / 2, cy = this.lineY;
     const e = p * p; // ease-in
@@ -1137,6 +1211,10 @@ class Renderer {
     const danger = p > 0.68;
     const col = danger ? '#ff3b54' : '#ff9a5b';
 
+    // 残りタップ数ぶんバーを長く（＝重い分割攻撃に見せる）
+    const remaining = attack.segments.length - attack.segIndex;
+    const lenScale = 1 + (remaining - 1) * 0.6;
+
     // トレイル（残像）
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
@@ -1145,7 +1223,7 @@ class Renderer {
       const tx = start.x + (cx - start.x) * pe;
       const ty = start.y + (cy - start.y) * pe;
       ctx.globalAlpha = (0.12) * (1 - k / 4) * Math.min(1, p + 0.3);
-      this._slash(ctx, tx, ty, angle, 50 + 30 * pe, col, 4);
+      this._slash(ctx, tx, ty, angle, (50 + 30 * pe) * lenScale, col, 4);
     }
     ctx.restore();
 
@@ -1155,7 +1233,43 @@ class Renderer {
     ctx.save();
     ctx.globalAlpha = Math.min(1, 0.4 + p);
     ctx.shadowColor = col; ctx.shadowBlur = 18;
-    this._slash(ctx, x, y, angle, 62 + 42 * e, col, 5 + 6 * e);
+    const len = (62 + 42 * e) * lenScale;
+    this._slash(ctx, x, y, angle, len, col, 5 + 6 * e);
+    // 分割の刻み（残りタップ位置）
+    if (remaining > 1) {
+      ctx.shadowBlur = 0;
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.fillStyle = '#fff';
+      for (let s = 1; s < remaining; s++) {
+        const px = -len / 2 + (len / remaining) * s;
+        ctx.beginPath();
+        ctx.arc(px, 0, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+
+    // 残りタップ数のピップを プレイヤー上に表示
+    if (attack.taps > 1) this._drawTapPips(ctx, attack);
+  }
+
+  _drawTapPips(ctx, attack) {
+    const cx = this.w / 2, cy = this.lineY - 46;
+    const total = attack.taps;
+    const done = attack.segIndex;
+    const gap = 16;
+    const w = (total - 1) * gap;
+    ctx.save();
+    for (let i = 0; i < total; i++) {
+      const x = cx - w / 2 + i * gap;
+      const remaining = i >= done;
+      ctx.globalAlpha = remaining ? 1 : 0.3;
+      ctx.fillStyle = remaining ? '#ffd35b' : 'rgba(255,255,255,0.5)';
+      ctx.beginPath();
+      ctx.arc(x, cy, remaining ? 5 : 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -1459,7 +1573,7 @@ function reflectSettings(s) {
 const {CONFIG, NEED_ANGLE, tierForSuccess, rankForScore} = require('config');
 const {judgeTiming} = require('judge');
 const {calcGain} = require('scoring');
-const {createAttack, nextInterval} = require('enemy');
+const {createAttack, nextInterval, pickTaps, currentSegment} = require('enemy');
 const {vibrate, HAPTICS} = require('haptics');
 const ui = require('ui');
 const {getBest, setBest} = require('storage');
@@ -1472,14 +1586,15 @@ class Game {
     this.settings = settings;
     this.onGameOver = onGameOver || (() => {});
 
-    this.state = 'IDLE';       // IDLE | PLAYING | OVER
-    this.mode = 'normal';      // normal | practice
+    this.state = 'IDLE';
+    this.mode = 'normal';
     this.gameTime = 0;
 
     this.hitstopMs = 0;
     this.slowmoMs = 0;
 
     this._tierIndex = -1;
+    this._maxTaps = 1;
     this._resetStats();
   }
 
@@ -1496,8 +1611,9 @@ class Game {
     this.totalAttempts = 0;
     this.attack = null;
     this.nextSpawnAt = 0;
-    this.warmupRemaining = 0;   // >0 の間はノーダメージ・低速の準備フェーズ
+    this.warmupRemaining = 0;
     this._tierIndex = -1;
+    this._maxTaps = 1;
   }
 
   start(mode = 'normal') {
@@ -1507,7 +1623,6 @@ class Game {
     this.r.reducedMotion = !!this.settings.reducedMotion;
     this.r.clearTransients();
     this.particles.clear();
-    // 開始時のウォームアップ（案内＋低速ノーダメージ）
     this.warmupRemaining = mode === 'normal' ? CONFIG.WARMUP.count : PRACTICE_GOAL;
     this.nextSpawnAt = this.gameTime + 500;
     if (mode === 'normal') ui.showBanner('WARM UP', '来た方向の【反対】を押す');
@@ -1521,17 +1636,22 @@ class Game {
     if (this.state !== 'PLAYING') return;
     const a = this.attack;
     if (!a || a.resolved || this.gameTime < a.spawnAt) return; // 空打ち
-    const delta = this.gameTime - a.impactAt;
+    const seg = currentSegment(a);
+    if (!seg || seg.resolved) return;
+    const delta = this.gameTime - seg.impactAt;
     const dirOk = dir === a.needDir;
     const result = judgeTiming(delta, dirOk);
-    this._resolve(a, result, delta);
+    this._resolveSegment(a, seg, result, delta);
   }
 
   update(dtSec) {
     const now = this.gameTime;
     const a = this.attack;
-    if (a && !a.resolved && now >= a.windowEnd) {
-      this._resolve(a, 'MISS', a.windowEnd - a.impactAt);
+    if (a && !a.resolved) {
+      const seg = currentSegment(a);
+      if (seg && !seg.resolved && now >= seg.impactAt + CONFIG.GOOD_WINDOW) {
+        this._resolveSegment(a, seg, 'MISS', CONFIG.GOOD_WINDOW);
+      }
     }
     if ((!this.attack || this.attack.resolved) && now >= this.nextSpawnAt && this.state === 'PLAYING') {
       this._spawn();
@@ -1539,31 +1659,43 @@ class Game {
     this.particles.update(dtSec);
   }
 
-  _spawn() {
-    const visibleMs = this.inWarmup() ? CONFIG.WARMUP.visibleMs : this._tier().visibleMs;
-    this.attack = createAttack(this.gameTime, visibleMs);
-    this._checkTierUp();
-  }
-
   _tier() {
     return this.mode === 'practice' ? CONFIG.TIERS[0] : tierForSuccess(this.successCount);
   }
 
-  _checkTierUp() {
-    if (this.inWarmup() || this.mode !== 'normal') return;
-    const idx = CONFIG.TIERS.indexOf(tierForSuccess(this.successCount));
-    if (this._tierIndex >= 0 && idx > this._tierIndex) {
-      ui.showBanner('SPEED UP', null, 900); // 認知のための変化サイン
-    }
-    this._tierIndex = idx;
+  _spawn() {
+    const warm = this.inWarmup();
+    const tier = this._tier();
+    const opts = warm
+      ? { baseVisibleMs: CONFIG.WARMUP.visibleMs, speedJitter: 0, taps: 1 }
+      : { baseVisibleMs: tier.visibleMs, speedJitter: tier.speedJitter, taps: pickTaps(tier.tapWeights) };
+    this.attack = createAttack(this.gameTime, opts);
+    this.attack.warmup = warm;
+    this._checkTierUp();
   }
 
-  _resolve(a, result, delta) {
-    a.resolved = true;
+  _checkTierUp() {
+    if (this.inWarmup() || this.mode !== 'normal') return;
+    const tier = tierForSuccess(this.successCount);
+    const idx = CONFIG.TIERS.indexOf(tier);
+    if (this._tierIndex >= 0 && idx > this._tierIndex) {
+      if (tier.maxTaps > this._maxTaps && tier.maxTaps >= 2) {
+        ui.showBanner(`${tier.maxTaps}連 受け流し！`, '同じ向きに連続タップ', 1500);
+      } else {
+        ui.showBanner('SPEED UP', null, 900);
+      }
+    }
+    this._tierIndex = idx;
+    this._maxTaps = tier.maxTaps;
+  }
+
+  _resolveSegment(a, seg, result, delta) {
+    seg.resolved = true;
+    seg.result = result;
     a.resolvedAt = this.gameTime;
     a.result = result;
 
-    const warmup = this.inWarmup();
+    const warmup = a.warmup;
     const cx = this.r.w / 2;
     const cy = this.r.lineY;
     const reduced = this.settings.reducedMotion;
@@ -1571,8 +1703,11 @@ class Game {
     if (result === 'MISS') {
       this.combo = 0;
       this.perfectStreak = 0;
-      // ウォームアップ/練習中はノーダメージ
-      if (this.mode === 'normal' && !warmup) this.hp = Math.max(0, this.hp - 1);
+      // 1攻撃あたりのHP減は最大1（分割を全部外しても即死しない）
+      if (this.mode === 'normal' && !warmup && !a.hpLost) {
+        this.hp = Math.max(0, this.hp - 1);
+        a.hpLost = true;
+      }
       vibrate(HAPTICS.miss);
       this.r.triggerFlash('#5a0a14', 0.45);
       this.r.triggerVignette('150,20,40', warmup ? 0.4 : 0.7);
@@ -1596,7 +1731,7 @@ class Game {
       this.r.triggerShockwave(result);
 
       if (result === 'PERFECT') {
-        this.perfectCount += warmup ? 0 : 1;
+        if (!warmup) this.perfectCount++;
         this.perfectStreak++;
         vibrate(HAPTICS.perfect);
         this.r.triggerFlash('#fff7df', 0.5);
@@ -1626,18 +1761,26 @@ class Game {
       if (this.combo >= 2) ui.bumpCombo();
     }
 
-    // ウォームアップ消化 → 本番開始
-    if (warmup) {
+    ui.updateHUD(this);
+
+    a.segIndex++;
+    if (a.segIndex >= a.segments.length) this._onAttackResolved(a);
+  }
+
+  _onAttackResolved(a) {
+    a.resolved = true;
+
+    if (a.warmup) {
       this.warmupRemaining--;
       if (this.warmupRemaining <= 0 && this.mode === 'normal') {
         this.combo = 0;
         this.perfectStreak = 0;
-        this._tierIndex = CONFIG.TIERS.indexOf(tierForSuccess(0));
+        const t0 = tierForSuccess(0);
+        this._tierIndex = CONFIG.TIERS.indexOf(t0);
+        this._maxTaps = t0.maxTaps;
         ui.showBanner('START!', null, 800);
       }
     }
-
-    ui.updateHUD(this);
 
     const intervalMs = this.inWarmup() ? CONFIG.WARMUP.intervalMs : this._tier().intervalMs;
     this.nextSpawnAt = this.gameTime + nextInterval(intervalMs);

@@ -2,7 +2,7 @@
 // ビジュアル/演出強化版: タイミングリング・方向受け流し・衝撃波・スコアポップ・
 // コンボオーラ・背景アンビエント。
 import { CONFIG, NEED_ANGLE } from './config.js';
-import { attackProgress } from './enemy.js';
+import { ringProgress } from './enemy.js';
 
 const PLAYER_R = 27;
 
@@ -218,7 +218,7 @@ export class Renderer {
   // ---- タイミングリング（収束）----
   _drawTimingRing(ctx, attack, now) {
     const cx = this.w / 2, cy = this.lineY;
-    const p = attackProgress(attack, now); // 0..(>1)
+    const p = ringProgress(attack, now); // 0..(>1) 次の分割への収束
     const maxR = Math.min(this.w, this.h) * 0.42;
     // p=1 でプレイヤー外周(PLAYER_R)にちょうど一致
     const r = PLAYER_R + (maxR - PLAYER_R) * (1 - Math.min(p, 1));
@@ -259,7 +259,7 @@ export class Renderer {
   }
 
   _drawAttack(ctx, attack, now) {
-    const p = attackProgress(attack, now);
+    const p = ringProgress(attack, now);
     const start = this.attackStart(attack.dir);
     const cx = this.w / 2, cy = this.lineY;
     const e = p * p; // ease-in
@@ -272,6 +272,10 @@ export class Renderer {
     const danger = p > 0.68;
     const col = danger ? '#ff3b54' : '#ff9a5b';
 
+    // 残りタップ数ぶんバーを長く（＝重い分割攻撃に見せる）
+    const remaining = attack.segments.length - attack.segIndex;
+    const lenScale = 1 + (remaining - 1) * 0.6;
+
     // トレイル（残像）
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
@@ -280,7 +284,7 @@ export class Renderer {
       const tx = start.x + (cx - start.x) * pe;
       const ty = start.y + (cy - start.y) * pe;
       ctx.globalAlpha = (0.12) * (1 - k / 4) * Math.min(1, p + 0.3);
-      this._slash(ctx, tx, ty, angle, 50 + 30 * pe, col, 4);
+      this._slash(ctx, tx, ty, angle, (50 + 30 * pe) * lenScale, col, 4);
     }
     ctx.restore();
 
@@ -290,7 +294,43 @@ export class Renderer {
     ctx.save();
     ctx.globalAlpha = Math.min(1, 0.4 + p);
     ctx.shadowColor = col; ctx.shadowBlur = 18;
-    this._slash(ctx, x, y, angle, 62 + 42 * e, col, 5 + 6 * e);
+    const len = (62 + 42 * e) * lenScale;
+    this._slash(ctx, x, y, angle, len, col, 5 + 6 * e);
+    // 分割の刻み（残りタップ位置）
+    if (remaining > 1) {
+      ctx.shadowBlur = 0;
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.fillStyle = '#fff';
+      for (let s = 1; s < remaining; s++) {
+        const px = -len / 2 + (len / remaining) * s;
+        ctx.beginPath();
+        ctx.arc(px, 0, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+
+    // 残りタップ数のピップを プレイヤー上に表示
+    if (attack.taps > 1) this._drawTapPips(ctx, attack);
+  }
+
+  _drawTapPips(ctx, attack) {
+    const cx = this.w / 2, cy = this.lineY - 46;
+    const total = attack.taps;
+    const done = attack.segIndex;
+    const gap = 16;
+    const w = (total - 1) * gap;
+    ctx.save();
+    for (let i = 0; i < total; i++) {
+      const x = cx - w / 2 + i * gap;
+      const remaining = i >= done;
+      ctx.globalAlpha = remaining ? 1 : 0.3;
+      ctx.fillStyle = remaining ? '#ffd35b' : 'rgba(255,255,255,0.5)';
+      ctx.beginPath();
+      ctx.arc(x, cy, remaining ? 5 : 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
