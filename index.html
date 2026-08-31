@@ -57,6 +57,22 @@
         <button id="btn-play" class="btn btn-primary">プレイ</button>
         <button id="btn-howto" class="btn">遊び方</button>
         <button id="btn-settings" class="btn">設定</button>
+        <button id="btn-home-share" class="btn">ゲームをシェア</button>
+        <p id="home-share-status" class="platform-status" role="status" aria-live="polite"></p>
+        <a class="platform-link" href="https://chameleonjp-lab.github.io/chameleonjp_lab/" target="_blank" rel="noopener noreferrer">カメレオンJPの実験場へ</a>
+      </div>
+    </section>
+
+    <!-- 名前確認（ランキング送信の前提） -->
+    <section id="screen-name" class="screen hidden">
+      <div class="panel name-panel">
+        <h2>名前を入力</h2>
+        <p class="name-help">ランキングに表示する名前を入力してください。</p>
+        <label class="name-label" for="player-name">表示名</label>
+        <input id="player-name" class="name-input" type="text" maxlength="20" autocomplete="nickname" placeholder="名前を入力してください">
+        <p id="name-error" class="platform-status error" role="alert"></p>
+        <button id="btn-name-start" class="btn btn-primary">この名前で開始</button>
+        <button id="btn-name-back" class="btn">もどる</button>
       </div>
     </section>
 
@@ -118,8 +134,18 @@
           <div><span id="result-perfect">0%</span><small>PERFECT率</small></div>
           <div><span id="result-tier">1</span><small>到達ティア</small></div>
         </div>
+        <p id="result-player" class="platform-status"></p>
+        <textarea id="result-share-text" class="result-share-text" readonly aria-label="結果のシェア文"></textarea>
+        <button id="btn-result-share" class="btn">結果をシェア（文面をコピー）</button>
+        <p id="result-share-status" class="platform-status" role="status" aria-live="polite"></p>
+        <section class="ranking-box" aria-labelledby="result-ranking-title">
+          <h3 id="result-ranking-title">スコアランキング TOP10</h3>
+          <ol id="result-ranking-list"><li>ランキングを読み込み中…</li></ol>
+          <p id="result-ranking-status" class="platform-status" role="status" aria-live="polite"></p>
+        </section>
         <button id="btn-retry" class="btn btn-primary">もう一回</button>
         <button id="btn-result-home" class="btn">ホーム</button>
+        <a class="platform-link" href="https://chameleonjp-lab.github.io/chameleonjp_lab/" target="_blank" rel="noopener noreferrer">カメレオンJPの実験場へ</a>
       </div>
     </section>
 

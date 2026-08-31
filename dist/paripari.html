@@ -218,6 +218,23 @@ html, body {
 .tagline b, .ready-hint b { color: var(--gold); }
 .best { color: var(--cyan); font-weight: 800; margin-bottom: 22px; letter-spacing: 2px; }
 
+.platform-link { display: block; margin: 10px 0 0; color: var(--cyan); font-weight: 700; text-decoration: underline; }
+.platform-status { min-height: 1.3em; margin: 5px 0; color: rgba(233,238,247,.72); font-size: 13px; line-height: 1.4; }
+.platform-status.error { color: var(--crimson); }
+.name-panel { max-width: 340px; }
+.name-help { margin: 0 0 14px; color: rgba(233,238,247,.75); line-height: 1.5; }
+.name-label { display: block; margin-bottom: 6px; color: var(--gold); font-size: 13px; font-weight: 800; text-align: left; }
+.name-input { width: 100%; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.08); color: var(--ink); font: inherit; font-size: 16px; outline: none; }
+.name-input:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(91,220,255,.18); }
+.name-input::placeholder { color: rgba(233,238,247,.45); }
+.result-share-text { display: block; width: 100%; min-height: 68px; margin: 8px 0; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.08); color: var(--ink); font: 13px/1.45 inherit; resize: vertical; }
+.ranking-box { margin: 12px 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.05); text-align: left; }
+.ranking-box h3 { margin: 0 0 7px; color: var(--gold); font-size: 15px; text-align: center; }
+.ranking-box ol { margin: 0; padding-left: 24px; }
+.ranking-box li { padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.09); font-size: 13px; }
+.ranking-box .platform-status { text-align: center; }
+.result-panel { max-height: calc(100dvh - 36px); overflow-y: auto; padding: 4px 0 20px; }
+
 .btn {
   display: block;
   width: 100%;
@@ -341,6 +358,22 @@ html, body {
         <button id="btn-play" class="btn btn-primary">プレイ</button>
         <button id="btn-howto" class="btn">遊び方</button>
         <button id="btn-settings" class="btn">設定</button>
+        <button id="btn-home-share" class="btn">ゲームをシェア</button>
+        <p id="home-share-status" class="platform-status" role="status" aria-live="polite"></p>
+        <a class="platform-link" href="https://chameleonjp-lab.github.io/chameleonjp_lab/" target="_blank" rel="noopener noreferrer">カメレオンJPの実験場へ</a>
+      </div>
+    </section>
+
+    <!-- 名前確認（ランキング送信の前提） -->
+    <section id="screen-name" class="screen hidden">
+      <div class="panel name-panel">
+        <h2>名前を入力</h2>
+        <p class="name-help">ランキングに表示する名前を入力してください。</p>
+        <label class="name-label" for="player-name">表示名</label>
+        <input id="player-name" class="name-input" type="text" maxlength="20" autocomplete="nickname" placeholder="名前を入力してください">
+        <p id="name-error" class="platform-status error" role="alert"></p>
+        <button id="btn-name-start" class="btn btn-primary">この名前で開始</button>
+        <button id="btn-name-back" class="btn">もどる</button>
       </div>
     </section>
 
@@ -402,8 +435,18 @@ html, body {
           <div><span id="result-perfect">0%</span><small>PERFECT率</small></div>
           <div><span id="result-tier">1</span><small>到達ティア</small></div>
         </div>
+        <p id="result-player" class="platform-status"></p>
+        <textarea id="result-share-text" class="result-share-text" readonly aria-label="結果のシェア文"></textarea>
+        <button id="btn-result-share" class="btn">結果をシェア（文面をコピー）</button>
+        <p id="result-share-status" class="platform-status" role="status" aria-live="polite"></p>
+        <section class="ranking-box" aria-labelledby="result-ranking-title">
+          <h3 id="result-ranking-title">スコアランキング TOP10</h3>
+          <ol id="result-ranking-list"><li>ランキングを読み込み中…</li></ol>
+          <p id="result-ranking-status" class="platform-status" role="status" aria-live="polite"></p>
+        </section>
         <button id="btn-retry" class="btn btn-primary">もう一回</button>
         <button id="btn-result-home" class="btn">ホーム</button>
+        <a class="platform-link" href="https://chameleonjp-lab.github.io/chameleonjp_lab/" target="_blank" rel="noopener noreferrer">カメレオンJPの実験場へ</a>
       </div>
     </section>
 
@@ -1320,7 +1363,7 @@ class Renderer {
 const {CONFIG} = require('config');
 const $ = (id) => document.getElementById(id);
 
-const SCREENS = ['title', 'howto', 'settings', 'ready', 'pause', 'result'];
+const SCREENS = ['title', 'name', 'howto', 'settings', 'ready', 'pause', 'result'];
 
 function showScreen(name) {
   SCREENS.forEach((s) => $('screen-' + s).classList.toggle('hidden', s !== name));
@@ -1616,6 +1659,7 @@ const {setupInput, lockGestures} = require('input');
 const {setHapticsEnabled} = require('haptics');
 const ui = require('ui');
 const storage = require('storage');
+const {callRankingRpc, currentGameUrl, escapeHtml, shareOrCopy} = require('platform');
 const $ = (id) => document.getElementById(id);
 
 const canvas = $('game-canvas');
@@ -1628,6 +1672,12 @@ renderer.reducedMotion = !!settings.reducedMotion;
 
 let pendingResult = null;   // リザルト表示用
 let countdownTimer = null;
+let pendingMode = 'normal';
+let playerName = (localStorage.getItem('paripari.player-name') || '').trim();
+let resultSequence = 0;
+
+const GAME_SLUG = 'paripari';
+const CLIENT_VERSION = 'paripari-2026-08-31-platform';
 
 const game = new Game({
   renderer, particles, settings,
@@ -1641,6 +1691,7 @@ const game = new Game({
     ui.setPlayUIVisible(false);
     ui.setBestLabel(data.best);
     ui.showResult(data);
+    renderResultPlatform(data);
   },
 });
 
@@ -1684,13 +1735,88 @@ function startCountdown(onDone) {
 }
 
 function beginNormalGame() {
-  startCountdown(() => game.start('normal'));
+  showNameScreen('normal');
 }
 
 function beginPractice() {
+  showNameScreen('practice');
+}
+
+function showNameScreen(mode) {
+  pendingMode = mode;
+  $('player-name').value = playerName;
+  $('name-error').textContent = '';
+  ui.showScreen('name');
+  queueMicrotask(() => $('player-name').focus({ preventScroll: true }));
+}
+
+function startNamedGame() {
+  playerName = $('player-name').value.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 20);
+  $('player-name').value = playerName;
+  if (!playerName) {
+    $('name-error').textContent = '名前を入力してから開始してください。';
+    $('player-name').focus();
+    return;
+  }
+  localStorage.setItem('paripari.player-name', playerName);
+  if (pendingMode === 'normal') {
+    startCountdown(() => game.start('normal'));
+    return;
+  }
   ui.hideAllScreens();
   ui.setPlayUIVisible(true);
   game.start('practice');
+}
+
+function shareTextForResult(data) {
+  return `${playerName}さんのパリパリ結果：${data.score.toLocaleString()}点、ランク${data.rank}！\n最大コンボ${data.maxCombo}・PERFECT率${data.perfectRate}%・到達ティア${data.tier}\n${currentGameUrl()}\n#パリパリ #ミニゲーム`;
+}
+
+function shareTextForHome() {
+  return `パリパリ：来た方向と反対を、ちょうどの瞬間に弾け。\n${currentGameUrl()}\n#パリパリ #ミニゲーム`;
+}
+
+function renderRanking(rows) {
+  const list = Array.isArray(rows) ? rows.slice(0, 10) : [];
+  $('result-ranking-list').innerHTML = list.length
+    ? list.map((row) => `<li>${escapeHtml(row.display_name || row.player_name || 'ななし')}：${Number(row.score ?? row.best_score ?? 0).toLocaleString()}点</li>`).join('')
+    : '<li>まだランキングがありません。</li>';
+}
+
+async function submitAndLoadRanking(data, sequence) {
+  const status = $('result-ranking-status');
+  status.textContent = 'ランキングを更新中…';
+  try {
+    await callRankingRpc('submit_score', {
+      p_display_name: playerName,
+      p_game_slug: GAME_SLUG,
+      p_score: Math.trunc(data.score),
+      p_client_version: CLIENT_VERSION,
+    });
+  } catch (_) {
+    if (sequence === resultSequence) status.textContent = '今回のスコアを送信できませんでした。ランキングを表示します。';
+  }
+  try {
+    const rows = await callRankingRpc('get_best_score_ranking', { p_game_slug: GAME_SLUG, p_limit: 10 });
+    if (sequence !== resultSequence) return;
+    renderRanking(rows);
+    if (status.textContent === 'ランキングを更新中…') status.textContent = '上位10名を表示しています。';
+  } catch (_) {
+    if (sequence !== resultSequence) return;
+    renderRanking([]);
+    status.textContent = 'ランキングを読み込めませんでした。';
+  }
+}
+
+function renderResultPlatform(data) {
+  const sequence = ++resultSequence;
+  const text = shareTextForResult(data);
+  $('result-player').textContent = `${playerName}さんの結果`;
+  $('result-share-text').value = text;
+  $('result-share-status').textContent = '';
+  $('result-ranking-list').innerHTML = '<li>ランキングを読み込み中…</li>';
+  $('result-ranking-status').textContent = '';
+  void submitAndLoadRanking(data, sequence);
 }
 
 // ---------- DOM ボタン配線 ----------
@@ -1698,12 +1824,17 @@ $('btn-play').addEventListener('click', beginNormalGame);
 $('btn-howto').addEventListener('click', () => ui.showScreen('howto'));
 $('btn-howto-back').addEventListener('click', () => ui.showScreen('title'));
 $('btn-howto-try').addEventListener('click', beginPractice);
+$('btn-name-start').addEventListener('click', startNamedGame);
+$('btn-name-back').addEventListener('click', () => ui.showScreen('title'));
+$('player-name').addEventListener('input', () => { $('name-error').textContent = ''; });
+$('btn-home-share').addEventListener('click', () => shareOrCopy({ text: shareTextForHome(), title: 'パリパリ', statusElement: $('home-share-status'), textElement: $('result-share-text') }));
+$('btn-result-share').addEventListener('click', () => shareOrCopy({ text: $('result-share-text').value, title: 'パリパリの結果', statusElement: $('result-share-status'), textElement: $('result-share-text') }));
 $('btn-settings').addEventListener('click', () => { ui.reflectSettings(settings); ui.showScreen('settings'); });
 $('btn-settings-back').addEventListener('click', () => ui.showScreen('title'));
 
 $('btn-pause').addEventListener('click', pauseGame);
 $('btn-resume').addEventListener('click', resumeGame);
-$('btn-pause-retry').addEventListener('click', () => { ui.showScreen('ready'); beginNormalGame(); });
+$('btn-pause-retry').addEventListener('click', beginNormalGame);
 $('btn-pause-home').addEventListener('click', gotoTitle);
 
 $('btn-retry').addEventListener('click', beginNormalGame);
