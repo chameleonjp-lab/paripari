@@ -3,7 +3,7 @@ import { CONFIG } from './config.js';
 
 const $ = (id) => document.getElementById(id);
 
-const SCREENS = ['title', 'howto', 'settings', 'ready', 'pause', 'result'];
+const SCREENS = ['title', 'name', 'howto', 'settings', 'ready', 'pause', 'result'];
 
 export function showScreen(name) {
   SCREENS.forEach((s) => $('screen-' + s).classList.toggle('hidden', s !== name));
