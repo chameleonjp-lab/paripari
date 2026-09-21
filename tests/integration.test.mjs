@@ -43,6 +43,18 @@ test('D04: 後から低い点を保存しても同じ版の自己ベストが下
   assert.equal(storage.getBest(), 1000);
 });
 
+test('D03/R2: 時計の旧ルールであるR1の自己ベストを混ぜず保持する', (t) => {
+  const oldVersion = 'r1-5dir-20260922';
+  const oldKey = `paripari.best.${oldVersion}`;
+  const oldValue = JSON.stringify({ version: oldVersion, score: 18000 });
+  const values = savedValues(t, { [oldKey]: oldValue });
+  assert.notEqual(storage.RULE_VERSION, oldVersion);
+  assert.equal(storage.getBest(), 0);
+  storage.setBest(350);
+  assert.equal(storage.getBest(), 350);
+  assert.equal(values.get(oldKey), oldValue);
+});
+
 test('D02: 保存の読み書きが例外でも名前・設定・得点処理が止まらない', (t) => {
   savedValues(t);
   t.mock.method(localStorage, 'getItem', () => { throw new Error('storage blocked'); });

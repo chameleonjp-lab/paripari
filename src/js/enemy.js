@@ -1,11 +1,13 @@
 // 攻撃のライフサイクルと時間モデル 要件 §2.2 §5
 import { CONFIG, OPPOSITE } from './config.js';
+import { defaultRandom } from './random.js';
 
 let _id = 0;
 
 // tapWeights から必要タップ数(1..3)を抽選
-export function pickTaps(weights) {
-  const r = Math.random();
+export function pickTaps(weights, random = defaultRandom) {
+  const rng = typeof random === 'function' ? random : defaultRandom;
+  const r = rng();
   let acc = 0;
   for (let i = 0; i < weights.length; i++) {
     acc += weights[i];
@@ -17,7 +19,7 @@ export function pickTaps(weights) {
 /**
  * 攻撃を生成する。
  * @param {number} now performance.now()
- * @param {object} opts { baseVisibleMs, speedJitter, taps, dirs }
+ * @param {object} opts { baseVisibleMs, speedJitter, taps, dirs, random }
  */
 export function createAttack(now, opts) {
   const {
@@ -25,11 +27,14 @@ export function createAttack(now, opts) {
     speedJitter = 0,
     taps = 1,
     dirs = CONFIG.DIRECTIONS,
+    random = defaultRandom,
   } = opts;
 
-  const dir = dirs[(Math.random() * dirs.length) | 0];
+  const rng = typeof random === 'function' ? random : defaultRandom;
+
+  const dir = dirs[Math.min(dirs.length - 1, Math.floor(rng() * dirs.length))];
   // 速度ランダム性: バーごとに可視時間を ±speedJitter で揺らす
-  const jitter = 1 + (Math.random() * 2 - 1) * speedJitter;
+  const jitter = 1 + (rng() * 2 - 1) * speedJitter;
   const visibleMs = Math.max(300, Math.round(baseVisibleMs * jitter));
 
   const g = CONFIG.SEGMENT_GAP;
@@ -70,8 +75,9 @@ export function ringProgress(attack, now) {
   return Math.max(0, Math.min(1.4, (now - from) / span));
 }
 
-export function nextInterval(intervalMs) {
+export function nextInterval(intervalMs, random = defaultRandom) {
   const j = CONFIG.INTERVAL_JITTER;
-  const factor = 1 + (Math.random() * 2 - 1) * j;
-  return intervalMs * factor;
+  const rng = typeof random === 'function' ? random : defaultRandom;
+  const factor = 1 + (rng() * 2 - 1) * j;
+  return Math.max(CONFIG.MIN_INTERVAL_MS, intervalMs * factor);
 }

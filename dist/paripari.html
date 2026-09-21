@@ -520,6 +520,12 @@ html, body {
 
   <script>
 (() => {
+  var __defProp = Object.defineProperty;
+  var __export = (target, all) => {
+    for (var name in all)
+      __defProp(target, name, { get: all[name], enumerable: true });
+  };
+
   // src/js/config.js
   var CONFIG = {
     // --- 判定窓 (ms) ---
@@ -551,6 +557,11 @@ html, body {
     ],
     // 攻撃は上半分から来る5方向（下部はボタン専用エリア）
     DIRECTIONS: ["L", "R", "U", "UL", "UR"],
+    // 入力の固定順。時刻が一致したときの採用結果を端末や描画頻度から独立させる。
+    INPUT_DIRECTIONS: ["L", "DL", "D", "DR", "R"],
+    // 配送保証より短い間隔を作らない。実際の各ティア間隔はこれより十分長いが、
+    // 注入設定や将来の調整でも 50ms 以下へ落ちないようにする。
+    MIN_INTERVAL_MS: 51,
     // --- ウォームアップ（開始時の案内＋低速ノーダメージ準備）---
     WARMUP: { count: 5, visibleMs: 1200, intervalMs: 1150 },
     // --- 分割バー（マルチタップ）の各分割の到達間隔 ---
@@ -612,10 +623,34 @@ html, body {
     return "C";
   }
 
+  // src/js/random.js
+  function createRandom(seed = defaultSeed()) {
+    let state = Number(seed) >>> 0;
+    return () => {
+      state = state + 1831565813 | 0;
+      let t = Math.imul(state ^ state >>> 15, 1 | state);
+      t ^= t + Math.imul(t ^ t >>> 7, 61 | t);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function defaultSeed() {
+    const perf = globalThis.performance;
+    const now = typeof perf?.now === "function" ? perf.now() : 0;
+    const origin = Number.isFinite(perf?.timeOrigin) ? perf.timeOrigin : Date.now();
+    return (Math.floor(now * 1e3) ^ Math.floor(origin)) >>> 0;
+  }
+  var moduleRandom = null;
+  function moduleRandomValue() {
+    if (!moduleRandom) moduleRandom = createRandom();
+    return moduleRandom();
+  }
+  var defaultRandom = moduleRandomValue;
+
   // src/js/enemy.js
   var _id = 0;
-  function pickTaps(weights) {
-    const r = Math.random();
+  function pickTaps(weights, random = defaultRandom) {
+    const rng = typeof random === "function" ? random : defaultRandom;
+    const r = rng();
     let acc = 0;
     for (let i = 0; i < weights.length; i++) {
       acc += weights[i];
@@ -628,10 +663,12 @@ html, body {
       baseVisibleMs,
       speedJitter = 0,
       taps = 1,
-      dirs = CONFIG.DIRECTIONS
+      dirs = CONFIG.DIRECTIONS,
+      random = defaultRandom
     } = opts;
-    const dir = dirs[Math.random() * dirs.length | 0];
-    const jitter = 1 + (Math.random() * 2 - 1) * speedJitter;
+    const rng = typeof random === "function" ? random : defaultRandom;
+    const dir = dirs[Math.min(dirs.length - 1, Math.floor(rng() * dirs.length))];
+    const jitter = 1 + (rng() * 2 - 1) * speedJitter;
     const visibleMs = Math.max(300, Math.round(baseVisibleMs * jitter));
     const g = CONFIG.SEGMENT_GAP;
     const gap = Math.min(g.max, Math.max(g.min, visibleMs * g.ratio));
@@ -669,10 +706,11 @@ html, body {
     const span = Math.max(1, to - from);
     return Math.max(0, Math.min(1.4, (now - from) / span));
   }
-  function nextInterval(intervalMs) {
+  function nextInterval(intervalMs, random = defaultRandom) {
     const j = CONFIG.INTERVAL_JITTER;
-    const factor = 1 + (Math.random() * 2 - 1) * j;
-    return intervalMs * factor;
+    const rng = typeof random === "function" ? random : defaultRandom;
+    const factor = 1 + (rng() * 2 - 1) * j;
+    return Math.max(CONFIG.MIN_INTERVAL_MS, intervalMs * factor);
   }
 
   // src/js/renderer.js
@@ -1275,6 +1313,78 @@ html, body {
     }
   };
 
+  // src/js/clock.js
+  var INPUT_DELAY_MS = 50;
+  var STALL_THRESHOLD_MS = 250;
+  var validWallTime = (value) => typeof value === "number" && Number.isFinite(value) && value >= 0;
+  function normalizeEventTimestamp(raw, receivedWall, timeOrigin = globalThis.performance?.timeOrigin ?? 0) {
+    if (!validWallTime(receivedWall)) return null;
+    if (raw == null || raw === 0 || typeof raw === "number" && !Number.isFinite(raw)) {
+      return receivedWall;
+    }
+    if (typeof raw !== "number" || raw < 0) return null;
+    let time = raw;
+    if (raw >= 1e12) {
+      if (!validWallTime(timeOrigin) || timeOrigin === 0) return null;
+      time -= timeOrigin;
+    }
+    return validWallTime(time) && time <= receivedWall ? time : null;
+  }
+  function requireWallTime(wall) {
+    if (!validWallTime(wall)) throw new RangeError("時計には有効な単調時刻が必要です");
+  }
+  var GameClock = class {
+    constructor({ timeOrigin = globalThis.performance?.timeOrigin ?? 0 } = {}) {
+      this.timeOrigin = timeOrigin;
+      this.running = false;
+      this._elapsed = 0;
+      this._activeStart = 0;
+    }
+    start(wall) {
+      requireWallTime(wall);
+      this._elapsed = 0;
+      this._activeStart = wall;
+      this.running = true;
+      return 0;
+    }
+    // サンプルするだけで状態を変更しない。長い途絶では最後の描画時刻を指定して停止できる。
+    now(wall) {
+      requireWallTime(wall);
+      return this._elapsed + (this.running ? Math.max(0, wall - this._activeStart) : 0);
+    }
+    pause(wall) {
+      requireWallTime(wall);
+      if (this.running) {
+        this._elapsed = this.now(wall);
+        this.running = false;
+      }
+      return this._elapsed;
+    }
+    resume(wall) {
+      requireWallTime(wall);
+      if (!this.running) {
+        this._activeStart = wall;
+        this.running = true;
+      }
+      return this.now(wall);
+    }
+    /**
+     * 現在の実行区間の入力だけをゲーム時刻へ変換する。
+     * 再開前のイベント、停止中、保証を超える配送遅れは受け付けない。
+     */
+    mapInput(raw, receivedWall) {
+      if (!this.running || !validWallTime(receivedWall)) return null;
+      const eventWall = normalizeEventTimestamp(raw, receivedWall, this.timeOrigin);
+      if (eventWall == null || eventWall < this._activeStart) return null;
+      const delay = receivedWall - eventWall;
+      if (delay < 0 || delay > INPUT_DELAY_MS) return null;
+      return {
+        time: this._elapsed + eventWall - this._activeStart,
+        receivedAt: this.now(receivedWall)
+      };
+    }
+  };
+
   // src/js/judge.js
   function judgeTiming(deltaMs, dirOk, cfg = CONFIG) {
     if (!dirOk) return "MISS";
@@ -1319,6 +1429,21 @@ html, body {
   };
 
   // src/js/ui.js
+  var ui_exports = {};
+  __export(ui_exports, {
+    bumpCombo: () => bumpCombo,
+    hideAllScreens: () => hideAllScreens,
+    hideBanner: () => hideBanner,
+    popJudge: () => popJudge,
+    reflectSettings: () => reflectSettings,
+    setBestLabel: () => setBestLabel,
+    setCountdown: () => setCountdown,
+    setPlayUIVisible: () => setPlayUIVisible,
+    showBanner: () => showBanner,
+    showResult: () => showResult,
+    showScreen: () => showScreen,
+    updateHUD: () => updateHUD
+  });
   var $ = (id) => document.getElementById(id);
   var SCREENS = ["title", "howto", "settings", "ready", "pause", "result"];
   function showScreen(name) {
@@ -1401,7 +1526,7 @@ html, body {
   }
 
   // src/js/storage.js
-  var RULE_VERSION = "r1-5dir-20260922";
+  var RULE_VERSION = "r2-time-20260922";
   var KEY_BEST = `paripari.best.${RULE_VERSION}`;
   var KEY_SETTINGS = "paripari.settings";
   var KEY_PLAYER_NAME = "paripari.player-name";
@@ -1485,25 +1610,61 @@ html, body {
 
   // src/js/game.js
   var PRACTICE_GOAL = 5;
+  var INPUT_ORDER = Object.freeze(
+    (CONFIG.INPUT_DIRECTIONS || ["L", "DL", "D", "DR", "R"]).slice()
+  );
+  var INPUT_RANK = new Map(INPUT_ORDER.map((dir, index) => [dir, index]));
+  var makeEmptyRenderer = () => ({
+    w: 0,
+    h: 0,
+    lineY: 0,
+    reducedMotion: false
+  });
+  var finite = (value) => typeof value === "number" && Number.isFinite(value);
   var Game = class {
-    constructor({ renderer: renderer2, particles: particles2, settings: settings2, onGameOver }) {
-      this.r = renderer2;
-      this.particles = particles2;
-      this.settings = settings2;
-      this.onGameOver = onGameOver || (() => {
-      });
+    /**
+     * @param {object} options
+     * @param {object} options.renderer 既存Renderer（純粋検査では省略可）
+     * @param {object} options.particles 既存ParticlePool（純粋検査では省略可）
+     * @param {object} options.settings 設定
+     * @param {(data: object) => void} options.onGameOver 結果通知
+     * @param {object} options.ui UI実装（省略時は既存ui.js）
+     * @param {() => number} options.random ゲーム専用乱数
+     */
+    constructor({
+      renderer: renderer2 = null,
+      particles: particles2 = null,
+      settings: settings2 = {},
+      onGameOver = null,
+      ui = ui_exports,
+      random = null
+    } = {}) {
+      this.r = renderer2 || makeEmptyRenderer();
+      this.particles = particles2 || null;
+      this.settings = { reducedMotion: false, vibrate: true, ...settings2 };
+      this.onGameOver = typeof onGameOver === "function" ? onGameOver : () => {
+      };
+      this.ui = ui || ui_exports;
+      this.random = typeof random === "function" ? random : createRandom();
       this.state = "IDLE";
       this.mode = "normal";
       this.gameTime = 0;
+      this.roundId = 0;
+      this._roundActive = false;
+      this._processingTime = 0;
+      this._inputQueue = [];
+      this._inputSequence = 0;
+      this._gameOverNotified = false;
+      this._lastUpdateTime = 0;
       this.hitstopMs = 0;
       this.slowmoMs = 0;
       this._tierIndex = -1;
       this._maxTaps = 1;
       this._resetStats();
     }
-    setSettings(s) {
-      this.settings = s;
-      if (this.r) this.r.reducedMotion = !!s.reducedMotion;
+    setSettings(settings2 = {}) {
+      this.settings = { ...this.settings, ...settings2 };
+      if (this.r) this.r.reducedMotion = !!this.settings.reducedMotion;
     }
     _resetStats() {
       this.hp = CONFIG.MAX_HP;
@@ -1520,59 +1681,215 @@ html, body {
       this._tierIndex = -1;
       this._maxTaps = 1;
     }
+    /** Start a new isolated round at game time zero. */
     start(mode = "normal") {
-      this.mode = mode;
+      this.mode = mode === "practice" ? "practice" : "normal";
       this.state = "PLAYING";
+      this.roundId += 1;
+      this._roundActive = true;
+      this._gameOverNotified = false;
+      this.gameTime = 0;
+      this._lastUpdateTime = 0;
+      this._processingTime = 0;
+      this.clearInputs();
       this._resetStats();
       this.r.reducedMotion = !!this.settings.reducedMotion;
-      this.r.clearTransients();
-      this.particles.clear();
-      this.warmupRemaining = mode === "normal" ? CONFIG.WARMUP.count : PRACTICE_GOAL;
-      this.nextSpawnAt = this.gameTime + 500;
-      if (mode === "normal") showBanner("WARM UP", "来た方向の【反対】を押す");
-      updateHUD(this);
+      this._callRenderer("clearTransients");
+      this._callParticles("clear");
+      this.warmupRemaining = this.mode === "normal" ? CONFIG.WARMUP.count : PRACTICE_GOAL;
+      this.nextSpawnAt = 500;
+      if (this.mode === "normal") {
+        this._ui("showBanner", "WARM UP", "来た方向の【反対】を押す");
+      }
+      this._ui("updateHUD", this);
+      return this.roundId;
     }
     isPlaying() {
-      return this.state === "PLAYING";
+      return this.state === "PLAYING" && this._roundActive;
     }
     inWarmup() {
       return this.warmupRemaining > 0;
     }
-    handleAction(dir) {
-      if (this.state !== "PLAYING") return;
+    /**
+     * Queue one input. This method intentionally has no immediate game-state effect.
+     * `time` and `receivedAt` are already game-clock milliseconds.
+     */
+    enqueueAction({ dir, time, receivedAt, roundId = this.roundId } = {}) {
+      if (!this.isPlaying()) return false;
+      if (!INPUT_RANK.has(dir)) return false;
+      if (roundId !== this.roundId) return false;
+      const eventTime = time;
+      const receiptTime = receivedAt;
+      if (!finite(eventTime) || !finite(receiptTime)) return false;
+      if (eventTime > receiptTime || receiptTime - eventTime > INPUT_DELAY_MS) return false;
+      if (eventTime < 0 || receiptTime < 0) return false;
+      this._inputQueue.push({
+        dir,
+        time: eventTime,
+        receivedAt: receiptTime,
+        roundId,
+        sequence: this._inputSequence++
+      });
+      return true;
+    }
+    /** Compatibility name for old input wiring; it still only enqueues. */
+    handleAction(action) {
+      return this.enqueueAction(action || {});
+    }
+    clearInputs() {
+      this._inputQueue.length = 0;
+    }
+    /** Freeze this round. Pending inputs are retained unless explicitly discarded. */
+    pause({ discardInputs = false } = {}) {
+      if (!this.isPlaying()) return false;
+      this.state = "PAUSED";
+      if (discardInputs) this.clearInputs();
+      return true;
+    }
+    resume() {
+      if (this.state !== "PAUSED" || !this._roundActive) return false;
+      this.state = "PLAYING";
+      return true;
+    }
+    /** Invalidate the active round, its attack, and all queued input. */
+    stop() {
+      this._roundActive = false;
+      this.state = "IDLE";
+      this.attack = null;
+      this.clearInputs();
+      this.hitstopMs = 0;
+      this.slowmoMs = 0;
+      return true;
+    }
+    /**
+     * Advance to an absolute game-time horizon and drain ready input/timeout events.
+     * Input at exactly horizon-50 remains pending. A timeout is held through the
+     * same strict delivery watermark; the following sample settles the logical
+     * deadline, with a ready equal-time input selected first.
+     */
+    update(nowGameMs) {
+      if (!this.isPlaying()) return this.gameTime;
+      const requested = Number(nowGameMs);
+      const horizon = finite(requested) ? Math.max(this.gameTime, requested) : this.gameTime;
+      const previous = this.gameTime;
+      const roundAtStart = this.roundId;
+      this._drainUntil(horizon);
+      if (this.roundId === roundAtStart) this.gameTime = horizon;
+      const dt = Math.max(0, horizon - previous) / 1e3;
+      this._callParticles("update", dt);
+      this._lastUpdateTime = horizon;
+      return this.gameTime;
+    }
+    _drainUntil(horizon) {
+      let cursor = this.gameTime;
+      let guard = 0;
+      while (this.isPlaying() && guard++ < 1e4) {
+        this._discardStaleInputs();
+        const candidate = this._peekReadyInput(horizon);
+        const hasActiveAttack = !!(this.attack && !this.attack.resolved);
+        const scheduledSpawn = !hasActiveAttack && finite(this.nextSpawnAt) && this.nextSpawnAt <= horizon;
+        if (scheduledSpawn) {
+          if (candidate && candidate.time < this.nextSpawnAt) {
+            this._discardInputGroup(candidate.time);
+            continue;
+          }
+          const spawnAt = Math.max(cursor, this.nextSpawnAt);
+          this._processingTime = spawnAt;
+          this._spawn(this.nextSpawnAt);
+          cursor = Math.max(cursor, this.nextSpawnAt);
+          continue;
+        }
+        if (hasActiveAttack) {
+          const seg = currentSegment(this.attack);
+          const timeoutAt = seg && !seg.resolved ? seg.impactAt + CONFIG.GOOD_WINDOW : Infinity;
+          if (candidate && candidate.time <= timeoutAt) {
+            this._discardInputGroup(candidate.time, (winner) => {
+              const processAt = Math.max(cursor, winner.time);
+              this._processingTime = processAt;
+              this._applyQueuedInput(winner);
+              cursor = Math.max(cursor, processAt);
+            });
+            continue;
+          }
+          const timeoutWatermark = horizon - INPUT_DELAY_MS;
+          if (finite(timeoutAt) && timeoutAt < timeoutWatermark) {
+            this._processingTime = timeoutAt;
+            this._resolveSegment(this.attack, seg, "MISS", CONFIG.GOOD_WINDOW, timeoutAt);
+            cursor = Math.max(cursor, timeoutAt);
+            continue;
+          }
+          if (candidate && finite(timeoutAt) && candidate.time > timeoutAt) {
+          }
+          break;
+        }
+        if (candidate) {
+          this._discardInputGroup(candidate.time);
+          continue;
+        }
+        break;
+      }
+      this._processingTime = horizon;
+    }
+    _discardStaleInputs() {
+      if (!this._inputQueue.length) return;
+      this._inputQueue = this._inputQueue.filter((input) => input.roundId === this.roundId);
+    }
+    _peekReadyInput(horizon) {
+      const cutoff = horizon - INPUT_DELAY_MS;
+      const available = this._inputQueue.filter((input) => input.roundId === this.roundId && input.receivedAt <= horizon && input.time < cutoff);
+      if (!available.length) return null;
+      available.sort((a, b) => a.time - b.time || INPUT_RANK.get(a.dir) - INPUT_RANK.get(b.dir) || a.sequence - b.sequence);
+      return available[0];
+    }
+    /** Remove one exact-time group and optionally process its fixed-order winner. */
+    _discardInputGroup(time, consume = null) {
+      const group = this._inputQueue.filter((input) => input.roundId === this.roundId && input.time === time).sort((a, b) => INPUT_RANK.get(a.dir) - INPUT_RANK.get(b.dir) || a.sequence - b.sequence);
+      if (!group.length) return;
+      const winner = group[0];
+      const remove = new Set(group);
+      this._inputQueue = this._inputQueue.filter((input) => !remove.has(input));
+      if (typeof consume === "function") consume(winner);
+    }
+    _applyQueuedInput(input) {
       const a = this.attack;
-      if (!a || a.resolved || this.gameTime < a.spawnAt) return;
+      if (!a || a.resolved || !this.isPlaying()) return;
+      if (input.time < a.spawnAt) return;
       const seg = currentSegment(a);
       if (!seg || seg.resolved) return;
-      const delta = this.gameTime - seg.impactAt;
-      const dirOk = dir === a.needDir;
-      const result = judgeTiming(delta, dirOk);
-      this._resolveSegment(a, seg, result, delta);
-    }
-    update(dtSec) {
-      const now = this.gameTime;
-      const a = this.attack;
-      if (a && !a.resolved) {
-        const seg = currentSegment(a);
-        if (seg && !seg.resolved && now >= seg.impactAt + CONFIG.GOOD_WINDOW) {
-          this._resolveSegment(a, seg, "MISS", CONFIG.GOOD_WINDOW);
-        }
+      const index = a.segIndex;
+      if (index > 0) {
+        const previous = a.segments[index - 1];
+        if (!previous?.resolved || input.time < seg.impactAt - CONFIG.GOOD_WINDOW) return;
+        if (finite(previous.resolvedAt) && input.time < previous.resolvedAt) return;
       }
-      if ((!this.attack || this.attack.resolved) && now >= this.nextSpawnAt && this.state === "PLAYING") {
-        this._spawn();
-      }
-      this.particles.update(dtSec);
+      const delta = input.time - seg.impactAt;
+      const result = judgeTiming(delta, input.dir === a.needDir);
+      this._resolveSegment(a, seg, result, delta, input.time);
     }
     _tier() {
       return this.mode === "practice" ? CONFIG.TIERS[0] : tierForSuccess(this.successCount);
     }
-    _spawn() {
+    _spawn(scheduledAt = this.nextSpawnAt) {
+      if (!this.isPlaying()) return null;
+      const spawnAt = finite(scheduledAt) ? scheduledAt : this.gameTime;
       const warm = this.inWarmup();
       const tier = this._tier();
-      const opts = warm ? { baseVisibleMs: CONFIG.WARMUP.visibleMs, speedJitter: 0, taps: 1 } : { baseVisibleMs: tier.visibleMs, speedJitter: tier.speedJitter, taps: pickTaps(tier.tapWeights) };
-      this.attack = createAttack(this.gameTime, opts);
+      const opts = warm ? {
+        baseVisibleMs: CONFIG.WARMUP.visibleMs,
+        speedJitter: 0,
+        taps: 1,
+        random: this.random
+      } : {
+        baseVisibleMs: tier.visibleMs,
+        speedJitter: tier.speedJitter,
+        taps: pickTaps(tier.tapWeights, this.random),
+        random: this.random
+      };
+      this.attack = createAttack(spawnAt, opts);
       this.attack.warmup = warm;
+      this.attack.scheduledSpawnAt = spawnAt;
       this._checkTierUp();
+      return this.attack;
     }
     _checkTierUp() {
       if (this.inWarmup() || this.mode !== "normal") return;
@@ -1580,23 +1897,25 @@ html, body {
       const idx = CONFIG.TIERS.indexOf(tier);
       if (this._tierIndex >= 0 && idx > this._tierIndex) {
         if (tier.maxTaps > this._maxTaps && tier.maxTaps >= 2) {
-          showBanner(`${tier.maxTaps}連 受け流し！`, "同じ向きに連続タップ", 1500);
+          this._ui("showBanner", `${tier.maxTaps}連 受け流し！`, "同じ向きに連続タップ", 1500);
         } else {
-          showBanner("SPEED UP", null, 900);
+          this._ui("showBanner", "SPEED UP", null, 900);
         }
       }
       this._tierIndex = idx;
       this._maxTaps = tier.maxTaps;
     }
-    _resolveSegment(a, seg, result, delta) {
+    _resolveSegment(a, seg, result, delta, resolvedAt = this._processingTime) {
+      if (!this.isPlaying() || !a || a.resolved || !seg || seg.resolved) return false;
       seg.resolved = true;
       seg.result = result;
-      a.resolvedAt = this.gameTime;
+      seg.resolvedAt = resolvedAt;
+      a.resolvedAt = resolvedAt;
       a.result = result;
-      const warmup = a.warmup;
-      const cx = this.r.w / 2;
-      const cy = this.r.lineY;
-      const reduced = this.settings.reducedMotion;
+      const warmup = !!a.warmup;
+      const reduced = !!this.settings.reducedMotion;
+      const { cx, cy } = this._center();
+      if (!warmup) this.totalAttempts++;
       if (result === "MISS") {
         this.combo = 0;
         this.perfectStreak = 0;
@@ -1604,85 +1923,92 @@ html, body {
           this.hp = Math.max(0, this.hp - 1);
           a.hpLost = true;
         }
-        vibrate(HAPTICS.miss);
-        this.r.triggerFlash("#5a0a14", 0.45);
-        this.r.triggerVignette("150,20,40", warmup ? 0.4 : 0.7);
-        this.r.triggerShake(CONFIG.SHAKE_MISS);
-        this.r.triggerShockwave("MISS");
-        this.particles.spawnBurst(cx, cy, {
+        this._callHaptics(HAPTICS.miss);
+        this._callRenderer("triggerFlash", "#5a0a14", 0.45);
+        this._callRenderer("triggerVignette", "150,20,40", warmup ? 0.4 : 0.7);
+        this._callRenderer("triggerShake", CONFIG.SHAKE_MISS);
+        this._callRenderer("triggerShockwave", "MISS");
+        this._spawnParticles(cx, cy, {
           count: 16,
           speed: 240,
-          colors: this.r.burstColors("MISS"),
+          colors: this._burstColors("MISS"),
           size: 3,
           life: 0.45,
           gravity: 700
         });
-        popJudge("MISS", delta);
+        this._ui("popJudge", "MISS", delta);
       } else {
         this.combo++;
         this.maxCombo = Math.max(this.maxCombo, this.combo);
         if (!warmup) {
           this.successCount++;
-          this.totalAttempts++;
           const gain = calcGain(result, this.combo, delta);
           this.score += gain;
-          this.r.addScorePopup(gain, result);
+          this._callRenderer("addScorePopup", gain, result);
         }
-        this.r.triggerDeflect(a.needDir, result);
-        this.r.triggerShockwave(result);
+        this._callRenderer("triggerDeflect", a.needDir, result);
+        this._callRenderer("triggerShockwave", result);
         if (result === "PERFECT") {
           if (!warmup) this.perfectCount++;
           this.perfectStreak++;
-          vibrate(HAPTICS.perfect);
-          this.r.triggerFlash("#fff7df", 0.5);
-          this.hitstopMs = CONFIG.HITSTOP_PERFECT_MS;
-          if (!reduced) this.slowmoMs = CONFIG.SLOWMO_MS;
-          this.particles.spawnBurst(cx, cy, {
+          this._callHaptics(HAPTICS.perfect);
+          this._callRenderer("triggerFlash", "#fff7df", 0.5);
+          this.hitstopMs = 0;
+          this.slowmoMs = 0;
+          this._spawnParticles(cx, cy, {
             count: 34,
             speed: 460,
-            colors: this.r.burstColors("PERFECT"),
+            colors: this._burstColors("PERFECT"),
             size: 4,
             life: 0.65,
             gravity: 480
           });
-          this.particles.spawnBurst(cx, cy, {
+          this._spawnParticles(cx, cy, {
             count: 12,
             speed: 520,
             spread: 0.7,
             angle: this._dirAngle(a.needDir),
-            colors: this.r.burstColors("PERFECT"),
+            colors: this._burstColors("PERFECT"),
             size: 3,
             life: 0.5,
             gravity: 300
           });
-          if (!warmup && this.perfectStreak > 0 && this.perfectStreak % CONFIG.HEAL_EVERY_PERFECT_STREAK === 0) {
+          if (!warmup && this.perfectStreak % CONFIG.HEAL_EVERY_PERFECT_STREAK === 0) {
             this.hp = Math.min(CONFIG.MAX_HP, this.hp + 1);
           }
         } else {
           this.perfectStreak = 0;
-          vibrate(HAPTICS.good);
-          this.r.triggerFlash("#bfefff", 0.3);
-          this.hitstopMs = CONFIG.HITSTOP_GOOD_MS;
-          this.particles.spawnBurst(cx, cy, {
+          this._callHaptics(HAPTICS.good);
+          this._callRenderer("triggerFlash", "#bfefff", 0.3);
+          this.hitstopMs = 0;
+          this.slowmoMs = 0;
+          this._spawnParticles(cx, cy, {
             count: 20,
             speed: 340,
             spread: 1.4,
             angle: this._dirAngle(a.needDir),
-            colors: this.r.burstColors("GOOD"),
+            colors: this._burstColors("GOOD"),
             size: 3,
             life: 0.5,
             gravity: 600
           });
         }
-        popJudge(result, delta);
-        if (this.combo >= 2) bumpCombo();
+        this._ui("popJudge", result, delta);
+        if (this.combo >= 2) this._ui("bumpCombo");
       }
-      updateHUD(this);
+      this._ui("updateHUD", this);
+      if (this.mode === "normal" && this.hp <= 0) {
+        this._gameOver();
+        return true;
+      }
       a.segIndex++;
       if (a.segIndex >= a.segments.length) this._onAttackResolved(a);
+      return true;
     }
     _onAttackResolved(a) {
+      if (!a || a.resolved) return;
       a.resolved = true;
+      a.lastImpactAt = a.segments[a.segments.length - 1]?.impactAt ?? a.spawnAt;
       if (a.warmup) {
         this.warmupRemaining--;
         if (this.warmupRemaining <= 0 && this.mode === "normal") {
@@ -1691,43 +2017,88 @@ html, body {
           const t0 = tierForSuccess(0);
           this._tierIndex = CONFIG.TIERS.indexOf(t0);
           this._maxTaps = t0.maxTaps;
-          showBanner("START!", null, 800);
+          this._ui("showBanner", "START!", null, 800);
         }
       }
       const intervalMs = this.inWarmup() ? CONFIG.WARMUP.intervalMs : this._tier().intervalMs;
-      this.nextSpawnAt = this.gameTime + nextInterval(intervalMs);
-      if (this.mode === "normal" && this.hp <= 0) {
-        this._gameOver();
-      } else if (this.mode === "practice" && this.warmupRemaining <= 0) {
-        this.state = "IDLE";
-        this.attack = null;
-        this.onGameOver({ practiceDone: true });
+      const interval = nextInterval(intervalMs, this.random);
+      a.intervalMs = interval;
+      this.nextSpawnAt = a.lastImpactAt + CONFIG.GOOD_WINDOW + interval;
+      if (this.mode === "practice" && this.warmupRemaining <= 0) {
+        this._finishPractice();
       }
+    }
+    _finishPractice() {
+      if (!this._roundActive || this._gameOverNotified) return;
+      this._gameOverNotified = true;
+      this._roundActive = false;
+      this.state = "IDLE";
+      this.attack = null;
+      this.clearInputs();
+      this.onGameOver({ practiceDone: true, roundId: this.roundId });
     }
     _dirAngle(dir) {
       return NEED_ANGLE[dir] != null ? NEED_ANGLE[dir] : 0;
     }
     _gameOver() {
+      if (this._gameOverNotified) return;
+      this._gameOverNotified = true;
+      this._roundActive = false;
       this.state = "OVER";
       this.attack = null;
+      this.clearInputs();
       const best = getBest();
       const isBest = this.score > best;
-      if (isBest) setBest(this.score);
+      const storedBest = isBest ? setBest(this.score) : best;
       const perfectRate = this.totalAttempts > 0 ? Math.round(this.perfectCount / Math.max(1, this.successCount) * 100) : 0;
       const tierNum = CONFIG.TIERS.indexOf(tierForSuccess(this.successCount)) + 1;
+      this._ui("updateHUD", this);
       this.onGameOver({
         practiceDone: false,
         score: this.score,
-        best: Math.max(best, this.score),
+        best: Math.max(storedBest, this.score),
         isBest,
         maxCombo: this.maxCombo,
         perfectRate,
         tier: tierNum,
-        rank: rankForScore(this.score)
+        rank: rankForScore(this.score),
+        roundId: this.roundId
       });
     }
+    _center() {
+      const width = finite(this.r?.w) ? this.r.w : 0;
+      const height = finite(this.r?.lineY) ? this.r.lineY : 0;
+      return { cx: width / 2, cy: height };
+    }
+    _burstColors(result) {
+      if (typeof this.r?.burstColors === "function") return this.r.burstColors(result);
+      if (result === "PERFECT") return ["#fff", "#ffd35b", "#5bdcff", "#ffea9e"];
+      if (result === "GOOD") return ["#fff", "#5bdcff"];
+      return ["#ff3b54", "#ff8a5b"];
+    }
+    _spawnParticles(x, y, options) {
+      if (typeof this.particles?.spawnBurst === "function") this.particles.spawnBurst(x, y, options);
+    }
+    _callParticles(method, ...args) {
+      if (typeof this.particles?.[method] === "function") this.particles[method](...args);
+    }
+    _callRenderer(method, ...args) {
+      if (typeof this.r?.[method] === "function") this.r[method](...args);
+    }
+    _callHaptics(pattern) {
+      if (this.settings.vibrate !== false) vibrate(pattern);
+    }
+    _ui(method, ...args) {
+      if (typeof this.ui?.[method] === "function") this.ui[method](...args);
+    }
     getRenderState() {
-      return { now: this.gameTime, attack: this.attack, combo: this.combo, hp: this.hp, warmup: this.inWarmup() };
+      return {
+        now: this.gameTime,
+        attack: this.attack,
+        combo: this.combo,
+        hp: this.hp,
+        warmup: this.inWarmup()
+      };
     }
   };
 
@@ -1751,9 +2122,73 @@ html, body {
     c: "DR",
     C: "DR"
   };
-  function spawnRipple(btn, e) {
+  var EDITABLE_SELECTOR = [
+    "input",
+    "textarea",
+    "select",
+    '[contenteditable]:not([contenteditable="false"])',
+    '[role="textbox"]'
+  ].join(", ");
+  function rawEventTime(event) {
+    return event ? event.timeStamp : void 0;
+  }
+  function targetElement(target) {
+    if (!target) return null;
+    if (target.nodeType === 1) return target;
+    return target.parentElement || null;
+  }
+  function isEditingTarget(target) {
+    const el = targetElement(target);
+    if (!el) return false;
+    if (el.isContentEditable) return true;
+    return !!(el.closest && el.closest(EDITABLE_SELECTOR));
+  }
+  function eventPointerId(event, prefix = "pointer") {
+    const rawId = event && event.pointerId;
+    const id = Number(rawId);
+    if (rawId != null && Number.isFinite(id)) return `${prefix}:${id}`;
+    return `${prefix}:primary`;
+  }
+  function touchIdentifier(touch) {
+    const rawId = touch && touch.identifier;
+    const id = Number(rawId);
+    return rawId != null && Number.isFinite(id) ? `touch:${id}` : "touch:primary";
+  }
+  function touchPoints(event) {
+    const changed = event && event.changedTouches;
+    if (changed && typeof changed.length === "number" && changed.length > 0) {
+      return Array.from(changed);
+    }
+    const touches = event && event.touches;
+    if (touches && typeof touches.length === "number" && touches.length > 0) {
+      return [touches[0]];
+    }
+    return [null];
+  }
+  function pointInside(element, point, event) {
+    if (!element) return false;
+    const x = Number(point && point.clientX);
+    const y = Number(point && point.clientY);
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+      if (typeof element.getBoundingClientRect === "function") {
+        const rect = element.getBoundingClientRect();
+        if (rect && Number.isFinite(rect.left) && Number.isFinite(rect.right) && Number.isFinite(rect.top) && Number.isFinite(rect.bottom)) {
+          return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+        }
+      }
+      if (typeof document !== "undefined" && typeof document.elementFromPoint === "function") {
+        const atPoint = document.elementFromPoint(x, y);
+        return !!(atPoint && (atPoint === element || element.contains && element.contains(atPoint)));
+      }
+      return false;
+    }
+    const target = event && targetElement(event.target);
+    return !!(target && (target === element || element.contains && element.contains(target)));
+  }
+  function spawnRipple(btn, event, point = null) {
+    if (!btn || typeof btn.getBoundingClientRect !== "function" || typeof document === "undefined" || typeof document.createElement !== "function") return;
     const rect = btn.getBoundingClientRect();
-    const pt = e.touches && e.touches[0] || e;
+    const pt = point || event && event.touches && event.touches[0] || event || {};
     const x = (pt.clientX != null ? pt.clientX : rect.left + rect.width / 2) - rect.left;
     const y = (pt.clientY != null ? pt.clientY : rect.top + rect.height / 2) - rect.top;
     const span = document.createElement("span");
@@ -1761,63 +2196,170 @@ html, body {
     span.style.left = x + "px";
     span.style.top = y + "px";
     btn.appendChild(span);
-    span.addEventListener("animationend", () => span.remove());
-    setTimeout(() => span.remove(), 600);
+    const remove = () => {
+      if (span.parentNode) span.remove();
+    };
+    span.addEventListener("animationend", remove, { once: true });
+    setTimeout(remove, 600);
   }
-  function isEditingTarget(target) {
-    const el = target && target.nodeType === 1 ? target : target?.parentElement;
-    if (!el) return false;
-    return !!(el.closest && el.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]'));
+  function safeCanHandleAction(canHandleAction, context) {
+    try {
+      return canHandleAction(context) !== false;
+    } catch (_) {
+      return false;
+    }
   }
-  function setupInput({ onAction, onFirstGesture, canHandleAction = () => true }) {
+  function setupInput({
+    onAction,
+    onFirstGesture,
+    canHandleAction = () => true
+  } = {}) {
     let firstGestureDone = false;
     let composing = false;
-    const fireFirst = () => {
-      if (firstGestureDone) return;
-      firstGestureDone = true;
-      onFirstGesture && onFirstGesture();
-    };
-    const buttons = document.querySelectorAll("[data-dir]");
+    const buttons = Array.from(document.querySelectorAll("[data-dir]"));
     const pointerSupported = "PointerEvent" in window;
     const downEvent = pointerSupported ? "pointerdown" : "touchstart";
-    buttons.forEach((btn) => {
-      btn.addEventListener(downEvent, (e) => {
-        e.preventDefault();
-        fireFirst();
-        const dir = btn.getAttribute("data-dir");
-        const time = e.timeStamp && e.timeStamp > 0 ? e.timeStamp : performance.now();
-        btn.classList.add("pressed");
-        spawnRipple(btn, e);
-        onAction({ dir, time });
-      }, { passive: false });
-      btn.addEventListener(pointerSupported ? "pointerup" : "touchend", () => {
-        btn.classList.remove("pressed");
-      });
-      btn.addEventListener(pointerSupported ? "pointercancel" : "touchcancel", () => {
-        btn.classList.remove("pressed");
-      });
-      btn.addEventListener("pointerleave", () => btn.classList.remove("pressed"));
+    const upEvent = pointerSupported ? "pointerup" : "touchend";
+    const cancelEvent = pointerSupported ? "pointercancel" : "touchcancel";
+    const activePresses = /* @__PURE__ */ new Map();
+    const listeners = [];
+    const listen = (target, type, handler, options) => {
+      target.addEventListener(type, handler, options);
+      listeners.push(() => target.removeEventListener(type, handler, options));
+    };
+    const fireFirst = (event) => {
+      if (firstGestureDone) return;
+      firstGestureDone = true;
+      if (typeof onFirstGesture === "function") onFirstGesture(event);
+    };
+    const removePressedClass = (button) => {
+      if (button && button.classList) button.classList.remove("pressed");
+    };
+    const clearPressed = () => {
+      activePresses.clear();
+      buttons.forEach(removePressedClass);
+    };
+    const releasePress = (id, button = null) => {
+      const held = activePresses.get(id);
+      if (!held) {
+        removePressedClass(button);
+        return;
+      }
+      activePresses.delete(id);
+      if (!Array.from(activePresses.values()).some((entry) => entry.button === held.button)) {
+        removePressedClass(held.button);
+      }
+    };
+    const actionContext = (dir, event, source, pointerId = null) => ({
+      dir,
+      event,
+      source,
+      pointerId
     });
-    window.addEventListener("keydown", (e) => {
-      if (e.repeat) return;
-      const dir = KEY_DIR[e.key];
+    const dispatchAction = (dir, event, source, pointerId = null, button = null, point = null, alreadyAllowed = false) => {
+      const context = actionContext(dir, event, source, pointerId);
+      if (!alreadyAllowed && !safeCanHandleAction(canHandleAction, context)) return false;
+      const time = rawEventTime(event);
+      const payload = { dir, time };
+      if (button) {
+        button.classList.add("pressed");
+        spawnRipple(button, event, point);
+      }
+      if (typeof onAction === "function") onAction(payload);
+      return true;
+    };
+    const pointerDown = (event) => {
+      if (event && event.button != null && event.button !== 0) return;
+      const button = event && event.currentTarget;
+      const dir = button && button.getAttribute("data-dir");
+      if (!button || !dir) return;
+      const id = eventPointerId(event);
+      if (activePresses.has(id)) return;
+      if (!safeCanHandleAction(canHandleAction, actionContext(dir, event, "pointer", id))) return;
+      event.preventDefault();
+      fireFirst(event);
+      activePresses.set(id, { button });
+      dispatchAction(dir, event, "pointer", id, button, null, true);
+    };
+    const touchStart = (event) => {
+      const button = event && event.currentTarget;
+      const dir = button && button.getAttribute("data-dir");
+      if (!button || !dir) return;
+      for (const point of touchPoints(event)) {
+        const id = touchIdentifier(point);
+        if (activePresses.has(id)) continue;
+        if (!safeCanHandleAction(canHandleAction, actionContext(dir, event, "touch", id))) continue;
+        event.preventDefault();
+        fireFirst(event);
+        activePresses.set(id, { button });
+        dispatchAction(dir, event, "touch", id, button, point, true);
+      }
+    };
+    buttons.forEach((button) => {
+      listen(button, downEvent, pointerSupported ? pointerDown : touchStart, { passive: false });
+      listen(button, upEvent, (event) => {
+        if (pointerSupported) releasePress(eventPointerId(event));
+        else touchPoints(event).forEach((point) => releasePress(touchIdentifier(point)));
+      });
+      listen(button, cancelEvent, (event) => {
+        if (pointerSupported) releasePress(eventPointerId(event));
+        else touchPoints(event).forEach((point) => releasePress(touchIdentifier(point)));
+      });
+      if (pointerSupported) {
+        listen(button, "pointerleave", (event) => releasePress(eventPointerId(event), button));
+      }
+    });
+    if (pointerSupported) {
+      listen(window, "pointerup", (event) => releasePress(eventPointerId(event)));
+      listen(window, "pointercancel", (event) => releasePress(eventPointerId(event)));
+      listen(window, "pointermove", (event) => {
+        const id = eventPointerId(event);
+        const held = activePresses.get(id);
+        if (held && (!pointInside(held.button, event, event) || event.buttons === 0)) {
+          releasePress(id, held.button);
+        }
+      }, { passive: true });
+    } else {
+      listen(window, "touchend", (event) => touchPoints(event).forEach((point) => releasePress(touchIdentifier(point))));
+      listen(window, "touchcancel", (event) => touchPoints(event).forEach((point) => releasePress(touchIdentifier(point))));
+      listen(window, "touchmove", (event) => {
+        for (const point of touchPoints(event)) {
+          const id = touchIdentifier(point);
+          const held = activePresses.get(id);
+          if (held && !pointInside(held.button, point, event)) releasePress(id, held.button);
+        }
+      }, { passive: true });
+    }
+    const keydown = (event) => {
+      if (event.defaultPrevented || event.repeat) return;
+      const dir = KEY_DIR[event.key];
       if (!dir) return;
-      if (composing || e.isComposing || e.keyCode === 229 || isEditingTarget(e.target)) return;
-      if (!canHandleAction()) return;
-      e.preventDefault();
-      fireFirst();
-      onAction({ dir, time: e.timeStamp || performance.now() });
-    });
-    window.addEventListener("compositionstart", () => {
+      if (composing || event.isComposing || event.keyCode === 229 || isEditingTarget(event.target)) return;
+      if (!safeCanHandleAction(canHandleAction, actionContext(dir, event, "key", null))) return;
+      event.preventDefault();
+      fireFirst(event);
+      if (typeof onAction === "function") {
+        onAction({ dir, time: rawEventTime(event) });
+      }
+    };
+    listen(window, "keydown", keydown);
+    listen(window, "compositionstart", () => {
       composing = true;
     });
-    window.addEventListener("compositionend", () => {
+    listen(window, "compositionend", () => {
       composing = false;
     });
-    const clearPressed = () => buttons.forEach((btn) => btn.classList.remove("pressed"));
-    window.addEventListener("blur", clearPressed);
-    document.addEventListener("visibilitychange", clearPressed);
-    window.addEventListener(downEvent, fireFirst, { passive: true, once: false });
+    listen(window, "blur", clearPressed);
+    listen(window, "pagehide", clearPressed);
+    listen(window, "orientationchange", clearPressed);
+    listen(window, "resize", clearPressed);
+    listen(document, "visibilitychange", clearPressed);
+    listen(window, downEvent, fireFirst, { passive: true });
+    const destroy = () => {
+      clearPressed();
+      listeners.splice(0).forEach((remove) => remove());
+    };
+    return { clearPressed, destroy };
   }
   function lockGestures({ targets = [], isEnabled = () => true } = {}) {
     const gestureTargets = Array.from(targets).filter(Boolean);
@@ -1844,6 +2386,383 @@ html, body {
       }, options);
     });
   }
+
+  // src/js/session.js
+  var SESSION_STATES = Object.freeze({
+    HOME: "HOME",
+    HOWTO: "HOWTO",
+    SETTINGS: "SETTINGS",
+    COUNTDOWN: "COUNTDOWN",
+    PLAYING: "PLAYING",
+    PRACTICE: "PRACTICE",
+    PAUSED: "PAUSED",
+    RESUME_COUNTDOWN: "RESUME_COUNTDOWN",
+    RESULT: "RESULT"
+  });
+  var COUNTDOWN_STEP_MS = 700;
+  var COUNTDOWN_STEPS = 3;
+  var COUNTDOWN_TOTAL_MS = COUNTDOWN_STEP_MS * COUNTDOWN_STEPS;
+  var STALL_THRESHOLD_MS2 = STALL_THRESHOLD_MS;
+  var ACTIVE_STATES = /* @__PURE__ */ new Set([
+    SESSION_STATES.COUNTDOWN,
+    SESSION_STATES.PLAYING,
+    SESSION_STATES.PRACTICE,
+    SESSION_STATES.RESUME_COUNTDOWN
+  ]);
+  var finiteWall = (value) => typeof value === "number" && Number.isFinite(value) && value >= 0;
+  function defaultWallNow() {
+    if (typeof performance !== "undefined" && typeof performance.now === "function") return performance.now();
+    return Date.now();
+  }
+  function noop() {
+  }
+  var SessionController = class {
+    constructor({
+      game: game2 = null,
+      clock: clock2 = null,
+      input = null,
+      wallNow = defaultWallNow,
+      isVisible = () => true,
+      isPortrait = () => true,
+      isOperable = () => true,
+      onStateChange = noop,
+      onCountdown = noop,
+      onStart = noop,
+      onPause = noop,
+      onResult = noop,
+      onInvalidate = noop,
+      countdownStepMs = COUNTDOWN_STEP_MS,
+      stallThresholdMs = STALL_THRESHOLD_MS2
+    } = {}) {
+      this.game = game2;
+      this.clock = clock2;
+      this.input = input;
+      this.wallNow = wallNow;
+      this.isVisible = isVisible;
+      this.isPortrait = isPortrait;
+      this.isOperable = isOperable;
+      this.onStateChange = onStateChange;
+      this.onCountdown = onCountdown;
+      this.onStart = onStart;
+      this.onPause = onPause;
+      this.onResult = onResult;
+      this.onInvalidate = onInvalidate;
+      this.countdownStepMs = countdownStepMs;
+      this.stallThresholdMs = stallThresholdMs;
+      this.state = SESSION_STATES.HOME;
+      this.mode = null;
+      this.matchId = 0;
+      this.roundId = null;
+      this.result = null;
+      this.pauseReason = null;
+      this.resumeState = null;
+      this.resumeGameStarted = false;
+      this._generation = 0;
+      this._countdown = null;
+      this.lastPresentedWall = null;
+    }
+    get generation() {
+      return this._generation;
+    }
+    get isActive() {
+      return ACTIVE_STATES.has(this.state);
+    }
+    canHandleAction() {
+      return (this.state === SESSION_STATES.PLAYING || this.state === SESSION_STATES.PRACTICE) && this.environmentReady();
+    }
+    environmentReady() {
+      try {
+        return !!this.isVisible() && !!this.isPortrait() && !!this.isOperable();
+      } catch (_) {
+        return false;
+      }
+    }
+    _emitState(next, extra = {}) {
+      const previous = this.state;
+      this.state = next;
+      const context = {
+        previous,
+        state: next,
+        mode: this.mode,
+        matchId: this.matchId,
+        roundId: this.roundId,
+        generation: this._generation,
+        ...extra
+      };
+      this.onStateChange(next, context);
+      return context;
+    }
+    _clearPressed() {
+      if (this.input && typeof this.input.clearPressed === "function") this.input.clearPressed();
+    }
+    _clearGameInputs() {
+      if (this.game) this.game.clearInputs();
+    }
+    _stopGame() {
+      if (!this.game) return;
+      this.game.stop();
+    }
+    _pauseGame(discardInputs) {
+      if (!this.game) return;
+      this.game.pause({ discardInputs: !!discardInputs });
+    }
+    _resumeGame() {
+      if (!this.game) return;
+      this.game.resume();
+    }
+    _pauseClock(wall) {
+      if (this.clock && finiteWall(wall)) {
+        this.clock.pause(wall);
+      }
+    }
+    _startClock(wall) {
+      if (this.clock && finiteWall(wall)) {
+        this.clock.start(wall);
+      }
+    }
+    _resumeClock(wall) {
+      if (this.clock && finiteWall(wall)) {
+        this.clock.resume(wall);
+      }
+    }
+    _invalidate(reason) {
+      this._generation += 1;
+      this._countdown = null;
+      this._clearPressed();
+      this._clearGameInputs();
+      this.onInvalidate({ reason, matchId: this.matchId, generation: this._generation });
+    }
+    _beginCountdown(mode, wall, resume = false, gameStarted = resume) {
+      const generation = this._generation;
+      this.lastPresentedWall = wall;
+      this._countdown = {
+        mode,
+        resume,
+        gameStarted: !!gameStarted,
+        generation,
+        startedAt: wall,
+        shown: 3
+      };
+      this._emitState(resume ? SESSION_STATES.RESUME_COUNTDOWN : SESSION_STATES.COUNTDOWN, {
+        count: 3
+      });
+      this.onCountdown(3, {
+        state: this.state,
+        mode,
+        matchId: this.matchId,
+        generation
+      });
+    }
+    _activate(mode, wall, resume, generation) {
+      if (generation !== this._generation || !this._countdown) return false;
+      const countdown = this._countdown;
+      this._countdown = null;
+      if (resume && countdown.gameStarted) {
+        this._resumeClock(wall);
+        this._resumeGame();
+      } else {
+        this._startClock(wall);
+        if (this.game) this.game.start(mode);
+      }
+      this.mode = mode;
+      this.lastPresentedWall = wall;
+      if (this.game && this.game.roundId != null) this.roundId = this.game.roundId;
+      const next = mode === "practice" ? SESSION_STATES.PRACTICE : SESSION_STATES.PLAYING;
+      this._emitState(next, { resumed: resume });
+      this.onCountdown(0, {
+        state: next,
+        mode,
+        matchId: this.matchId,
+        generation
+      });
+      this.onStart(mode, {
+        state: next,
+        resumed: resume,
+        matchId: this.matchId,
+        generation,
+        roundId: this.roundId
+      });
+      return true;
+    }
+    /** Begin a normal match at a 3-2-1 countdown. */
+    start(mode = "normal", wall = this.wallNow()) {
+      if (!finiteWall(wall)) return false;
+      if (mode !== "normal" && mode !== "practice") mode = "normal";
+      const allowed = mode === "practice" ? this.state === SESSION_STATES.HOWTO : [SESSION_STATES.HOME, SESSION_STATES.RESULT, SESSION_STATES.PAUSED].includes(this.state);
+      if (!allowed || !this.environmentReady()) return false;
+      this._invalidate("start");
+      this._stopGame();
+      this.matchId += 1;
+      this.roundId = null;
+      this.mode = mode;
+      this.result = null;
+      this.pauseReason = null;
+      this.resumeState = null;
+      this.resumeGameStarted = mode === "practice";
+      this.lastPresentedWall = wall;
+      if (mode === "practice") {
+        this._countdown = { mode, resume: false, generation: this._generation, startedAt: wall, shown: 0 };
+        return this._activate(mode, wall, false, this._generation);
+      }
+      this._beginCountdown(mode, wall, false);
+      return true;
+    }
+    /** A menu action that explicitly enters one of the non-play screens. */
+    navigate(next, wall = this.wallNow()) {
+      if (![SESSION_STATES.HOME, SESSION_STATES.HOWTO, SESSION_STATES.SETTINGS].includes(next)) return false;
+      if (this.isActive || this.state === SESSION_STATES.PAUSED) this.home(wall);
+      this._emitState(next);
+      return true;
+    }
+    /** Stop the current match and invalidate callbacks from it. */
+    home(wall = this.wallNow()) {
+      this._invalidate("home");
+      this._pauseClock(wall);
+      this._stopGame();
+      this.mode = null;
+      this.roundId = null;
+      this.result = null;
+      this.pauseReason = null;
+      this.resumeState = null;
+      this.resumeGameStarted = false;
+      this.lastPresentedWall = wall;
+      this.matchId += 1;
+      this._emitState(SESSION_STATES.HOME);
+      return true;
+    }
+    /**
+     * Pause any countdown or play state. Hidden/pagehide/orientation calls use
+     * the same method, so returning to the page never starts a match silently.
+     */
+    pause(reason = "manual", {
+      wall = this.wallNow(),
+      discardInputs = false,
+      presentedWall = null
+    } = {}) {
+      if (!this.isActive) return false;
+      if (!finiteWall(wall)) return false;
+      const previousPresented = this.lastPresentedWall;
+      const stalled = previousPresented != null && wall - previousPresented > this.stallThresholdMs;
+      const wasPlaying = this.state === SESSION_STATES.PLAYING || this.state === SESSION_STATES.PRACTICE;
+      const longGap = stalled;
+      if (wasPlaying && !longGap) {
+        const horizon = this.clock && typeof this.clock.now === "function" ? this.clock.now(wall) : null;
+        if (horizon != null && this.game) this.game.update(horizon);
+        if (!this.isActive) return false;
+      }
+      this.resumeState = this.state;
+      this.resumeGameStarted = wasPlaying || !!this._countdown?.gameStarted;
+      this.pauseReason = reason;
+      this._generation += 1;
+      this._countdown = null;
+      const freezeAt = longGap ? previousPresented : finiteWall(presentedWall) ? presentedWall : wall;
+      this._pauseClock(freezeAt);
+      if (this.resumeGameStarted) this._pauseGame(longGap || discardInputs);
+      if (longGap || discardInputs) this._clearGameInputs();
+      this._clearPressed();
+      this._emitState(SESSION_STATES.PAUSED, {
+        reason,
+        resumeState: this.resumeState,
+        discardInputs: !!discardInputs
+      });
+      this.onPause({ reason, matchId: this.matchId, generation: this._generation });
+      return true;
+    }
+    pauseForEnvironment(reason = "hidden", wall = this.wallNow()) {
+      return this.pause(reason, { wall, discardInputs: reason === "stall" });
+    }
+    /** Explicit user resume. It always inserts a fresh 3-2-1 countdown. */
+    resume(wall = this.wallNow()) {
+      if (this.state !== SESSION_STATES.PAUSED || !finiteWall(wall) || !this.environmentReady()) return false;
+      const mode = this.mode || (this.resumeState === SESSION_STATES.PRACTICE ? "practice" : "normal");
+      this._generation += 1;
+      this.pauseReason = null;
+      this._beginCountdown(mode, wall, true, this.resumeGameStarted);
+      return true;
+    }
+    /** Called by main before drawing a frame; returns true if a stall paused us. */
+    observeFrame(wall) {
+      if (!finiteWall(wall)) return { stalled: false, previous: this.lastPresentedWall };
+      const previous = this.lastPresentedWall;
+      if (previous == null || wall - previous <= this.stallThresholdMs || !this.isActive) {
+        this.lastPresentedWall = wall;
+        return { stalled: false, previous };
+      }
+      this.pause("stall", {
+        wall,
+        presentedWall: previous,
+        discardInputs: true
+      });
+      this.lastPresentedWall = wall;
+      return { stalled: true, previous, wall };
+    }
+    /** Advance countdown and issue at most one transition per rAF sample. */
+    tick(wall = this.wallNow()) {
+      if (!finiteWall(wall)) return false;
+      if (this.state === SESSION_STATES.PLAYING || this.state === SESSION_STATES.PRACTICE) {
+        if (!this.environmentReady()) {
+          this.pause("environment", { wall });
+          return false;
+        }
+        return true;
+      }
+      if (!this._countdown || this.state !== SESSION_STATES.COUNTDOWN && this.state !== SESSION_STATES.RESUME_COUNTDOWN) return false;
+      if (!this.environmentReady()) {
+        this.pause("environment", { wall });
+        return false;
+      }
+      const countdown = this._countdown;
+      if (countdown.generation !== this._generation) return false;
+      const elapsed = Math.max(0, wall - countdown.startedAt);
+      const next = Math.max(1, 3 - Math.floor(elapsed / this.countdownStepMs));
+      if (next !== countdown.shown && elapsed < this.countdownStepMs * 3) {
+        countdown.shown = next;
+        this.onCountdown(next, {
+          state: this.state,
+          mode: countdown.mode,
+          matchId: this.matchId,
+          generation: this._generation
+        });
+      }
+      if (elapsed >= this.countdownStepMs * 3) {
+        return this._activate(countdown.mode, wall, countdown.resume, countdown.generation);
+      }
+      return true;
+    }
+    /** Guard game-over callbacks against a previous match or stale transition. */
+    finish(data, roundId = this.roundId) {
+      if (!(this.state === SESSION_STATES.PLAYING || this.state === SESSION_STATES.PRACTICE)) return false;
+      if (roundId != null && this.roundId != null && roundId !== this.roundId) return false;
+      this._generation += 1;
+      this._countdown = null;
+      this._pauseClock(this.wallNow());
+      this._clearGameInputs();
+      this._clearPressed();
+      this.result = data;
+      if (data && data.practiceDone) {
+        this._emitState(SESSION_STATES.HOWTO, { practiceDone: true });
+        return true;
+      }
+      this._emitState(SESSION_STATES.RESULT, { result: data });
+      this.onResult(data, {
+        matchId: this.matchId,
+        roundId: this.roundId,
+        generation: this._generation
+      });
+      return true;
+    }
+    handleVisibility(hidden, wall = this.wallNow()) {
+      if (hidden) return this.pauseForEnvironment("hidden", wall);
+      return false;
+    }
+    handlePageHide(wall = this.wallNow()) {
+      return this.pauseForEnvironment("pagehide", wall);
+    }
+    handleOrientation(isPortrait, wall = this.wallNow()) {
+      if (!isPortrait) return this.pauseForEnvironment("orientation", wall);
+      return false;
+    }
+  };
 
   // src/js/platform.js
   var OFFICIAL_GAME_URL = "";
@@ -1892,38 +2811,100 @@ html, body {
   var canvas = $2("game-canvas");
   var renderer = new Renderer(canvas);
   var particles = new ParticlePool();
+  var clock = new GameClock();
   var settings = getSettings();
   setHapticsEnabled(settings.vibrate);
   renderer.reducedMotion = !!settings.reducedMotion;
-  var countdownTimer = null;
   var playerName = getPlayerName();
+  var session = null;
+  var inputController = null;
   var game = new Game({
     renderer,
     particles,
     settings,
     onGameOver: (data) => {
-      if (data.practiceDone) {
-        hideBanner();
-        setPlayUIVisible(false);
-        showScreen("howto");
-        return;
-      }
-      hideBanner();
-      setPlayUIVisible(false);
-      setBestLabel(data.best);
-      showResult(data);
-      renderResultShare(data);
+      if (session) session.finish(data, data.roundId);
     }
   });
-  setupInput({
-    canHandleAction: () => game.isPlaying(),
-    onAction: ({ dir }) => {
-      if (game.isPlaying()) game.handleAction(dir);
+  inputController = setupInput({
+    canHandleAction: () => !!session && session.canHandleAction(),
+    onAction: ({ dir, time }) => {
+      if (!session || !session.canHandleAction()) return;
+      const receivedWall = performance.now();
+      const mapped = clock.mapInput(time, receivedWall);
+      if (!mapped) return;
+      const roundId = session.roundId;
+      game.enqueueAction({ dir, ...mapped, roundId });
+    }
+  });
+  session = new SessionController({
+    game,
+    clock,
+    input: inputController,
+    isVisible: () => !document.hidden,
+    isPortrait: () => !(isHandheldDevice() && isLandscapeOrientation()),
+    // This is an environment check, not the game-input check above. Countdown
+    // and pause screens remain operable even though they reject attack input.
+    isOperable: () => document.visibilityState !== "hidden",
+    onStateChange: (state, context) => {
+      switch (state) {
+        case SESSION_STATES.HOME:
+          hideBanner();
+          setPlayUIVisible(false);
+          setBestLabel(getBest());
+          playerName = getPlayerName() || playerName;
+          $2("player-name").value = playerName;
+          $2("name-error").textContent = "";
+          renderHomeShare();
+          showScreen("title");
+          break;
+        case SESSION_STATES.HOWTO:
+          hideBanner();
+          setPlayUIVisible(false);
+          showScreen("howto");
+          break;
+        case SESSION_STATES.SETTINGS:
+          hideBanner();
+          setPlayUIVisible(false);
+          reflectSettings(settings);
+          showScreen("settings");
+          break;
+        case SESSION_STATES.COUNTDOWN:
+        case SESSION_STATES.RESUME_COUNTDOWN:
+          hideBanner();
+          setPlayUIVisible(false);
+          showScreen("ready");
+          break;
+        case SESSION_STATES.PLAYING:
+        case SESSION_STATES.PRACTICE:
+          hideAllScreens();
+          setPlayUIVisible(true);
+          break;
+        case SESSION_STATES.PAUSED:
+          setPlayUIVisible(false);
+          showScreen("pause");
+          break;
+        case SESSION_STATES.RESULT:
+          hideBanner();
+          setPlayUIVisible(false);
+          showResult(context.result);
+          break;
+        default:
+          break;
+      }
+    },
+    onCountdown: (n) => {
+      if (n > 0) setCountdown(n);
+      else setCountdown(0);
+    },
+    onResult: (data) => {
+      setBestLabel(data.best);
+      renderResultShare(data);
     }
   });
   lockGestures({
     targets: [canvas, $2("controls")],
-    isEnabled: () => game.isPlaying()
+    isEnabled: () => !!session && session.canHandleAction()
   });
   function shareTextForHome() {
     const url = officialGameUrl();
@@ -1967,44 +2948,11 @@ html, body {
     return true;
   }
   function gotoTitle() {
-    if (countdownTimer) {
-      clearInterval(countdownTimer);
-      countdownTimer = null;
-    }
-    game.state = "IDLE";
-    game.attack = null;
-    hideBanner();
-    setPlayUIVisible(false);
-    setBestLabel(getBest());
-    playerName = getPlayerName() || playerName;
-    $2("player-name").value = playerName;
-    $2("name-error").textContent = "";
-    renderHomeShare();
-    showScreen("title");
-  }
-  function startCountdown(onDone) {
-    hideAllScreens();
-    setPlayUIVisible(false);
-    showScreen("ready");
-    let n = 3;
-    setCountdown(n);
-    if (countdownTimer) clearInterval(countdownTimer);
-    countdownTimer = setInterval(() => {
-      n--;
-      if (n <= 0) {
-        clearInterval(countdownTimer);
-        countdownTimer = null;
-        hideAllScreens();
-        setPlayUIVisible(true);
-        onDone();
-      } else {
-        setCountdown(n);
-      }
-    }, 700);
+    if (session) session.home(performance.now());
   }
   function beginNormalGame() {
     if (!readPlayerName()) return;
-    startCountdown(() => game.start("normal"));
+    session.start("normal", performance.now());
   }
   function beginRetryGame() {
     if (!playerName) {
@@ -2012,16 +2960,14 @@ html, body {
       $2("name-error").textContent = "名前を入力してから開始してください。";
       return;
     }
-    startCountdown(() => game.start("normal"));
+    session.start("normal", performance.now());
   }
   function beginPractice() {
-    hideAllScreens();
-    setPlayUIVisible(true);
-    game.start("practice");
+    session.start("practice", performance.now());
   }
   $2("btn-play").addEventListener("click", beginNormalGame);
-  $2("btn-howto").addEventListener("click", () => showScreen("howto"));
-  $2("btn-howto-back").addEventListener("click", () => showScreen("title"));
+  $2("btn-howto").addEventListener("click", () => session.navigate(SESSION_STATES.HOWTO));
+  $2("btn-howto-back").addEventListener("click", () => session.navigate(SESSION_STATES.HOME));
   $2("btn-howto-try").addEventListener("click", beginPractice);
   var nameComposing = false;
   $2("player-name").addEventListener("input", () => {
@@ -2053,11 +2999,8 @@ html, body {
     statusElement: $2("result-share-status"),
     textElement: $2("result-share-text")
   }));
-  $2("btn-settings").addEventListener("click", () => {
-    reflectSettings(settings);
-    showScreen("settings");
-  });
-  $2("btn-settings-back").addEventListener("click", () => showScreen("title"));
+  $2("btn-settings").addEventListener("click", () => session.navigate(SESSION_STATES.SETTINGS));
+  $2("btn-settings-back").addEventListener("click", () => session.navigate(SESSION_STATES.HOME));
   $2("btn-pause").addEventListener("click", pauseGame);
   $2("btn-resume").addEventListener("click", resumeGame);
   $2("btn-pause-retry").addEventListener("click", beginRetryGame);
@@ -2076,22 +3019,17 @@ html, body {
   bindToggle("set-motion", "reducedMotion", (v) => {
     renderer.reducedMotion = v;
   });
-  var pausedState = null;
   function pauseGame() {
-    if (!game.isPlaying()) return;
-    pausedState = "PLAYING";
-    game.state = "IDLE";
-    showScreen("pause");
+    if (session) session.pause("manual", { wall: performance.now() });
   }
   function resumeGame() {
-    if (pausedState === "PLAYING") {
-      hideAllScreens();
-      game.state = "PLAYING";
-      pausedState = null;
-    }
+    if (session) session.resume(performance.now());
   }
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden && game.isPlaying()) pauseGame();
+    if (document.hidden && session) session.handleVisibility(true, performance.now());
+  });
+  window.addEventListener("pagehide", () => {
+    if (session) session.handlePageHide(performance.now());
   });
   function handleResize() {
     renderer.resize();
@@ -2114,31 +3052,30 @@ html, body {
   function checkOrientation() {
     const shouldRotate = isLandscapeOrientation() && isHandheldDevice();
     $2("rotate-hint").classList.toggle("hidden", !shouldRotate);
-    if (shouldRotate && game.isPlaying()) pauseGame();
+    if (shouldRotate && session) session.handleOrientation(false, performance.now());
   }
   window.addEventListener("resize", handleResize);
   window.addEventListener("orientationchange", () => setTimeout(handleResize, 200));
   if (window.visualViewport) window.visualViewport.addEventListener("resize", handleResize);
-  var last = performance.now();
+  var lastRenderWall = performance.now();
   function loop(now) {
-    let dtMs = now - last;
-    last = now;
-    if (dtMs > 50) dtMs = 50;
-    let scale = 1;
-    if (game.hitstopMs > 0) {
-      game.hitstopMs -= dtMs;
-      scale = 0;
-    } else if (game.slowmoMs > 0) {
-      game.slowmoMs -= dtMs;
-      scale = CONFIG.SLOWMO_SCALE;
+    const previousWall = lastRenderWall;
+    const frameMs = Math.max(0, now - previousWall);
+    lastRenderWall = now;
+    const frame = session && session.observeFrame(now);
+    if (!frame || !frame.stalled) {
+      session && session.tick(now);
+      const active = session && (session.state === SESSION_STATES.PLAYING || session.state === SESSION_STATES.PRACTICE);
+      if (active) {
+        if (!session.environmentReady()) {
+          session.pause("environment", { wall: now });
+        } else {
+          const gameNow = clock.now(now);
+          game.update(gameNow);
+        }
+      }
     }
-    const playing = game.isPlaying();
-    const dtScaled = dtMs * scale;
-    if (playing) {
-      game.gameTime += dtScaled;
-      game.update(dtScaled / 1e3);
-    }
-    const renderDtSec = (playing ? dtScaled : dtMs) / 1e3;
+    const renderDtSec = Math.min(frameMs, 50) / 1e3;
     renderer.draw(renderDtSec, game.getRenderState(), particles);
     requestAnimationFrame(loop);
   }
