@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
+  checks:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -27,17 +27,51 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build:check
-      - run: npx playwright install --with-deps chromium webkit
+      - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
         env:
           PARIPARI_ARTIFACT_DIR: artifacts/browser
-          # Match WebKit's own WPE test renderer on GPU-less Linux runners.
-          # https://github.com/WebKit/WebKit/blob/main/Tools/Scripts/webkitpy/port/wpe.py
-          LIBGL_ALWAYS_SOFTWARE: '1'
-          WEBKIT_SKIA_ENABLE_CPU_RENDERING: '1'
+          PARIPARI_BROWSERS: chromium
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: browser-evidence
+          name: browser-evidence-chromium
           path: artifacts/browser
           if-no-files-found: warn
+
+  webkit:
+    # Use the native Apple port for the Safari-targeted browser regression.
+    # https://playwright.dev/docs/browsers#webkit
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install webkit
+      - run: npm run test:browser
+        env:
+          PARIPARI_ARTIFACT_DIR: artifacts/browser
+          PARIPARI_BROWSERS: webkit
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-evidence-webkit
+          path: artifacts/browser
+          if-no-files-found: warn
+
+  verify:
+    # Preserve the existing gate; either browser failing must fail verification.
+    needs: [checks, webkit]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require both browser jobs
+        env:
+          CHECKS_RESULT: ${{ needs.checks.result }}
+          WEBKIT_RESULT: ${{ needs.webkit.result }}
+        run: test "$CHECKS_RESULT" = success && test "$WEBKIT_RESULT" = success

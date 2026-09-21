@@ -52,13 +52,15 @@
 
 レビュー中に、開始カウント中の離脱後に未開始のGameをresumeしてしまう経路、配送待ち前に期限切れが確定する経路、長い途絶の判定前に前フレーム時刻を更新してしまう経路を修正しました。回帰検査を追加し、独立レビューでも境界を再現しています。
 
-ローカル環境はNode.js 24.19.0、esbuild 0.28.2、Playwright 1.62.1です。Chromiumは153.0.8010.0のローカル実行ファイルを明示して検査しました。WebKitはローカルOS依存ライブラリが不足するため、Ubuntu上のQualityでChromiumとともに必須実行します。未導入を成功扱いでスキップしません。`npm run build:check`と`git diff --check`も合格しています。
+ローカル環境はNode.js 24.19.0、esbuild 0.28.2、Playwright 1.62.1です。Chromiumは153.0.8010.0のローカル実行ファイルを明示して検査しました。WebKitはローカルOS依存ライブラリが不足するためCIで確認します。QualityはUbuntuの単体・生成一致・Chromiumと、macOS 15のWebKitを必須実行し、両方の成功を既存の`verify`で要求します。片方の失敗・キャンセル・スキップを成功扱いにしません。`npm run build:check`と`git diff --check`も合格しています。
 
-ブラウザ検査はHTTP応答にだけGame・Clock・Sessionの参照を注入し、配布ソースへ検査用操作口を加えません。攻撃予定を時計から相対設定し、キー・タッチ・rAFの実配線を通します。非表示とpagehideはイベント注入、回転はモバイルviewport変更による検査です。実機の背景化や履歴復元の完全な再現とは区別します。Qualityの画像証拠は`browser-evidence`へ保存します。
+ブラウザ検査はHTTP応答にだけGame・Clock・Sessionの参照を注入し、配布ソースへ検査用操作口を加えません。攻撃予定を時計から相対設定し、キー・タッチ・rAFの実配線を通します。非表示とpagehideはイベント注入、回転はモバイルviewport変更による検査です。実機の背景化や履歴復元の完全な再現とは区別します。Qualityの画像証拠は`browser-evidence-chromium`と`browser-evidence-webkit`へ保存します。
 
 初回CIのWebKitで4件が失敗したため、描画間隔・画面状態・停止理由の診断を追加しました。再現時は250ミリ秒を超える途絶で`PAUSED/stall`となりました。当初は撮影後や自然出現とタッチ操作が重なる時点に着目し、操作検査中の撮影を末尾へ移動、ホーム/結果の撮影後は連続3描画の復帰を待つ形へ変更しました。5ボタン・押下解除の検査は攻撃なしfixtureに分離し、攻撃判定は別の実キー経路で検査しています。
 
-追加診断では、撮影を行わない初回プレイ描画でも1,235ミリ秒、攻撃のないpointer検査でも887ミリ秒の途絶が生じました。撮影だけが原因ではないため、GPUのないLinux CIのWPE描画方式を、[WebKit自身のWPEテスト](https://github.com/WebKit/WebKit/blob/fa206e3d4d47ac4bdaa02e271c06b18708d5218f/Tools/Scripts/webkitpy/port/wpe.py)と同じ`LIBGL_ALWAYS_SOFTWARE=1`、`WEBKIT_SKIA_ENABLE_CPU_RENDERING=1`に揃えます。後者は[WebKitの環境変数資料](https://github.com/WebKit/WebKit/blob/fa206e3d4d47ac4bdaa02e271c06b18708d5218f/Source/WebKit/glib/environment-variables.md.in)に記載されたCPU描画設定です。製品の停止境界、時計、CSS、判定条件は変更しません。診断JSONも画像と同じ成果物へ保存し、CIの最終結果はPRへ記録します。原因調査はSol Extra High、追加差分の独立レビューはSol Highが担当します。
+追加診断では、撮影を行わない初回プレイ描画でも1,235ミリ秒、攻撃のないpointer検査でも887ミリ秒の途絶が生じました。[WebKit自身のWPEテスト](https://github.com/WebKit/WebKit/blob/fa206e3d4d47ac4bdaa02e271c06b18708d5218f/Tools/Scripts/webkitpy/port/wpe.py)と同じCPU描画設定も試しましたが、Linuxで3件の途絶が残りました。撮影だけが原因という説明や、Linux WPEの問題が解消したという扱いにはしません。
+
+Safariを対象とする必須検査はmacOS版WebKitへ移します。[Playwrightの公式資料](https://github.com/microsoft/playwright/blob/2a095f6fc41a861c053bcf9335b4e912d32dbbae/docs/src/browsers.md#webkit)も、Safariに近い環境にはmacOSを案内しています。製品の停止境界、時計、CSS、判定条件、ブラウザ検査の期待値は変更しません。診断JSONも画像と同じ成果物へ保存し、CIの最終結果はPRへ記録します。Linux WPEの描画遅延と実機性能は未解決・未確認事項として残します。原因調査はSol Extra High、追加差分の独立レビューはSol Highが担当します。
 
 担当：設計・時計・統合と補足検査はAstra High、ゲーム本体・入力と画面状態・主な検査はLuna Max。入力順序の重要設計はSol Extra Highが検討。独立レビューはSol Highへ分けています。
 
