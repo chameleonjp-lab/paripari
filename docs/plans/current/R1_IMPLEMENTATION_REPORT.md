@@ -33,7 +33,7 @@
 | `npm run build:check` | 合格 | 再生成の内容とdistが一致 |
 | `git diff --check` | 合格 | 空白エラーなし |
 | ローカルブラウザ検査 | Chromium 13ケース合格 | 分割/生成HTML、PC/タッチ、成功/失敗/結果/再挑戦、共有・保存非対応、任意練習・IME・回転の回帰。WebKitはこの環境では未実施 |
-| GitHub Actions | PRのQuality結果を参照 | 標準ChromiumとWebKitの両方を必須として実行。片方を自動スキップしない |
+| GitHub Actions | 合格 | [Quality #2](https://github.com/chameleonjp-lab/paripari/actions/runs/35633180292)：単体41件、配布物一致、Chromium 13件＋WebKit 13件が全て合格。片方を自動スキップしない |
 | 独立レビュー | 完了・R1未解決指摘0 | Sol Highが別コンテキストで差分・実行結果を確認。修正後も41件とChromium13ケースを独立再検査 |
 | iPhone実機 | 未実施 | 模擬寸法とLinux WebKitを実機確認と扱わない |
 
@@ -57,6 +57,7 @@ Qualityではこれらの部分実施指定を付けず `npm run test:browser` �
 - ローカルChromiumは153.0.8010.0を使用。通常のPlaywrightブラウザ取得がタイムアウトしたため、作業環境のみ別配布のChromiumを指定。プロジェクトの依存には追加していない。
 - ローカルWebKitの取得は成功したが、必要なOSライブラリがなく起動不可。OS側の依存導入も環境の権限エラーで実行不可。GitHub Actionsで標準のChromium/WebKitを検査する。
 - ローカル検査ではスクリーンショット22枚を作成。Chromiumのみの実行であることをテスト出力でも明示。
+- GitHub Actionsの検査対象は `8edddfe554ce9b1ebf7873dee116bf9eb8d22578`。Ubuntu 24.04、Chromium 151.0.7922.34、WebKit 26.5（Playwright revision 2336）で26件が合格。[スクリーンショット44枚](https://github.com/chameleonjp-lab/paripari/actions/runs/35633180292/artifacts/10655133083)を保存。
 - 証拠はブラウザ検査の出力とQualityの `r1-browser-evidence` に残す。通常の端末記録とは隔離する。
 
 ## 修正とレビュー
@@ -71,7 +72,7 @@ Qualityではこれらの部分実施指定を付けず `npm run test:browser` �
 
 検査側のconsole.error未判定も修正しました。Sol Highによる最終再レビューで、R1範囲の未解決High/Medium/Low指摘は0件となりました。単体41件、配布物一致、Chromium13ケースを別担当が再実行し、全て合格しました。WebKitとiPhone実機の確認をこの判定へ含めていません。
 
-初回の[Quality実行](https://github.com/chameleonjp-lab/paripari/actions/runs/35632165345)では、単体41件・配布物一致が合格し、ブラウザ検査は25件合格・WebKit横向き案内の1件が失敗しました。検査には固定100ミリ秒待機があり、製品の回転後200ミリ秒待機より短いため、案内の表示状態を期限付きで待つ方式へ変更しました。失敗時には画面・向きの診断を残します。製品の向き判定はこの検査修正では変更しません。修正後の結果はPRの最新Qualityを参照します。
+初回の[Quality実行](https://github.com/chameleonjp-lab/paripari/actions/runs/35632165345)では、単体41件・配布物一致が合格し、ブラウザ検査は25件合格・WebKit横向き案内の1件が失敗しました。検査には固定100ミリ秒待機があり、製品の回転後200ミリ秒待機より短いため、案内の表示状態を期限付きで待つ方式へ変更しました。失敗時には画面・向きの診断を残し、縦向きへ戻した後の案内消滅も必須検査に加えました。製品の向き判定はこの検査修正では変更していません。Sol Highがこの差分を再レビューして追加指摘なしと確認し、Quality #2で26件全てが合格しました。
 
 ## 残作業・公開の扱い
 
