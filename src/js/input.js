@@ -25,8 +25,15 @@ function spawnRipple(btn, e) {
   setTimeout(() => span.remove(), 600);
 }
 
-export function setupInput({ onAction, onFirstGesture }) {
+function isEditingTarget(target) {
+  const el = target && target.nodeType === 1 ? target : target?.parentElement;
+  if (!el) return false;
+  return !!(el.closest && el.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]'));
+}
+
+export function setupInput({ onAction, onFirstGesture, canHandleAction = () => true }) {
   let firstGestureDone = false;
+  let composing = false;
   const fireFirst = () => {
     if (firstGestureDone) return;
     firstGestureDone = true;
@@ -62,31 +69,54 @@ export function setupInput({ onAction, onFirstGesture }) {
     if (e.repeat) return;
     const dir = KEY_DIR[e.key];
     if (!dir) return;
+    // 名前欄・設定欄・編集可能要素・IME変換中の操作をゲームが奪わない。
+    if (composing || e.isComposing || e.keyCode === 229 || isEditingTarget(e.target)) return;
+    // メニューやカウントダウン中も、ブラウザ標準のキー操作を止めない。
+    if (!canHandleAction()) return;
     e.preventDefault();
     fireFirst();
     onAction({ dir, time: e.timeStamp || performance.now() });
   });
 
+  window.addEventListener('compositionstart', () => { composing = true; });
+  window.addEventListener('compositionend', () => { composing = false; });
+
+  // 画面遷移・タブ切替の途中で見た目の押下状態を残さない。
+  const clearPressed = () => buttons.forEach((btn) => btn.classList.remove('pressed'));
+  window.addEventListener('blur', clearPressed);
+  document.addEventListener('visibilitychange', clearPressed);
+
   // 任意の最初のタッチでも音声初期化フックを発火
   window.addEventListener(downEvent, fireFirst, { passive: true, once: false });
 }
 
-// ズーム/スクロール/バウンス抑止（要件 §6.3 §6.4）
-export function lockGestures() {
-  // ダブルタップズーム抑止
+// ゲーム領域のズーム/スクロール/バウンス抑止（要件 §6.3 §6.4）。
+// メニューや名前・共有欄にはリスナーを付けず、編集とスクロールを妨げない。
+export function lockGestures({ targets = [], isEnabled = () => true } = {}) {
+  const gestureTargets = Array.from(targets).filter(Boolean);
   let lastTouchEnd = 0;
-  document.addEventListener('touchend', (e) => {
-    const now = Date.now();
-    if (now - lastTouchEnd <= 300) e.preventDefault();
-    lastTouchEnd = now;
-  }, { passive: false });
+  const options = { passive: false };
 
-  // ピンチズーム抑止
-  document.addEventListener('gesturestart', (e) => e.preventDefault());
-  document.addEventListener('gesturechange', (e) => e.preventDefault());
+  gestureTargets.forEach((target) => {
+    // ダブルタップズーム抑止
+    target.addEventListener('touchend', (e) => {
+      if (!isEnabled()) { lastTouchEnd = 0; return; }
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) e.preventDefault();
+      lastTouchEnd = now;
+    }, options);
 
-  // スクロール/バウンス抑止
-  document.addEventListener('touchmove', (e) => {
-    if (e.scale && e.scale !== 1) e.preventDefault();
-  }, { passive: false });
+    // iOS系のピンチジェスチャー抑止
+    target.addEventListener('gesturestart', (e) => {
+      if (isEnabled()) e.preventDefault();
+    }, options);
+    target.addEventListener('gesturechange', (e) => {
+      if (isEnabled()) e.preventDefault();
+    }, options);
+
+    // タッチ操作中のピンチ/バウンスだけ抑止し、通常のメニュー移動は残す。
+    target.addEventListener('touchmove', (e) => {
+      if (isEnabled() && e.scale && e.scale !== 1) e.preventDefault();
+    }, options);
+  });
 }

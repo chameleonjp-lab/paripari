@@ -22,15 +22,17 @@ html, body {
   overscroll-behavior: none;
   position: fixed;
   inset: 0;
-  touch-action: none;
+  touch-action: auto;
   user-select: none;
   -webkit-user-select: none;
-  -webkit-touch-callout: none;
+  -webkit-touch-callout: default;
 }
 
 #app {
   position: relative;
   width: 100%;
+  max-width: 540px;
+  margin-inline: auto;
   height: 100%;
   height: 100dvh;
   overflow: hidden;
@@ -42,6 +44,15 @@ html, body {
   width: 100%;
   height: 100%;
   display: block;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#controls, #hud, #judge-pop, #banner, #rotate-hint {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .hidden { display: none !important; }
@@ -212,8 +223,12 @@ html, body {
   -webkit-backdrop-filter: blur(2px);
   padding: 24px;
   text-align: center;
+  overflow-y: auto;
+  touch-action: pan-y;
+  user-select: text;
+  -webkit-user-select: text;
 }
-.title-wrap, .panel { width: 100%; max-width: 340px; }
+.title-wrap, .panel { width: 100%; max-width: 340px; margin: auto; }
 .logo {
   font-size: clamp(48px, 18vw, 76px);
   margin: 0 0 8px;
@@ -228,6 +243,62 @@ html, body {
 .tagline { color: rgba(233,238,247,.8); margin: 0 0 18px; font-size: 15px; }
 .tagline b, .ready-hint b { color: var(--gold); }
 .best { color: var(--cyan); font-weight: 800; margin-bottom: 22px; letter-spacing: 2px; }
+.name-label {
+  display: block;
+  margin: 0 0 6px;
+  color: rgba(233,238,247,.78);
+  font-size: 13px;
+  text-align: left;
+}
+.name-input {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(0,0,0,.25);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  touch-action: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.name-input::placeholder { color: rgba(233,238,247,.45); }
+.name-input:focus, .share-preview:focus { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.platform-status {
+  min-height: 1.25em;
+  margin: 7px 0;
+  color: rgba(233,238,247,.7);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.platform-status.error { color: #ff8f9e; }
+.share-preview {
+  display: block;
+  width: 100%;
+  min-height: 50px;
+  margin: 7px 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px;
+  background: rgba(0,0,0,.22);
+  color: rgba(233,238,247,.72);
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  resize: vertical;
+  touch-action: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.platform-link {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--cyan);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 
 .btn {
   display: block;
@@ -240,6 +311,9 @@ html, body {
   color: var(--ink);
   font-size: 17px;
   font-weight: 700;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .btn:active { transform: scale(.98); }
 .btn-primary {

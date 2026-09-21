@@ -3,8 +3,29 @@
 > **完成版の現在の計画**： [docs/plans/current/README.md](docs/plans/current/README.md)
 >
 > 2系統の試作を統合する [実装計画書 v2.0](docs/plans/current/IMPLEMENTATION_PLAN.md)、[受入検査](docs/plans/current/ACCEPTANCE_TESTS.md)、[進捗](docs/plans/current/PROGRESS.md) を追加しました。
-> 今回は計画書のみで、完成版の実装・公開は未実施です。ランキング連携は対象外です。
+> 現在は最初の工程 **R1（本体と名前・共有の統合）** の実装段階です。検査結果と残作業は[進捗](docs/plans/current/PROGRESS.md)を参照してください。完成版の公開とランキング連携は行っていません。
 > 以下の説明と旧 `docs/requirements.md` / `docs/implementation-plan.md` は試作時点の内容です。完成版との相違は新しい計画を優先し、旧説明の「検査済み」等を今回の検査結果として扱わないでください。
+
+## 現在の開発・検査手順
+
+Node.js 24で次を実行します。ゲーム本体はブラウザ標準機能だけで動きます。開発用に、依存関係をたどって配布HTMLを作るesbuildと、自動操作用のPlaywrightを追加しています。
+
+```sh
+npm ci
+npm test
+npm run build
+npm run build:check
+npx playwright install --with-deps chromium webkit
+npm run test:browser
+```
+
+`npm test` は元からある判定・得点・20段階の検査に、生成の失敗検出、名前・保存・共有の検査を加えます。`build:check` は分割ソースと配布物の一致を確認します。配布HTMLだけを直接修正しません。
+
+ブラウザ検査は分割版と単一HTMLを実際に開きます。証拠の出力先は `PARIPARI_ARTIFACT_DIR` で指定できます。端末の通常の記録とは別のブラウザ環境を使い、検査用のゲーム操作口を本番には公開しません。PRのQuality検査は公開や外部得点送信を行いません。
+
+R1では正式公開URLを空欄にしています。共有には現在の開発URLを使わず、公開URLが準備中であることを文面で案内します。URLの確定はR6で行います。入力時刻と停止復帰はR2、初回練習と画面品質の仕上げはR3、難易度と日本語説明はR4で続けます。
+
+以下は試作時点の説明です。特に「iPhoneでファイルを開くだけ」「描画頻度に依存しない」という記述は、今回の実機検査・時刻検査を保証するものではありません。
 
 > 来た方向と**反対**を、ちょうどで弾け。
 > iPhone SE のブラウザで快適に遊べる、ジャストタイミング受け流しゲーム。
