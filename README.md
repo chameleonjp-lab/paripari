@@ -3,7 +3,7 @@
 > **完成版の現在の計画**： [docs/plans/current/README.md](docs/plans/current/README.md)
 >
 > 2系統の試作を統合する [実装計画書 v2.0](docs/plans/current/IMPLEMENTATION_PLAN.md)、[受入検査](docs/plans/current/ACCEPTANCE_TESTS.md)、[進捗](docs/plans/current/PROGRESS.md) を追加しました。
-> 現在は最初の工程 **R1（本体と名前・共有の統合）** の実装段階です。検査結果と残作業は[進捗](docs/plans/current/PROGRESS.md)を参照してください。完成版の公開とランキング連携は行っていません。
+> R1（本体と名前・共有の統合）はPR #6でマージ済みです。現在は **R2（入力時刻・共通時計・停止復帰）** の実装段階です。検査結果と残作業は[進捗](docs/plans/current/PROGRESS.md)を参照してください。完成版の公開とランキング連携は行っていません。
 > 以下の説明と旧 `docs/requirements.md` / `docs/implementation-plan.md` は試作時点の内容です。完成版との相違は新しい計画を優先し、旧説明の「検査済み」等を今回の検査結果として扱わないでください。
 
 ## 現在の開発・検査手順
@@ -19,11 +19,13 @@ npx playwright install --with-deps chromium webkit
 npm run test:browser
 ```
 
-`npm test` は元からある判定・得点・20段階の検査に、生成の失敗検出、名前・保存・共有の検査を加えます。`build:check` は分割ソースと配布物の一致を確認します。配布HTMLだけを直接修正しません。
+`npm test` は元からある判定・得点・20段階の検査に、生成の失敗検出、名前・保存・共有、時計・配送順・停止状態の検査を加えます。`build:check` は分割ソースと配布物の一致を確認します。配布HTMLだけを直接修正しません。
 
 ブラウザ検査は分割版と単一HTMLを実際に開きます。証拠の出力先は `PARIPARI_ARTIFACT_DIR` で指定できます。端末の通常の記録とは別のブラウザ環境を使い、検査用のゲーム操作口を本番には公開しません。PRのQuality検査は公開や外部得点送信を行いません。
 
 R1では正式公開URLを空欄にしています。共有には現在の開発URLを使わず、公開URLが準備中であることを文面で案内します。URLの確定はR6で行います。入力時刻と停止復帰はR2、初回練習と画面品質の仕上げはR3、難易度と日本語説明はR4で続けます。
+
+R2の時刻・入力順・停止の保証範囲と検査結果は[R2実装記録](docs/plans/current/R2_IMPLEMENTATION_REPORT.md)にまとめます。配送遅れ0〜50ミリ秒を保証するため、入力と期限切れを発生時刻順に確定します。250ミリ秒を超えて描画が途絶えた場合は一時停止し、復帰直後にまとめて失敗へ進めません。
 
 以下は試作時点の説明です。特に「iPhoneでファイルを開くだけ」「描画頻度に依存しない」という記述は、今回の実機検査・時刻検査を保証するものではありません。
 

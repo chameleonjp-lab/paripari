@@ -30,10 +30,10 @@ jobs:
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:browser
         env:
-          PARIPARI_ARTIFACT_DIR: artifacts/r1
+          PARIPARI_ARTIFACT_DIR: artifacts/browser
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: r1-browser-evidence
-          path: artifacts/r1
+          name: browser-evidence
+          path: artifacts/browser
           if-no-files-found: warn

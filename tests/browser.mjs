@@ -1,4 +1,4 @@
-// R1ブラウザ受入検査。
+// R2/currentブラウザ受入検査（R1の起動・入力・共有回帰を含む）。
 //
 // 実行:
 //   npm run build
@@ -21,7 +21,7 @@ const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const DIST_FILE = resolve(ROOT, 'dist/paripari.html');
 const HOOK_MARKER = 'PARIPARI_R1_TEST_HOOK_BEGIN';
 const DEFAULT_TIMEOUT = Number(process.env.PARIPARI_R1_TIMEOUT_MS || 8_000);
-const ARTIFACT_DIR = resolve(process.env.PARIPARI_ARTIFACT_DIR || '/tmp/paripari-r1');
+const ARTIFACT_DIR = resolve(process.env.PARIPARI_ARTIFACT_DIR || '/tmp/paripari-browser');
 
 const requestedBrowsers = (process.env.PARIPARI_BROWSERS || 'chromium,webkit')
   .split(',')
@@ -33,7 +33,7 @@ if (!requestedBrowsers.length || requestedBrowsers.some((name) => !browserFactor
   throw new Error(`PARIPARI_BROWSERS must contain chromium and/or webkit (got ${requestedBrowsers.join(',')})`);
 }
 if (requestedBrowsers.length < 2) {
-  console.warn(`R1_BROWSER_PARTIAL: ${requestedBrowsers.join(',')} のみ明示実行。Chromium+WebKitの完全検査ではありません。`);
+  console.warn(`BROWSER_PARTIAL: ${requestedBrowsers.join(',')} のみ明示実行。Chromium+WebKitの完全検査ではありません。`);
 }
 
 const results = [];
@@ -69,6 +69,8 @@ function splitHook(source) {
 /* ${HOOK_MARKER} */
 globalThis.__testGame = typeof game === 'undefined' ? null : game;
 globalThis.__testRenderer = typeof renderer === 'undefined' ? null : renderer;
+globalThis.__testClock = typeof clock === 'undefined' ? null : clock;
+globalThis.__testSession = typeof session === 'undefined' ? null : session;
 globalThis.__testHookReady = true;
 /* PARIPARI_R1_TEST_HOOK_END */
 `;
@@ -88,6 +90,8 @@ function bundleHook(html) {
   /* ${HOOK_MARKER} */
   globalThis.__testGame = typeof game === 'undefined' ? null : game;
   globalThis.__testRenderer = typeof renderer === 'undefined' ? null : renderer;
+  globalThis.__testClock = typeof clock === 'undefined' ? null : clock;
+  globalThis.__testSession = typeof session === 'undefined' ? null : session;
   globalThis.__testHookReady = true;
   /* PARIPARI_R1_TEST_HOOK_END */`;
   return `${html.slice(0, end)}${hook}${html.slice(end)}`;
@@ -390,40 +394,81 @@ async function startByName(page, { hook = false, label = 'ゲーム' } = {}) {
   await waitForPlaying(page, { hook, label });
 }
 
-async function prepareAttack(page, { needDir = 'R', taps = 1, hp = 3 } = {}) {
-  return page.evaluate(({ needDir: wanted, taps: count, hp: requestedHp }) => {
+async function prepareAttack(page, {
+  needDir = 'R',
+  taps = 1,
+  hp = 3,
+  mode = 'normal',
+  impactOffset = 80,
+  gapMs = 180,
+} = {}) {
+  return page.evaluate(({
+    needDir: wanted,
+    taps: count,
+    hp: requestedHp,
+    mode: requestedMode,
+    impactOffset: firstOffset,
+    gapMs: segmentGap,
+  }) => {
     const game = globalThis.__testGame;
-    if (!game || typeof game.start !== 'function') throw new Error('R1 test hookのGameがありません');
-
-    game.start('normal');
-    game.mode = 'normal';
+    const clock = globalThis.__testClock;
+    if (!game || !clock || typeof clock.now !== 'function') {
+      throw new Error('R2 test hookのGame/Clockがありません');
+    }
+    const now = clock.now(performance.now());
+    if (!Number.isFinite(now)) throw new Error('R2 test clockの現在時刻を取得できません');
+    if (typeof game.clearInputs === 'function') game.clearInputs();
+    game.mode = requestedMode === 'practice' ? 'practice' : 'normal';
     game.state = 'PLAYING';
-    if ('warmupRemaining' in game) game.warmupRemaining = 0;
+    if ('warmupRemaining' in game) {
+      game.warmupRemaining = requestedMode === 'practice'
+        ? Math.max(1, Number(game.warmupRemaining) || 5)
+        : 0;
+    }
     if ('hp' in game) game.hp = requestedHp;
-    if ('gameTime' in game) {
-      const now = Number(game.gameTime) || 0;
-      game.nextSpawnAt = now;
-      if (!game.attack && typeof game._spawn === 'function') game._spawn();
-      const attack = game.attack;
-      if (!attack) throw new Error('テスト用攻撃を生成できません');
-      attack.warmup = false;
-      attack.resolved = false;
-      attack.resolvedAt = 0;
-      attack.result = null;
-      attack.segIndex = 0;
-      attack.hpLost = false;
-      attack.dir = wanted === 'R' ? 'L' : wanted === 'L' ? 'R' : 'L';
-      attack.needDir = wanted;
-      attack.taps = count;
-      attack.segments = Array.from({ length: count }, () => ({
-        impactAt: now,
+    game.nextSpawnAt = Number.POSITIVE_INFINITY;
+    const opposite = { L: 'R', R: 'L', D: 'U', DL: 'UR', DR: 'UL' };
+    const impacts = Array.from({ length: count }, (_, index) => now + firstOffset + index * segmentGap);
+    const attack = {
+      id: `r2-browser-fixture-${(globalThis.__r2FixtureId || 0) + 1}`,
+      dir: opposite[wanted] || 'L',
+      needDir: wanted,
+      spawnAt: now,
+      visibleMs: firstOffset,
+      taps: count,
+      segments: impacts.map((impactAt) => ({
+        impactAt,
         resolved: false,
         result: null,
-      }));
-      return { now, hp: game.hp, taps: attack.segments.length, needDir: attack.needDir };
-    }
-    throw new Error('GameのgameTimeがなく、R1の状態設定ができません');
-  }, { needDir, taps, hp });
+        resolvedAt: 0,
+        inputTime: null,
+      })),
+      segIndex: 0,
+      hpLost: false,
+      warmup: requestedMode === 'practice',
+      resolved: false,
+      resolvedAt: 0,
+      result: null,
+    };
+    globalThis.__r2FixtureId = (globalThis.__r2FixtureId || 0) + 1;
+    game.attack = attack;
+    return { now, impacts, hp: game.hp, taps: attack.segments.length, needDir: attack.needDir };
+  }, { needDir, taps, hp, mode, impactOffset, gapMs });
+}
+
+async function pressFixtureSegment(page, index, label) {
+  await page.waitForFunction((segmentIndex) => {
+    const game = globalThis.__testGame;
+    const clock = globalThis.__testClock;
+    const segment = game?.attack?.segments?.[segmentIndex];
+    return !!segment && !!clock && clock.now(performance.now()) >= segment.impactAt - 20;
+  }, index, { timeout: DEFAULT_TIMEOUT });
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction((segmentIndex) => {
+    const segment = globalThis.__testGame?.attack?.segments?.[segmentIndex];
+    return !!segment?.resolved;
+  }, index, { timeout: DEFAULT_TIMEOUT });
+  if (label) await page.waitForTimeout(0);
 }
 
 async function currentGameStats(page) {
@@ -447,7 +492,7 @@ async function runInputAndResultFlow(page, label) {
   // 単発の成功はGameの内部状態だけを準備し、判定そのものは実キー配線で行う。
   await prepareAttack(page, { needDir: 'R', taps: 1, hp: 3 });
   const beforeSuccess = await currentGameStats(page);
-  await page.keyboard.press('ArrowRight');
+  await pressFixtureSegment(page, 0, label);
   await page.waitForFunction((previous) => {
     const game = globalThis.__testGame;
     return game && Number(game.successCount) > Number(previous);
@@ -455,6 +500,12 @@ async function runInputAndResultFlow(page, label) {
 
   // 方向違いは同じ実キー配線からMISSになり、ライフを1だけ失う。
   await prepareAttack(page, { needDir: 'R', taps: 1, hp: 3 });
+  await page.waitForFunction(() => {
+    const game = globalThis.__testGame;
+    const clock = globalThis.__testClock;
+    return game?.attack?.segments?.[0] && clock
+      && clock.now(performance.now()) >= game.attack.segments[0].impactAt - 20;
+  }, undefined, { timeout: DEFAULT_TIMEOUT });
   await page.keyboard.press('ArrowLeft');
   await page.waitForFunction(() => globalThis.__testGame && globalThis.__testGame.hp === 2,
     undefined, { timeout: DEFAULT_TIMEOUT });
@@ -467,7 +518,7 @@ async function runInputAndResultFlow(page, label) {
   // 3分割の成功も内部オブジェクトだけを準備し、3回のキー入力は実配線を通す。
   await prepareAttack(page, { needDir: 'R', taps: 3, hp: 3 });
   const beforeThree = await currentGameStats(page);
-  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight');
+  for (let i = 0; i < 3; i++) await pressFixtureSegment(page, i, label);
   await page.waitForFunction((previous) => {
     const game = globalThis.__testGame;
     return game && Number(game.successCount) >= Number(previous) + 3;
@@ -476,6 +527,12 @@ async function runInputAndResultFlow(page, label) {
   // ライフ0→リザルトを確認する。結果生成は1試合につき1回だけでよいが、
   // ここでは表示到達と直後のリトライ導線を受入条件にする。
   await prepareAttack(page, { needDir: 'R', taps: 1, hp: 1 });
+  await page.waitForFunction(() => {
+    const game = globalThis.__testGame;
+    const clock = globalThis.__testClock;
+    return game?.attack?.segments?.[0] && clock
+      && clock.now(performance.now()) >= game.attack.segments[0].impactAt - 20;
+  }, undefined, { timeout: DEFAULT_TIMEOUT });
   await page.keyboard.press('ArrowLeft');
   await page.waitForFunction(() => {
     const game = globalThis.__testGame;
@@ -687,6 +744,225 @@ async function runMobileFlow(browser, browserName, origin, variant, short) {
       await page.waitForFunction(() => (globalThis.__r1PointerDowns || 0) >= 5,
         undefined, { timeout: DEFAULT_TIMEOUT });
       await saveScreenshot(page, label, 'buttons');
+      if (!short) await runPointerLifecycleRegression(page, label);
+      assertHealthy(observation, label);
+    } finally {
+      await page.close();
+    }
+  } finally {
+    await context.close();
+  }
+}
+
+async function runPointerLifecycleRegression(page, label) {
+  const button = page.locator('[data-dir]').first();
+  assert(await button.count() === 1, `${label}: pointer回帰用ボタンがありません`);
+
+  // Count the actual session-to-game dispatch through the R2 enqueue path.
+  await page.evaluate(() => {
+    const game = globalThis.__testGame;
+    if (!game) throw new Error('pointer回帰用Gameハンドルがありません');
+    globalThis.__r2ActionDispatches = 0;
+    const enqueue = typeof game.enqueueAction === 'function' ? game.enqueueAction : null;
+    if (!enqueue) throw new Error('GameにR2 enqueueAction APIがありません');
+    game.enqueueAction = function (...args) {
+      globalThis.__r2ActionDispatches++;
+      return enqueue.apply(this, args);
+    };
+  });
+
+  const dispatchPointer = async (type, pointerId, options = {}) => page.evaluate(({ type: eventType, pointerId: id, ...extra }) => {
+    const target = document.querySelector('[data-dir]');
+    if (!target) throw new Error('方向ボタンがありません');
+    const rect = target.getBoundingClientRect();
+    const event = new PointerEvent(eventType, {
+      bubbles: true,
+      cancelable: true,
+      pointerId: id,
+      pointerType: 'touch',
+      isPrimary: true,
+      button: 0,
+      buttons: eventType === 'pointerup' || eventType === 'pointercancel' ? 0 : 1,
+      clientX: extra.clientX ?? rect.left + rect.width / 2,
+      clientY: extra.clientY ?? rect.top + rect.height / 2,
+    });
+    (extra.dispatchToWindow ? window : target).dispatchEvent(event);
+    return target.classList.contains('pressed');
+  }, { type, pointerId, ...options });
+
+  const firstPressed = await dispatchPointer('pointerdown', 7101);
+  assert(firstPressed, `${label}: pointerdownでpressed状態になりません`);
+  const duplicatePressed = await dispatchPointer('pointerdown', 7101);
+  assert(duplicatePressed, `${label}:同一pointer再downでpressed状態が消えました`);
+  const dispatches = await page.evaluate(() => globalThis.__r2ActionDispatches);
+  assert(dispatches === 1, `${label}:同一pointer IDの再downが${dispatches}回入力になりました`);
+
+  // Pointer capture can preserve the original button as event.target. The
+  // coordinates, rather than target identity, must clear the visual press.
+  const rect = await button.boundingBox();
+  assert(rect, `${label}:方向ボタン矩形を取得できません`);
+  const outside = await dispatchPointer('pointermove', 7101, {
+    clientX: rect.x + rect.width + 160,
+    clientY: rect.y + rect.height + 160,
+  });
+  assert(!outside, `${label}:原targetのまま座標外へ移動してもpressedが残りました`);
+
+  const cancelPressed = await dispatchPointer('pointerdown', 7102);
+  assert(cancelPressed, `${label}:cancel前pointerdownが受理されません`);
+  const afterCancel = await dispatchPointer('pointercancel', 7102);
+  assert(!afterCancel, `${label}:pointercancel後もpressedが残りました`);
+
+  const upPressed = await dispatchPointer('pointerdown', 7103);
+  assert(upPressed, `${label}:up前pointerdownが受理されません`);
+  const afterUp = await dispatchPointer('pointerup', 7103, { dispatchToWindow: true });
+  assert(!afterUp, `${label}:window pointerup後もpressedが残りました`);
+
+  const blurPressed = await dispatchPointer('pointerdown', 7104);
+  assert(blurPressed, `${label}:blur前pointerdownが受理されません`);
+  const afterBlur = await page.evaluate(() => {
+    window.dispatchEvent(new Event('blur'));
+    return document.querySelector('[data-dir]')?.classList.contains('pressed') || false;
+  });
+  assert(!afterBlur, `${label}:blur後もpressedが残りました`);
+
+  // A home transition must also clear any held control. Pause first so the
+  // transition uses the normal lifecycle path available during a match.
+  await dispatchPointer('pointerdown', 7105);
+  const pause = await firstVisible(page, ['#btn-pause'], `${label}のポーズボタン`, 1_000);
+  await pause.click();
+  await firstVisible(page, ['#screen-pause'], `${label}のポーズ画面`, DEFAULT_TIMEOUT);
+  const afterPause = await page.locator('[data-dir].pressed').count();
+  assert(afterPause === 0, `${label}:ポーズ遷移後もpressed状態が残りました`);
+  const home = await firstVisible(page, ['#btn-pause-home'], `${label}のホームボタン`, DEFAULT_TIMEOUT);
+  await home.click();
+  await firstVisible(page, ['#screen-title'], `${label}のホーム復帰`, DEFAULT_TIMEOUT);
+}
+
+async function beginCountdownByName(page, label) {
+  const input = await firstVisible(page, [
+    '#player-name',
+    '[data-testid="player-name"]',
+    'input[name="playerName"]',
+    'input[name="name"]',
+  ], `${label}の名前欄`);
+  await input.fill('R2ブラウザ');
+  let start;
+  try {
+    start = await firstVisible(page, [
+      '#btn-name-start',
+      '[data-testid="name-start"]',
+      'button:has-text("この名前で開始")',
+      'button:has-text("名前で開始")',
+    ], `${label}の名前開始ボタン`, 700);
+  } catch (_) {
+    start = await firstVisible(page, [
+      '#btn-play',
+      'button:has-text("プレイ")',
+      'button:has-text("開始")',
+    ], `${label}のプレイボタン`);
+  }
+  await start.click();
+  await page.waitForFunction(() => {
+    const state = String(globalThis.__testSession?.state || '').toUpperCase();
+    return state === 'COUNTDOWN' || state === 'RESUME_COUNTDOWN';
+  }, undefined, { timeout: DEFAULT_TIMEOUT });
+}
+
+async function setDocumentHidden(page, hidden) {
+  const installed = await page.evaluate((value) => {
+    let ok = false;
+    try {
+      Object.defineProperty(document, 'hidden', {
+        configurable: true,
+        get: () => value,
+      });
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => value ? 'hidden' : 'visible',
+      });
+      ok = document.hidden === value;
+    } catch (_) {
+      ok = false;
+    }
+    document.dispatchEvent(new Event('visibilitychange'));
+    return ok;
+  }, hidden);
+  assert(installed, `document.hiddenの${hidden ? '非表示' : '表示'}検査注入に失敗しました`);
+}
+
+async function runBrowserSessionRegression(browser, browserName, origin, variant) {
+  const context = await newContext(browser, { mobile: true });
+  try {
+    const page = await context.newPage();
+    const observation = observe(page, origin);
+    const label = `${browserName}-${variant}-r2-session`;
+    try {
+      await page.goto(`${origin}${variant === 'split' ? '/' : '/dist.html'}`, {
+        waitUntil: 'domcontentloaded',
+        timeout: DEFAULT_TIMEOUT,
+      });
+      await waitForReady(page, label);
+      await page.waitForFunction(() => globalThis.__testHookReady && globalThis.__testSession,
+        undefined, { timeout: DEFAULT_TIMEOUT });
+
+      // Leaving during the initial 3-2-1 must pause the countdown. Returning
+      // only clears the browser flag; the explicit resume button is required.
+      await beginCountdownByName(page, label);
+      await setDocumentHidden(page, true);
+      await page.waitForFunction(() => globalThis.__testSession?.state === 'PAUSED',
+        undefined, { timeout: DEFAULT_TIMEOUT });
+      await setDocumentHidden(page, false);
+      assert(await page.locator('#screen-pause').isVisible(), `${label}: hidden復帰で自動再開しました`);
+      const resume = await firstVisible(page, ['#btn-resume'], `${label}の初期countdown再開`);
+      await resume.click();
+      await waitForPlaying(page, { hook: true, label: `${label} initial resume` });
+
+      // pagehide follows the same explicit pause path and clears a held input.
+      const button = page.locator('[data-dir]').first();
+      await page.evaluate(() => {
+        const target = document.querySelector('[data-dir]');
+        const rect = target.getBoundingClientRect();
+        target.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true,
+          cancelable: true,
+          pointerId: 8801,
+          pointerType: 'touch',
+          button: 0,
+          buttons: 1,
+          clientX: rect.left + rect.width / 2,
+          clientY: rect.top + rect.height / 2,
+        }));
+      });
+      assert(await button.evaluate((element) => element.classList.contains('pressed')),
+        `${label}: pagehide前pointerdownがpressedになりません`);
+      await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+      await page.waitForFunction(() => globalThis.__testSession?.state === 'PAUSED',
+        undefined, { timeout: DEFAULT_TIMEOUT });
+      assert(await page.locator('[data-dir].pressed').count() === 0,
+        `${label}: pagehide後にpressed状態が残りました`);
+      const pagehideResume = await firstVisible(page, ['#btn-resume'], `${label}のpagehide再開`);
+      await pagehideResume.click();
+      await waitForPlaying(page, { hook: true, label: `${label} pagehide resume` });
+
+      // A real mobile viewport rotation pauses play and requires the same
+      // explicit resume after returning to portrait.
+      await page.setViewportSize({ width: 667, height: 375 });
+      await page.waitForFunction(() => {
+        const hint = document.querySelector('#rotate-hint');
+        return hint && !hint.classList.contains('hidden');
+      }, undefined, { timeout: DEFAULT_TIMEOUT });
+      await page.waitForFunction(() => globalThis.__testSession?.state === 'PAUSED',
+        undefined, { timeout: DEFAULT_TIMEOUT });
+      await page.setViewportSize({ width: 375, height: 667 });
+      await page.waitForFunction(() => {
+        const hint = document.querySelector('#rotate-hint');
+        return hint && hint.classList.contains('hidden');
+      }, undefined, { timeout: DEFAULT_TIMEOUT });
+      assert(await page.locator('#screen-pause').isVisible(), `${label}:縦復帰で自動再開しました`);
+      const orientationResume = await firstVisible(page, ['#btn-resume'], `${label}の縦復帰再開`);
+      await orientationResume.click();
+      await waitForPlaying(page, { hook: true, label: `${label} orientation resume` });
+      await saveScreenshot(page, label, 'lifecycle');
       assertHealthy(observation, label);
     } finally {
       await page.close();
@@ -830,27 +1106,16 @@ async function runPracticeBlankNameRegression(browser, browserName, origin) {
       }, undefined, { timeout: DEFAULT_TIMEOUT });
 
       // 練習の5攻撃を実際のGame.updateで失敗確定させ、GameがpracticeDoneを
-      // 通知する自然な経路を通す。時刻境界そのものはR2の対象外なので、各攻撃は
-      // 明らかな期限切れへ置く。
+      // 通知する自然な経路を通す。攻撃予定は現在のGameClockから相対設定し、
+      // 本番時計やGame.updateの引数をテストから直接変更しない。
       for (let i = 0; i < 5; i++) {
-        await page.evaluate(() => {
+        const beforeWarmup = await page.evaluate(() => globalThis.__testGame?.warmupRemaining);
+        await prepareAttack(page, { mode: 'practice', taps: 1, hp: 3, impactOffset: 80 });
+        await page.waitForFunction((previous) => {
           const game = globalThis.__testGame;
-          if (!game || String(game.state || '').toUpperCase() !== 'PLAYING') {
-            throw new Error('練習GameがPLAYINGではありません');
-          }
-          game.mode = 'practice';
-          game.nextSpawnAt = game.gameTime;
-          game.update(0);
-          const attack = game.attack;
-          if (!attack) throw new Error('練習攻撃を生成できません');
-          const now = Number(game.gameTime) || 0;
-          attack.warmup = true;
-          attack.resolved = false;
-          attack.segIndex = 0;
-          attack.hpLost = false;
-          attack.segments = [{ impactAt: now - 141, resolved: false, result: null }];
-          game.update(0);
-        });
+          const state = String(game?.state || '').toUpperCase();
+          return state !== 'PLAYING' || Number(game?.warmupRemaining) < Number(previous);
+        }, beforeWarmup, { timeout: DEFAULT_TIMEOUT });
       }
       await firstVisible(page, ['#screen-howto', 'h2:has-text("遊び方")'],
         `${label}の練習完了後画面`);
@@ -937,6 +1202,8 @@ async function main() {
         for (const variant of ['split', 'dist']) {
           await runCase(`${browserName}: ${variant}の名前→成功/誤方向/timeout→結果→retry`,
             () => runHookFlow(browser, browserName, hookOrigin, variant));
+          await runCase(`${browserName}: ${variant}のR2初期countdown/pagehide/縦横復帰`,
+            () => runBrowserSessionRegression(browser, browserName, hookOrigin, variant));
           await runCase(`${browserName}: ${variant}スマホ5ボタン`,
             () => runMobileFlow(browser, browserName, hookOrigin, variant, false));
           await runCase(`${browserName}: ${variant}短画面開始`,
@@ -959,7 +1226,7 @@ async function main() {
 
   const pass = results.filter((result) => result.status === 'PASS').length;
   const failCount = results.filter((result) => result.status === 'FAIL').length;
-  console.log(`\nR1 browser: ${pass} passed, ${failCount} failed`);
+  console.log(`\nR2/current browser: ${pass} passed, ${failCount} failed`);
   console.log(`screenshots: ${ARTIFACT_DIR}`);
   if (failCount) process.exitCode = 1;
 }

@@ -1,6 +1,6 @@
 // localStorage ラッパ（ベストスコア・設定・表示名） 要件 §3.2 §4.6
 // ルールが変わった版の点数は旧版と混ぜない。旧キーは削除せず残す。
-export const RULE_VERSION = 'r1-5dir-20260922';
+export const RULE_VERSION = 'r2-time-20260922';
 const KEY_BEST = `paripari.best.${RULE_VERSION}`;
 const KEY_SETTINGS = 'paripari.settings';
 const KEY_PLAYER_NAME = 'paripari.player-name';

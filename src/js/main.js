@@ -1,9 +1,10 @@
 // エントリポイント: 起動・rAFループ・状態遷移の配線 要件 §4.1 §6.2
-import { CONFIG } from './config.js';
 import { Renderer } from './renderer.js';
 import { ParticlePool } from './particles.js';
 import { Game } from './game.js';
 import { setupInput, lockGestures } from './input.js';
+import { GameClock } from './clock.js';
+import { SessionController, SESSION_STATES } from './session.js';
 import { setHapticsEnabled } from './haptics.js';
 import * as ui from './ui.js';
 import * as storage from './storage.js';
@@ -14,43 +15,107 @@ const $ = (id) => document.getElementById(id);
 const canvas = $('game-canvas');
 const renderer = new Renderer(canvas);
 const particles = new ParticlePool();
+const clock = new GameClock();
 
 let settings = storage.getSettings();
 setHapticsEnabled(settings.vibrate);
 renderer.reducedMotion = !!settings.reducedMotion;
 
-let countdownTimer = null;
 let playerName = storage.getPlayerName();
+let session = null;
+let inputController = null;
 
 const game = new Game({
   renderer, particles, settings,
   onGameOver: (data) => {
-    if (data.practiceDone) {
-      // 任意練習の完了後は勝手に本番へ進めず、遊び方へ戻す。
-      // 本番はホームの名前入力を通った開始操作だけで始める。
-      ui.hideBanner();
-      ui.setPlayUIVisible(false);
-      ui.showScreen('howto');
-      return;
-    }
-    ui.hideBanner();
-    ui.setPlayUIVisible(false);
-    ui.setBestLabel(data.best);
-    ui.showResult(data);
-    renderResultShare(data);
+    // Game callbacks can arrive while a screen transition is invalidating a
+    // match. SessionController checks the current state/round before showing
+    // a result, so an old match cannot overwrite a new one.
+    if (session) session.finish(data, data.roundId);
   },
 });
 
 // ---------- 入力 ----------
-setupInput({
-  canHandleAction: () => game.isPlaying(),
-  onAction: ({ dir }) => {
-    if (game.isPlaying()) game.handleAction(dir);
+inputController = setupInput({
+  canHandleAction: () => !!session && session.canHandleAction(),
+  onAction: ({ dir, time }) => {
+    if (!session || !session.canHandleAction()) return;
+    const receivedWall = performance.now();
+    const mapped = clock.mapInput(time, receivedWall);
+    if (!mapped) return;
+    const roundId = session.roundId;
+    game.enqueueAction({ dir, ...mapped, roundId });
+  },
+});
+
+session = new SessionController({
+  game,
+  clock,
+  input: inputController,
+  isVisible: () => !document.hidden,
+  isPortrait: () => !(isHandheldDevice() && isLandscapeOrientation()),
+  // This is an environment check, not the game-input check above. Countdown
+  // and pause screens remain operable even though they reject attack input.
+  isOperable: () => document.visibilityState !== 'hidden',
+  onStateChange: (state, context) => {
+    switch (state) {
+      case SESSION_STATES.HOME:
+        ui.hideBanner();
+        ui.setPlayUIVisible(false);
+        ui.setBestLabel(storage.getBest());
+        playerName = storage.getPlayerName() || playerName;
+        $('player-name').value = playerName;
+        $('name-error').textContent = '';
+        renderHomeShare();
+        ui.showScreen('title');
+        break;
+      case SESSION_STATES.HOWTO:
+        ui.hideBanner();
+        ui.setPlayUIVisible(false);
+        ui.showScreen('howto');
+        break;
+      case SESSION_STATES.SETTINGS:
+        ui.hideBanner();
+        ui.setPlayUIVisible(false);
+        ui.reflectSettings(settings);
+        ui.showScreen('settings');
+        break;
+      case SESSION_STATES.COUNTDOWN:
+      case SESSION_STATES.RESUME_COUNTDOWN:
+        ui.hideBanner();
+        ui.setPlayUIVisible(false);
+        ui.showScreen('ready');
+        break;
+      case SESSION_STATES.PLAYING:
+      case SESSION_STATES.PRACTICE:
+        ui.hideAllScreens();
+        ui.setPlayUIVisible(true);
+        break;
+      case SESSION_STATES.PAUSED:
+        ui.setPlayUIVisible(false);
+        ui.showScreen('pause');
+        break;
+      case SESSION_STATES.RESULT:
+        ui.hideBanner();
+        ui.setPlayUIVisible(false);
+        ui.showResult(context.result);
+        break;
+      default:
+        break;
+    }
+  },
+  onCountdown: (n) => {
+    if (n > 0) ui.setCountdown(n);
+    else ui.setCountdown(0);
+  },
+  onResult: (data) => {
+    ui.setBestLabel(data.best);
+    renderResultShare(data);
   },
 });
 lockGestures({
   targets: [canvas, $('controls')],
-  isEnabled: () => game.isPlaying(),
+  isEnabled: () => !!session && session.canHandleAction(),
 });
 
 // ---------- 名前とシェア ----------
@@ -102,43 +167,12 @@ function readPlayerName() {
 
 // ---------- 画面遷移ヘルパ ----------
 function gotoTitle() {
-  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
-  game.state = 'IDLE';
-  game.attack = null;
-  ui.hideBanner();
-  ui.setPlayUIVisible(false);
-  ui.setBestLabel(storage.getBest());
-  playerName = storage.getPlayerName() || playerName;
-  $('player-name').value = playerName;
-  $('name-error').textContent = '';
-  renderHomeShare();
-  ui.showScreen('title');
-}
-
-function startCountdown(onDone) {
-  ui.hideAllScreens();
-  ui.setPlayUIVisible(false);
-  ui.showScreen('ready');
-  let n = 3;
-  ui.setCountdown(n);
-  if (countdownTimer) clearInterval(countdownTimer);
-  countdownTimer = setInterval(() => {
-    n--;
-    if (n <= 0) {
-      clearInterval(countdownTimer);
-      countdownTimer = null;
-      ui.hideAllScreens();
-      ui.setPlayUIVisible(true);
-      onDone();
-    } else {
-      ui.setCountdown(n);
-    }
-  }, 700);
+  if (session) session.home(performance.now());
 }
 
 function beginNormalGame() {
   if (!readPlayerName()) return;
-  startCountdown(() => game.start('normal'));
+  session.start('normal', performance.now());
 }
 
 function beginRetryGame() {
@@ -148,19 +182,17 @@ function beginRetryGame() {
     $('name-error').textContent = '名前を入力してから開始してください。';
     return;
   }
-  startCountdown(() => game.start('normal'));
+  session.start('normal', performance.now());
 }
 
 function beginPractice() {
-  ui.hideAllScreens();
-  ui.setPlayUIVisible(true);
-  game.start('practice');
+  session.start('practice', performance.now());
 }
 
 // ---------- DOM ボタン配線 ----------
 $('btn-play').addEventListener('click', beginNormalGame);
-$('btn-howto').addEventListener('click', () => ui.showScreen('howto'));
-$('btn-howto-back').addEventListener('click', () => ui.showScreen('title'));
+$('btn-howto').addEventListener('click', () => session.navigate(SESSION_STATES.HOWTO));
+$('btn-howto-back').addEventListener('click', () => session.navigate(SESSION_STATES.HOME));
 $('btn-howto-try').addEventListener('click', beginPractice);
 let nameComposing = false;
 $('player-name').addEventListener('input', () => { $('name-error').textContent = ''; });
@@ -187,8 +219,8 @@ $('btn-result-share').addEventListener('click', () => shareOrCopy({
   statusElement: $('result-share-status'),
   textElement: $('result-share-text'),
 }));
-$('btn-settings').addEventListener('click', () => { ui.reflectSettings(settings); ui.showScreen('settings'); });
-$('btn-settings-back').addEventListener('click', () => ui.showScreen('title'));
+$('btn-settings').addEventListener('click', () => session.navigate(SESSION_STATES.SETTINGS));
+$('btn-settings-back').addEventListener('click', () => session.navigate(SESSION_STATES.HOME));
 
 $('btn-pause').addEventListener('click', pauseGame);
 $('btn-resume').addEventListener('click', resumeGame);
@@ -211,25 +243,19 @@ bindToggle('set-vibrate', 'vibrate', (v) => setHapticsEnabled(v));
 bindToggle('set-motion', 'reducedMotion', (v) => { renderer.reducedMotion = v; });
 
 // ---------- ポーズ ----------
-let pausedState = null;
 function pauseGame() {
-  if (!game.isPlaying()) return;
-  pausedState = 'PLAYING';
-  game.state = 'IDLE'; // ループ更新を止める（描画は継続）
-  ui.showScreen('pause');
+  if (session) session.pause('manual', { wall: performance.now() });
 }
 function resumeGame() {
-  if (pausedState === 'PLAYING') {
-    ui.hideAllScreens();
-    game.state = 'PLAYING';
-    // 中断時間ぶん次攻撃を後ろ倒し（理不尽防止）
-    pausedState = null;
-  }
+  if (session) session.resume(performance.now());
 }
 
 // タブ離脱で自動ポーズ
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && game.isPlaying()) pauseGame();
+  if (document.hidden && session) session.handleVisibility(true, performance.now());
+});
+window.addEventListener('pagehide', () => {
+  if (session) session.handlePageHide(performance.now());
 });
 
 // ---------- リサイズ / 回転 ----------
@@ -256,33 +282,42 @@ function checkOrientation() {
   // タッチPCをモバイルと混同せず、向きはキーボード表示時の寸法変化に依存しない。
   const shouldRotate = isLandscapeOrientation() && isHandheldDevice();
   $('rotate-hint').classList.toggle('hidden', !shouldRotate);
-  if (shouldRotate && game.isPlaying()) pauseGame();
+  if (shouldRotate && session) session.handleOrientation(false, performance.now());
 }
 window.addEventListener('resize', handleResize);
 window.addEventListener('orientationchange', () => setTimeout(handleResize, 200));
 if (window.visualViewport) window.visualViewport.addEventListener('resize', handleResize);
 
 // ---------- メインループ ----------
-let last = performance.now();
+let lastRenderWall = performance.now();
 function loop(now) {
-  let dtMs = now - last;
-  last = now;
-  if (dtMs > 50) dtMs = 50; // 大きなフレーム飛びをクランプ
+  const previousWall = lastRenderWall;
+  const frameMs = Math.max(0, now - previousWall);
+  lastRenderWall = now;
 
-  // 演出タイマー（壁時計）と時間スケール
-  let scale = 1;
-  if (game.hitstopMs > 0) { game.hitstopMs -= dtMs; scale = 0; }
-  else if (game.slowmoMs > 0) { game.slowmoMs -= dtMs; scale = CONFIG.SLOWMO_SCALE; }
-
-  const playing = game.isPlaying();
-  const dtScaled = dtMs * scale;
-  // ゲーム時間はプレイ中のみ進める（ポーズ中の即時タイムアウトを防止）
-  if (playing) {
-    game.gameTime += dtScaled;
-    game.update(dtScaled / 1000);
+  // A long rAF gap is a stop boundary. Session freezes at the last presented
+  // wall time and discards only undelivered input; it never fast-forwards a
+  // hidden tab into a burst of misses.
+  const frame = session && session.observeFrame(now);
+  if (!frame || !frame.stalled) {
+    session && session.tick(now);
+    const active = session && (session.state === SESSION_STATES.PLAYING
+      || session.state === SESSION_STATES.PRACTICE);
+    if (active) {
+      if (!session.environmentReady()) {
+        session.pause('environment', { wall: now });
+      } else {
+        const gameNow = clock.now(now);
+        // R2 Game.update receives an absolute game time. Do not cap it to the
+        // draw interval or advance it from animation-frame count.
+        game.update(gameNow);
+      }
+    }
   }
-  // 描画はメニュー/ポーズ中も継続（背景アニメ・余韻）
-  const renderDtSec = (playing ? dtScaled : dtMs) / 1000;
+
+  // Rendering may use a small capped delta for decorative particles, but it
+  // never feeds that delta into the game clock.
+  const renderDtSec = Math.min(frameMs, 50) / 1000;
   renderer.draw(renderDtSec, game.getRenderState(), particles);
 
   requestAnimationFrame(loop);
