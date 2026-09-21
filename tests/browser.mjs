@@ -11,7 +11,7 @@
 // file://で開くHTMLは書き換えない。
 
 import { createServer } from 'node:http';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -37,6 +37,80 @@ if (requestedBrowsers.length < 2) {
 }
 
 const results = [];
+let currentCaseName = 'browser';
+let diagnosticPageId = 0;
+
+// CIの描画途絶を、製品の停止条件を変えずに調査するための観測だけを行う。
+// Playwrightのinit scriptなので、配布HTML/通常ソースには含まれない。
+async function installFrameDiagnostics(context) {
+  await context.addInitScript(() => {
+    const history = { maxGap: 0, gaps: [], screens: [], events: [] };
+    globalThis.__browserFrameDiagnostics = history;
+    const retain = (array, entry) => { array.push(entry); if (array.length > 60) array.shift(); };
+    let previous = null;
+    function observeFrame(wall) {
+      if (previous != null) {
+        const gap = wall - previous;
+        history.maxGap = Math.max(history.maxGap, gap);
+        if (gap > 100) retain(history.gaps, { wall, previous, gap, hidden: document.hidden });
+      }
+      previous = wall;
+      requestAnimationFrame(observeFrame);
+    }
+    requestAnimationFrame(observeFrame);
+    for (const type of ['visibilitychange', 'pagehide', 'orientationchange', 'resize']) {
+      const target = type === 'visibilitychange' ? document : window;
+      target.addEventListener(type, () => retain(history.events, {
+        type, wall: performance.now(), hidden: document.hidden,
+        width: innerWidth, height: innerHeight,
+      }));
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      const observer = new MutationObserver((changes) => {
+        if (!changes.some((change) => change.target.id?.startsWith('screen-'))) return;
+        retain(history.screens, {
+          wall: performance.now(),
+          visible: [...document.querySelectorAll('[id^="screen-"]')]
+            .filter((element) => !element.classList.contains('hidden')).map((element) => element.id),
+        });
+      });
+      observer.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
+    }, { once: true });
+  });
+}
+
+async function closeObservedPage(page) {
+  const label = `${currentCaseName}-${++diagnosticPageId}`;
+  try {
+    const diagnostic = await page.evaluate(() => ({
+      url: location.pathname,
+      wall: performance.now(),
+      frames: globalThis.__browserFrameDiagnostics ?? null,
+      screen: [...document.querySelectorAll('[id^="screen-"]')]
+        .filter((element) => !element.classList.contains('hidden')).map((element) => element.id),
+      session: globalThis.__testSession && {
+        state: globalThis.__testSession.state,
+        pauseReason: globalThis.__testSession.pauseReason,
+        lastPresentedWall: globalThis.__testSession.lastPresentedWall,
+      },
+      game: globalThis.__testGame && {
+        state: globalThis.__testGame.state,
+        time: globalThis.__testGame.gameTime,
+        hp: globalThis.__testGame.hp,
+      },
+    }));
+    const path = artifactPath(label, 'diagnostic').replace(/\.png$/, '.json');
+    await writeFile(path, JSON.stringify(diagnostic, null, 2));
+    if (diagnostic.screen.includes('screen-pause')) {
+      console.log(`BROWSER_PAUSED ${label} ${JSON.stringify(diagnostic)}`);
+      await saveScreenshot(page, label, 'paused');
+    }
+  } catch (error) {
+    console.log(`BROWSER_DIAGNOSTIC_UNAVAILABLE ${label}: ${String(error)}`);
+  } finally {
+    await page.close();
+  }
+}
 
 function fail(message) {
   throw new Error(message);
@@ -232,15 +306,22 @@ async function newContext(browser, { mobile = false, short = false, blocked = fa
       ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
       : undefined,
   });
+  await installFrameDiagnostics(context);
   if (blocked) addStorageAndShareBlock(context);
   return context;
 }
 
 function observe(page, origin) {
   const state = { pageErrors: [], consoleErrors: [], externalRequests: [] };
-  page.on('pageerror', (error) => state.pageErrors.push(describeError(error)));
+  page.on('pageerror', (error) => {
+    state.pageErrors.push(describeError(error));
+    console.error(`BROWSER_PAGE_ERROR ${currentCaseName}: ${describeError(error)}`);
+  });
   page.on('console', (message) => {
-    if (message.type() === 'error') state.consoleErrors.push(message.text());
+    if (message.type() === 'error') {
+      state.consoleErrors.push(message.text());
+      console.error(`BROWSER_CONSOLE_ERROR ${currentCaseName}: ${message.text()}`);
+    }
   });
   page.on('request', (request) => {
     try {
@@ -584,7 +665,7 @@ async function runDesktopSmoke(browser, browserName, origin, label) {
           await saveScreenshot(page, pageLabel, 'playing');
           assertHealthy(observation, pageLabel);
         } finally {
-          await page.close();
+          await closeObservedPage(page);
         }
       }
     }
@@ -611,7 +692,7 @@ async function runOrientationTouchRegression(browser, browserName, origin) {
       await saveScreenshot(page, label, 'home');
       assertHealthy(observation, label);
     } finally {
-      await page.close();
+      await closeObservedPage(page);
     }
   } finally {
     await pcContext.close();
@@ -685,7 +766,7 @@ async function runOrientationTouchRegression(browser, browserName, origin) {
         `${label}:縦復帰後も回転案内が残っています ${JSON.stringify(portraitDiagnostics)}`);
       assertHealthy(observation, label);
     } finally {
-      await page.close();
+      await closeObservedPage(page);
     }
   } finally {
     await phoneContext.close();
@@ -711,7 +792,7 @@ async function runHookFlow(browser, browserName, origin, variant) {
       await runInputAndResultFlow(page, label);
       assertHealthy(observation, label);
     } finally {
-      await page.close();
+      await closeObservedPage(page);
     }
   } finally {
     await context.close();
@@ -747,7 +828,7 @@ async function runMobileFlow(browser, browserName, origin, variant, short) {
       if (!short) await runPointerLifecycleRegression(page, label);
       assertHealthy(observation, label);
     } finally {
-      await page.close();
+      await closeObservedPage(page);
     }
   } finally {
     await context.close();
@@ -965,7 +1046,7 @@ async function runBrowserSessionRegression(browser, browserName, origin, variant
       await saveScreenshot(page, label, 'lifecycle');
       assertHealthy(observation, label);
     } finally {
-      await page.close();
+      await closeObservedPage(page);
     }
   } finally {
     await context.close();
@@ -1040,7 +1121,7 @@ async function runShareFallback(browser, browserName, origin, variant) {
       await saveScreenshot(page, label, 'fallback');
       assertHealthy(observation, label);
     } finally {
-      await page.close();
+      await closeObservedPage(page);
     }
   } finally {
     await context.close();
@@ -1067,7 +1148,7 @@ async function runFileFlow(browser, browserName) {
       await saveScreenshot(page, label, 'playing');
       assertHealthy(observation, label);
     } finally {
-      await page.close();
+      await closeObservedPage(page);
     }
   } finally {
     await context.close();
@@ -1149,7 +1230,7 @@ async function runPracticeBlankNameRegression(browser, browserName, origin) {
       await saveScreenshot(page, label, 'home');
       assertHealthy(observation, label);
     } finally {
-      await page.close();
+      await closeObservedPage(page);
     }
   } finally {
     await context.close();
@@ -1157,6 +1238,7 @@ async function runPracticeBlankNameRegression(browser, browserName, origin) {
 }
 
 async function runCase(name, action) {
+  currentCaseName = name;
   const started = Date.now();
   try {
     await action();
