@@ -31,6 +31,10 @@ jobs:
       - run: npm run test:browser
         env:
           PARIPARI_ARTIFACT_DIR: artifacts/browser
+          # Match WebKit's own WPE test renderer on GPU-less Linux runners.
+          # https://github.com/WebKit/WebKit/blob/main/Tools/Scripts/webkitpy/port/wpe.py
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          WEBKIT_SKIA_ENABLE_CPU_RENDERING: '1'
       - uses: actions/upload-artifact@v4
         if: always()
         with:

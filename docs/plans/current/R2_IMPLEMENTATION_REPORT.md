@@ -56,7 +56,9 @@
 
 ブラウザ検査はHTTP応答にだけGame・Clock・Sessionの参照を注入し、配布ソースへ検査用操作口を加えません。攻撃予定を時計から相対設定し、キー・タッチ・rAFの実配線を通します。非表示とpagehideはイベント注入、回転はモバイルviewport変更による検査です。実機の背景化や履歴復元の完全な再現とは区別します。Qualityの画像証拠は`browser-evidence`へ保存します。
 
-初回CIのWebKitで4件が失敗したため、描画間隔・画面状態・停止理由の診断を追加しました。再現時は250ミリ秒を超える途絶で`PAUSED/stall`となり、撮影直後の1,225ミリ秒の途絶や、自然出現とタッチ操作が重なった時点の283ミリ秒の途絶を記録しました。製品の停止境界は変更せず、操作検査中の撮影を末尾へ移動し、ホーム/結果の撮影後は連続3描画の復帰を待ってから開始します。5ボタン・押下解除の検査は攻撃なしのfixtureに分離し、攻撃判定は別の実キー経路で検査します。診断のJSONも画像と同じ成果物へ保存します。原因調査と対処の妥当性はSol Extra Highが確認しています。
+初回CIのWebKitで4件が失敗したため、描画間隔・画面状態・停止理由の診断を追加しました。再現時は250ミリ秒を超える途絶で`PAUSED/stall`となりました。当初は撮影後や自然出現とタッチ操作が重なる時点に着目し、操作検査中の撮影を末尾へ移動、ホーム/結果の撮影後は連続3描画の復帰を待つ形へ変更しました。5ボタン・押下解除の検査は攻撃なしfixtureに分離し、攻撃判定は別の実キー経路で検査しています。
+
+追加診断では、撮影を行わない初回プレイ描画でも1,235ミリ秒、攻撃のないpointer検査でも887ミリ秒の途絶が生じました。撮影だけが原因ではないため、GPUのないLinux CIのWPE描画方式を、[WebKit自身のWPEテスト](https://github.com/WebKit/WebKit/blob/fa206e3d4d47ac4bdaa02e271c06b18708d5218f/Tools/Scripts/webkitpy/port/wpe.py)と同じ`LIBGL_ALWAYS_SOFTWARE=1`、`WEBKIT_SKIA_ENABLE_CPU_RENDERING=1`に揃えます。後者は[WebKitの環境変数資料](https://github.com/WebKit/WebKit/blob/fa206e3d4d47ac4bdaa02e271c06b18708d5218f/Source/WebKit/glib/environment-variables.md.in)に記載されたCPU描画設定です。製品の停止境界、時計、CSS、判定条件は変更しません。診断JSONも画像と同じ成果物へ保存し、CIの最終結果はPRへ記録します。原因調査はSol Extra High、追加差分の独立レビューはSol Highが担当します。
 
 担当：設計・時計・統合と補足検査はAstra High、ゲーム本体・入力と画面状態・主な検査はLuna Max。入力順序の重要設計はSol Extra Highが検討。独立レビューはSol Highへ分けています。
 
