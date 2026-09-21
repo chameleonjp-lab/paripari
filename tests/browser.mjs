@@ -471,7 +471,9 @@ async function startByName(page, { hook = false, label = 'ゲーム' } = {}) {
       'button:has-text("開始")',
     ], `${label}のプレイボタン`);
   }
+  await markBrowserEvent(page, 'start-click-before');
   await start.click();
+  await markBrowserEvent(page, 'start-click-after');
   await waitForPlaying(page, { hook, label });
 }
 
@@ -622,7 +624,8 @@ async function runInputAndResultFlow(page, label) {
       && result && !result.classList.contains('hidden')
       && getComputedStyle(result).display !== 'none';
   }, undefined, { timeout: DEFAULT_TIMEOUT });
-  await page.screenshot({ path: artifactPath(label, 'result') });
+  await saveScreenshot(page, label, 'result');
+  await settleAfterScreenshot(page);
 
   const retry = await firstVisible(page, [
     '#btn-retry',
@@ -640,7 +643,49 @@ function artifactPath(label, suffix) {
 }
 
 async function saveScreenshot(page, label, suffix) {
+  await markBrowserEvent(page, 'screenshot-start', { label, suffix });
   await page.screenshot({ path: artifactPath(label, suffix) });
+  await markBrowserEvent(page, 'screenshot-end', { label, suffix });
+}
+
+async function markBrowserEvent(page, type, details = {}) {
+  await page.evaluate(({ type, details }) => {
+    const history = globalThis.__browserFrameDiagnostics;
+    if (!history) return;
+    history.events.push({ type, wall: performance.now(), ...details });
+    if (history.events.length > 60) history.events.shift();
+  }, { type, details });
+}
+
+// WebKitの画面取得はrAFを長く止める場合がある。HOME/RESULTで撮影した後は、
+// 実際に描画が戻ったことを確認してから新しい試合を始める。製品時計は操作しない。
+async function settleAfterScreenshot(page) {
+  const gaps = await page.evaluate(({ timeout, threshold }) => new Promise((resolveFrames, reject) => {
+    let previous = null;
+    let stable = 0;
+    let stopped = false;
+    const recent = [];
+    const timer = setTimeout(() => {
+      stopped = true;
+      reject(new Error('撮影後の描画が安定しません'));
+    }, timeout);
+    const sample = (wall) => {
+      if (stopped) return;
+      if (previous != null) {
+        const gap = wall - previous;
+        recent.push(gap);
+        if (recent.length > 8) recent.shift();
+        stable = gap <= threshold ? stable + 1 : 0;
+      }
+      previous = wall;
+      if (stable >= 3) {
+        clearTimeout(timer);
+        resolveFrames(recent);
+      } else requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  }), { timeout: DEFAULT_TIMEOUT, threshold: 250 });
+  await markBrowserEvent(page, 'screenshot-frames-restored', { gaps });
 }
 
 async function runDesktopSmoke(browser, browserName, origin, label) {
@@ -660,6 +705,7 @@ async function runDesktopSmoke(browser, browserName, origin, label) {
           const hook = await page.evaluate(() => globalThis.__testGame);
           assert(hook === undefined, `${pageLabel}: 通常起動にテスト用Gameハンドルが混入しています`);
           await saveScreenshot(page, pageLabel, 'home');
+          await settleAfterScreenshot(page);
           // 通常起動の配線でも、名前からプレイ画面まで到達できることを確認する。
           await startByName(page, { hook: false, label: pageLabel });
           await saveScreenshot(page, pageLabel, 'playing');
@@ -788,8 +834,9 @@ async function runHookFlow(browser, browserName, origin, variant) {
       await page.waitForFunction(() => globalThis.__testHookReady && globalThis.__testGame,
         undefined, { timeout: DEFAULT_TIMEOUT });
       await startByName(page, { hook: true, label });
-      await saveScreenshot(page, label, 'playing');
       await runInputAndResultFlow(page, label);
+      // 描画取得後はこのpageで入力時刻の検査を続けない。
+      await saveScreenshot(page, label, 'playing');
       assertHealthy(observation, label);
     } finally {
       await closeObservedPage(page);
@@ -818,14 +865,28 @@ async function runMobileFlow(browser, browserName, origin, variant, short) {
       const buttons = page.locator('[data-dir]');
       assert(await buttons.count() === 5, `${label}: タッチ操作ボタンが5個ではありません`);
       await page.evaluate(() => {
+        // このケースは5方向の実タッチと押下解除の検査。自然出現が途中で
+        // 重ならない「攻撃なし」のfixtureにする。時計・rAF・入力配線は実体。
+        // 攻撃の判定と描画はrunInputAndResultFlowの実キー経路で別に検査する。
+        const game = globalThis.__testGame;
+        if (!game?.isPlaying()) throw new Error('タッチ検査の開始時にGameが停止しています');
+        game.attack = null;
+        game.nextSpawnAt = Infinity;
+        game.clearInputs();
         globalThis.__r1PointerDowns = 0;
         document.addEventListener('pointerdown', () => { globalThis.__r1PointerDowns++; }, { capture: true });
       });
+      await markBrowserEvent(page, 'empty-attack-input-fixture');
       for (let i = 0; i < await buttons.count(); i++) await buttons.nth(i).tap();
       await page.waitForFunction(() => (globalThis.__r1PointerDowns || 0) >= 5,
         undefined, { timeout: DEFAULT_TIMEOUT });
+      if (!short) {
+        await page.evaluate(() => globalThis.__testGame.clearInputs());
+        await runPointerLifecycleRegression(page, label);
+        // 回帰の最後はHOMEへ戻るため、証拠用に明示的にもう一度開始する。
+        await startByName(page, { hook: true, label });
+      }
       await saveScreenshot(page, label, 'buttons');
-      if (!short) await runPointerLifecycleRegression(page, label);
       assertHealthy(observation, label);
     } finally {
       await closeObservedPage(page);
@@ -836,6 +897,7 @@ async function runMobileFlow(browser, browserName, origin, variant, short) {
 }
 
 async function runPointerLifecycleRegression(page, label) {
+  await markBrowserEvent(page, 'pointer-lifecycle-start');
   const button = page.locator('[data-dir]').first();
   assert(await button.count() === 1, `${label}: pointer回帰用ボタンがありません`);
 
@@ -942,7 +1004,9 @@ async function beginCountdownByName(page, label) {
       'button:has-text("開始")',
     ], `${label}のプレイボタン`);
   }
+  await markBrowserEvent(page, 'start-click-before');
   await start.click();
+  await markBrowserEvent(page, 'start-click-after');
   await page.waitForFunction(() => {
     const state = String(globalThis.__testSession?.state || '').toUpperCase();
     return state === 'COUNTDOWN' || state === 'RESUME_COUNTDOWN';
