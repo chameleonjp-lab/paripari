@@ -32,15 +32,17 @@ html, body {
   overscroll-behavior: none;
   position: fixed;
   inset: 0;
-  touch-action: none;
+  touch-action: auto;
   user-select: none;
   -webkit-user-select: none;
-  -webkit-touch-callout: none;
+  -webkit-touch-callout: default;
 }
 
 #app {
   position: relative;
   width: 100%;
+  max-width: 540px;
+  margin-inline: auto;
   height: 100%;
   height: 100dvh;
   overflow: hidden;
@@ -52,6 +54,15 @@ html, body {
   width: 100%;
   height: 100%;
   display: block;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#controls, #hud, #judge-pop, #banner, #rotate-hint {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .hidden { display: none !important; }
@@ -222,8 +233,12 @@ html, body {
   -webkit-backdrop-filter: blur(2px);
   padding: 24px;
   text-align: center;
+  overflow-y: auto;
+  touch-action: pan-y;
+  user-select: text;
+  -webkit-user-select: text;
 }
-.title-wrap, .panel { width: 100%; max-width: 340px; }
+.title-wrap, .panel { width: 100%; max-width: 340px; margin: auto; }
 .logo {
   font-size: clamp(48px, 18vw, 76px);
   margin: 0 0 8px;
@@ -238,6 +253,62 @@ html, body {
 .tagline { color: rgba(233,238,247,.8); margin: 0 0 18px; font-size: 15px; }
 .tagline b, .ready-hint b { color: var(--gold); }
 .best { color: var(--cyan); font-weight: 800; margin-bottom: 22px; letter-spacing: 2px; }
+.name-label {
+  display: block;
+  margin: 0 0 6px;
+  color: rgba(233,238,247,.78);
+  font-size: 13px;
+  text-align: left;
+}
+.name-input {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(0,0,0,.25);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  touch-action: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.name-input::placeholder { color: rgba(233,238,247,.45); }
+.name-input:focus, .share-preview:focus { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.platform-status {
+  min-height: 1.25em;
+  margin: 7px 0;
+  color: rgba(233,238,247,.7);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.platform-status.error { color: #ff8f9e; }
+.share-preview {
+  display: block;
+  width: 100%;
+  min-height: 50px;
+  margin: 7px 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px;
+  background: rgba(0,0,0,.22);
+  color: rgba(233,238,247,.72);
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  resize: vertical;
+  touch-action: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.platform-link {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--cyan);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 
 .btn {
   display: block;
@@ -250,6 +321,9 @@ html, body {
   color: var(--ink);
   font-size: 17px;
   font-weight: 700;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .btn:active { transform: scale(.98); }
 .btn-primary {
@@ -357,9 +431,18 @@ html, body {
         <h1 class="logo">パリパリ</h1>
         <p class="tagline">来た方向と<b>反対</b>を、ちょうどで弾け。</p>
         <div class="best">BEST <span id="title-best">0</span></div>
+        <label class="name-label" for="player-name">表示名（1〜20文字）</label>
+        <input id="player-name" class="name-input" type="text"
+          autocomplete="nickname" autocapitalize="none" spellcheck="false"
+          placeholder="名前を入力してください">
+        <p id="name-error" class="platform-status error" role="alert" aria-live="polite"></p>
         <button id="btn-play" class="btn btn-primary">プレイ</button>
         <button id="btn-howto" class="btn">遊び方</button>
         <button id="btn-settings" class="btn">設定</button>
+        <button id="btn-home-share" class="btn">ゲームをシェア</button>
+        <p id="home-share-status" class="platform-status" role="status" aria-live="polite"></p>
+        <textarea id="home-share-text" class="share-preview" readonly aria-label="ゲームのシェア文"></textarea>
+        <a class="platform-link" href="https://chameleonjp-lab.github.io/chameleonjp_lab/" target="_blank" rel="noopener noreferrer">カメレオンJPの実験場へ</a>
       </div>
     </section>
 
@@ -424,6 +507,11 @@ html, body {
         </div>
         <button id="btn-retry" class="btn btn-primary">もう一回</button>
         <button id="btn-result-home" class="btn">ホーム</button>
+        <p id="result-player" class="platform-status"></p>
+        <textarea id="result-share-text" class="share-preview" readonly aria-label="結果のシェア文"></textarea>
+        <button id="btn-result-share" class="btn">結果をシェア</button>
+        <p id="result-share-status" class="platform-status" role="status" aria-live="polite"></p>
+        <a class="platform-link" href="https://chameleonjp-lab.github.io/chameleonjp_lab/" target="_blank" rel="noopener noreferrer">カメレオンJPの実験場へ</a>
       </div>
     </section>
 
@@ -431,1595 +519,1634 @@ html, body {
   </div>
 
   <script>
-(function(){
-  var reg = {};
-  function def(name, fn){ reg[name] = { fn: fn, mod: null }; }
-  function require(name){
-    var e = reg[name];
-    if (!e) throw new Error('module not found: ' + name);
-    if (!e.mod){ e.mod = { exports: {} }; e.fn(e.mod, e.mod.exports, require); }
-    return e.mod.exports;
-  }
-  def('config', function(module, exports, require){
-// パリパリ チューニング定数（要件 §2.4 §3 §5）
-// すべてのバランス調整はこのファイルで完結する。
-
-const CONFIG = {
-  // --- 判定窓 (ms) ---
-  PERFECT_WINDOW: 60,
-  GOOD_WINDOW: 140,
-
-  // --- スコア ---
-  BASE_PERFECT: 300,
-  BASE_GOOD: 100,
-  COMBO_STEP: 5,
-  COMBO_STEP_BONUS: 0.5,
-  COMBO_MAX_MULT: 4.0,
-  TIMING_BONUS_MAX: 50,
-
-  // --- ライフ ---
-  MAX_HP: 3,
-  HEAL_EVERY_PERFECT_STREAK: 10,
-
-  // --- 演出 ---
-  HITSTOP_PERFECT_MS: 110,
-  HITSTOP_GOOD_MS: 50,
-  SLOWMO_SCALE: 0.25,
-  SLOWMO_MS: 140,
-  SHAKE_MISS: 14,
-  DPR_CAP: 3,
-
-  // --- ランクしきい値（総スコア）---
-  RANKS: [
-    { rank: 'S', min: 18000 },
-    { rank: 'A', min: 10000 },
-    { rank: 'B', min: 5000 },
-    { rank: 'C', min: 0 },
-  ],
-
-  // 攻撃は上半分から来る5方向（下部はボタン専用エリア）
-  DIRECTIONS: ['L', 'R', 'U', 'UL', 'UR'],
-
-  // --- ウォームアップ（開始時の案内＋低速ノーダメージ準備）---
-  WARMUP: { count: 5, visibleMs: 1200, intervalMs: 1150 },
-
-  // --- 分割バー（マルチタップ）の各分割の到達間隔 ---
-  SEGMENT_GAP: { ratio: 0.30, min: 155, max: 260 },
-
-  // --- 最大ティア ---
-  MAX_TIER: 20,
-
-  INTERVAL_JITTER: 0.12, // 攻撃間隔の基本ゆらぎ（速度ジッタとは別）
-
-  // TIERS は下で生成（20段階）
-  TIERS: [],
-};
-
-// 攻撃方向 → 受け流しに必要な入力（反対側）
-const OPPOSITE = { L: 'R', R: 'L', U: 'D', UL: 'DR', UR: 'DL' };
-
-// 受け流し方向（=ボタン）の角度（screen座標: 0=右, +y=下）
-const NEED_ANGLE = {
-  R: 0,
-  DR: Math.PI / 4,
-  D: Math.PI / 2,
-  DL: (3 * Math.PI) / 4,
-  L: Math.PI,
-};
-
-const lerp = (a, b, t) => a + (b - a) * t;
-const smooth = (t) => t * t * (3 - 2 * t);
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-
-/**
- * 20段階のティアを生成する。
- * 前半(〜ティア10): 速度を詰めつつ「速度ランダム性(speedJitter)」を 0→最大 へ。
- * 後半(ティア11〜): 速度ランダム性は出揃い、必要タップ数を 1→最大3 へ段階的に。
- * tapWeights: [p(1回), p(2回), p(3回)] の確率分布。
- */
-function buildTiers() {
-  const out = [];
-  for (let n = 0; n < CONFIG.MAX_TIER; n++) {
-    const speedT = smooth(clamp(n / 9, 0, 1));      // ティア10で速度は床に到達
-    const visibleMs = Math.round(lerp(980, 440, speedT));
-    const intervalMs = Math.round(lerp(1080, 540, speedT));
-    const speedJitter = +clamp((n / 9) * 0.35, 0, 0.35).toFixed(3); // ±割合。ティア10で最大0.35
-
-    // マルチタップの確率（ティア11〜で2回、ティア16〜で3回が混ざる）
-    const p2 = clamp((n - 9) * 0.07, 0, 0.5);
-    const p3 = clamp((n - 14) * 0.06, 0, 0.3);
-    const p1 = Math.max(0, 1 - p2 - p3);
-    const maxTaps = p3 > 0 ? 3 : p2 > 0 ? 2 : 1;
-
-    out.push({
-      successAt: Math.round(5 * n + 0.5 * n * n),
-      visibleMs,
-      intervalMs,
-      speedJitter,
-      tapWeights: [p1, p2, p3],
-      maxTaps,
-    });
-  }
-  return out;
-}
-
-CONFIG.TIERS = buildTiers();
-
-function tierForSuccess(successCount) {
-  const tiers = CONFIG.TIERS;
-  let current = tiers[0];
-  for (const t of tiers) {
-    if (successCount >= t.successAt) current = t;
-    else break;
-  }
-  return current;
-}
-
-function rankForScore(score) {
-  for (const r of CONFIG.RANKS) {
-    if (score >= r.min) return r.rank;
-  }
-  return 'C';
-}
-
-
-  Object.assign(exports, { CONFIG, OPPOSITE, NEED_ANGLE, tierForSuccess, rankForScore });
-  });
-
-  def('judge', function(module, exports, require){
-// 3段階判定（純粋関数・テスト対象） 要件 §2.4
-const {CONFIG} = require('config');
-/**
- * @param {number} deltaMs  入力時刻 - インパクト時刻T（負=早い, 正=遅い）
- * @param {boolean} dirOk    入力方向が正しい（攻撃の反対側）か
- * @param {object} cfg       判定窓を持つ設定（既定 CONFIG）
- * @returns {'PERFECT'|'GOOD'|'MISS'}
- */
-function judgeTiming(deltaMs, dirOk, cfg = CONFIG) {
-  if (!dirOk) return 'MISS';
-  const a = Math.abs(deltaMs);
-  if (a <= cfg.PERFECT_WINDOW) return 'PERFECT';
-  if (a <= cfg.GOOD_WINDOW) return 'GOOD';
-  return 'MISS';
-}
-
-
-  Object.assign(exports, { judgeTiming });
-  });
-
-  def('scoring', function(module, exports, require){
-// スコア/コンボ計算（純粋関数・テスト対象） 要件 §3
-const {CONFIG} = require('config');
-function comboMultiplier(combo, cfg = CONFIG) {
-  const mult = 1 + Math.floor(combo / cfg.COMBO_STEP) * cfg.COMBO_STEP_BONUS;
-  return Math.min(mult, cfg.COMBO_MAX_MULT);
-}
-
-function timingBonus(deltaMs, cfg = CONFIG) {
-  const ratio = 1 - Math.abs(deltaMs) / cfg.GOOD_WINDOW;
-  const bonus = Math.round(ratio * cfg.TIMING_BONUS_MAX);
-  return Math.max(0, Math.min(cfg.TIMING_BONUS_MAX, bonus));
-}
-
-/**
- * 1攻撃あたりの獲得点。
- * @param {'PERFECT'|'GOOD'|'MISS'} judge
- * @param {number} combo  この成功時点のコンボ（加点前/この成功を含む値を渡す側で統一）
- * @param {number} deltaMs
- */
-function calcGain(judge, combo, deltaMs, cfg = CONFIG) {
-  const base = judge === 'PERFECT' ? cfg.BASE_PERFECT : judge === 'GOOD' ? cfg.BASE_GOOD : 0;
-  if (base === 0) return 0;
-  return Math.round(base * comboMultiplier(combo, cfg) + timingBonus(deltaMs, cfg));
-}
-
-
-  Object.assign(exports, { comboMultiplier, timingBonus, calcGain });
-  });
-
-  def('storage', function(module, exports, require){
-// localStorage ラッパ（ベストスコア・設定） 要件 §3.2 §4.6
-const KEY_BEST = 'paripari.best';
-const KEY_SETTINGS = 'paripari.settings';
-
-const DEFAULT_SETTINGS = {
-  vibrate: true,
-  reducedMotion: false,
-};
-
-function safeGet(key) {
-  try { return localStorage.getItem(key); } catch { return null; }
-}
-function safeSet(key, val) {
-  try { localStorage.setItem(key, val); } catch { /* ignore */ }
-}
-
-function getBest() {
-  return parseInt(safeGet(KEY_BEST) || '0', 10) || 0;
-}
-function setBest(n) {
-  safeSet(KEY_BEST, String(Math.max(0, Math.floor(n))));
-}
-
-function getSettings() {
-  try {
-    const raw = safeGet(KEY_SETTINGS);
-    if (!raw) {
-      const prefersReduced = window.matchMedia &&
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      return { ...DEFAULT_SETTINGS, reducedMotion: !!prefersReduced };
-    }
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
-  } catch {
-    return { ...DEFAULT_SETTINGS };
-  }
-}
-function setSettings(s) {
-  safeSet(KEY_SETTINGS, JSON.stringify(s));
-}
-
-
-  Object.assign(exports, { getBest, setBest, getSettings, setSettings });
-  });
-
-  def('haptics', function(module, exports, require){
-// 触覚フィードバック（要件 §4.5）。iOS Safari は vibrate 非対応のため安全に無視される。
-let enabled = true;
-
-function setHapticsEnabled(v) { enabled = !!v; }
-
-function vibrate(pattern) {
-  if (!enabled) return;
-  try {
-    if (navigator.vibrate) navigator.vibrate(pattern);
-  } catch { /* ignore */ }
-}
-
-const HAPTICS = {
-  perfect: [10, 10, 10],
-  good: [15],
-  miss: [40],
-};
-
-
-  Object.assign(exports, { setHapticsEnabled, vibrate, HAPTICS });
-  });
-
-  def('particles', function(module, exports, require){
-// パーティクルプール（GCスパイク回避） 要件 §6.6
-const MAX = 220;
-
-class ParticlePool {
-  constructor() {
-    this.pool = new Array(MAX).fill(null).map(() => ({
-      active: false, x: 0, y: 0, vx: 0, vy: 0, life: 0, maxLife: 1,
-      size: 2, color: '#fff', gravity: 0,
-    }));
-  }
-
-  spawnBurst(x, y, opts = {}) {
-    const {
-      count = 16, speed = 320, spread = Math.PI * 2, angle = 0,
-      colors = ['#fff'], size = 3, life = 0.5, gravity = 600,
-    } = opts;
-    let spawned = 0;
-    for (let i = 0; i < this.pool.length && spawned < count; i++) {
-      const p = this.pool[i];
-      if (p.active) continue;
-      const a = angle + (Math.random() - 0.5) * spread;
-      const sp = speed * (0.4 + Math.random() * 0.6);
-      p.active = true;
-      p.x = x; p.y = y;
-      p.vx = Math.cos(a) * sp;
-      p.vy = Math.sin(a) * sp;
-      p.maxLife = life * (0.6 + Math.random() * 0.6);
-      p.life = p.maxLife;
-      p.size = size * (0.6 + Math.random() * 0.8);
-      p.color = colors[(Math.random() * colors.length) | 0];
-      p.gravity = gravity;
-      spawned++;
-    }
-  }
-
-  update(dt) {
-    for (const p of this.pool) {
-      if (!p.active) continue;
-      p.life -= dt;
-      if (p.life <= 0) { p.active = false; continue; }
-      p.vy += p.gravity * dt;
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-    }
-  }
-
-  draw(ctx) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (const p of this.pool) {
-      if (!p.active) continue;
-      const t = p.life / p.maxLife;
-      ctx.globalAlpha = Math.max(0, t);
-      ctx.fillStyle = p.color;
-      const s = p.size * (0.4 + t * 0.6);
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, s, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-
-  clear() {
-    for (const p of this.pool) p.active = false;
-  }
-}
-
-
-  Object.assign(exports, { ParticlePool });
-  });
-
-  def('input', function(module, exports, require){
-// 入力正規化（pointer/touch/key）と時刻記録 要件 §6.2 §6.3
-// 方向ボタンの押下を {dir, time} で通知する。
-
-// PC補助: 受け流し方向（=ボタン）に対応。L/R/D と斜め下DL/DR。
-const KEY_DIR = {
-  ArrowLeft: 'L', a: 'L', A: 'L',
-  ArrowRight: 'R', d: 'R', D: 'R',
-  ArrowDown: 'D', s: 'D', S: 'D',
-  q: 'DL', Q: 'DL', z: 'DL', Z: 'DL',
-  e: 'DR', E: 'DR', c: 'DR', C: 'DR',
-};
-
-// タップ位置に波紋を発生（操作フィードバック）
-function spawnRipple(btn, e) {
-  const rect = btn.getBoundingClientRect();
-  const pt = (e.touches && e.touches[0]) || e;
-  const x = (pt.clientX != null ? pt.clientX : rect.left + rect.width / 2) - rect.left;
-  const y = (pt.clientY != null ? pt.clientY : rect.top + rect.height / 2) - rect.top;
-  const span = document.createElement('span');
-  span.className = 'ripple';
-  span.style.left = x + 'px';
-  span.style.top = y + 'px';
-  btn.appendChild(span);
-  span.addEventListener('animationend', () => span.remove());
-  setTimeout(() => span.remove(), 600);
-}
-
-function setupInput({ onAction, onFirstGesture }) {
-  let firstGestureDone = false;
-  const fireFirst = () => {
-    if (firstGestureDone) return;
-    firstGestureDone = true;
-    onFirstGesture && onFirstGesture();
+(() => {
+  // src/js/config.js
+  var CONFIG = {
+    // --- 判定窓 (ms) ---
+    PERFECT_WINDOW: 60,
+    GOOD_WINDOW: 140,
+    // --- スコア ---
+    BASE_PERFECT: 300,
+    BASE_GOOD: 100,
+    COMBO_STEP: 5,
+    COMBO_STEP_BONUS: 0.5,
+    COMBO_MAX_MULT: 4,
+    TIMING_BONUS_MAX: 50,
+    // --- ライフ ---
+    MAX_HP: 3,
+    HEAL_EVERY_PERFECT_STREAK: 10,
+    // --- 演出 ---
+    HITSTOP_PERFECT_MS: 110,
+    HITSTOP_GOOD_MS: 50,
+    SLOWMO_SCALE: 0.25,
+    SLOWMO_MS: 140,
+    SHAKE_MISS: 14,
+    DPR_CAP: 3,
+    // --- ランクしきい値（総スコア）---
+    RANKS: [
+      { rank: "S", min: 18e3 },
+      { rank: "A", min: 1e4 },
+      { rank: "B", min: 5e3 },
+      { rank: "C", min: 0 }
+    ],
+    // 攻撃は上半分から来る5方向（下部はボタン専用エリア）
+    DIRECTIONS: ["L", "R", "U", "UL", "UR"],
+    // --- ウォームアップ（開始時の案内＋低速ノーダメージ準備）---
+    WARMUP: { count: 5, visibleMs: 1200, intervalMs: 1150 },
+    // --- 分割バー（マルチタップ）の各分割の到達間隔 ---
+    SEGMENT_GAP: { ratio: 0.3, min: 155, max: 260 },
+    // --- 最大ティア ---
+    MAX_TIER: 20,
+    INTERVAL_JITTER: 0.12,
+    // 攻撃間隔の基本ゆらぎ（速度ジッタとは別）
+    // TIERS は下で生成（20段階）
+    TIERS: []
   };
-
-  const buttons = document.querySelectorAll('[data-dir]');
-  const pointerSupported = 'PointerEvent' in window;
-  const downEvent = pointerSupported ? 'pointerdown' : 'touchstart';
-
-  buttons.forEach((btn) => {
-    btn.addEventListener(downEvent, (e) => {
-      e.preventDefault();
-      fireFirst();
-      const dir = btn.getAttribute('data-dir');
-      const time = (e.timeStamp && e.timeStamp > 0) ? e.timeStamp : performance.now();
-      btn.classList.add('pressed');
-      spawnRipple(btn, e);
-      onAction({ dir, time });
-    }, { passive: false });
-
-    btn.addEventListener(pointerSupported ? 'pointerup' : 'touchend', () => {
-      btn.classList.remove('pressed');
-    });
-    btn.addEventListener(pointerSupported ? 'pointercancel' : 'touchcancel', () => {
-      btn.classList.remove('pressed');
-    });
-    btn.addEventListener('pointerleave', () => btn.classList.remove('pressed'));
-  });
-
-  // キーボード（PC）
-  window.addEventListener('keydown', (e) => {
-    if (e.repeat) return;
-    const dir = KEY_DIR[e.key];
-    if (!dir) return;
-    e.preventDefault();
-    fireFirst();
-    onAction({ dir, time: e.timeStamp || performance.now() });
-  });
-
-  // 任意の最初のタッチでも音声初期化フックを発火
-  window.addEventListener(downEvent, fireFirst, { passive: true, once: false });
-}
-
-// ズーム/スクロール/バウンス抑止（要件 §6.3 §6.4）
-function lockGestures() {
-  // ダブルタップズーム抑止
-  let lastTouchEnd = 0;
-  document.addEventListener('touchend', (e) => {
-    const now = Date.now();
-    if (now - lastTouchEnd <= 300) e.preventDefault();
-    lastTouchEnd = now;
-  }, { passive: false });
-
-  // ピンチズーム抑止
-  document.addEventListener('gesturestart', (e) => e.preventDefault());
-  document.addEventListener('gesturechange', (e) => e.preventDefault());
-
-  // スクロール/バウンス抑止
-  document.addEventListener('touchmove', (e) => {
-    if (e.scale && e.scale !== 1) e.preventDefault();
-  }, { passive: false });
-}
-
-
-  Object.assign(exports, { setupInput, lockGestures });
-  });
-
-  def('enemy', function(module, exports, require){
-// 攻撃のライフサイクルと時間モデル 要件 §2.2 §5
-const {CONFIG, OPPOSITE} = require('config');
-let _id = 0;
-
-// tapWeights から必要タップ数(1..3)を抽選
-function pickTaps(weights) {
-  const r = Math.random();
-  let acc = 0;
-  for (let i = 0; i < weights.length; i++) {
-    acc += weights[i];
-    if (r < acc) return i + 1;
-  }
-  return 1;
-}
-
-/**
- * 攻撃を生成する。
- * @param {number} now performance.now()
- * @param {object} opts { baseVisibleMs, speedJitter, taps, dirs }
- */
-function createAttack(now, opts) {
-  const {
-    baseVisibleMs,
-    speedJitter = 0,
-    taps = 1,
-    dirs = CONFIG.DIRECTIONS,
-  } = opts;
-
-  const dir = dirs[(Math.random() * dirs.length) | 0];
-  // 速度ランダム性: バーごとに可視時間を ±speedJitter で揺らす
-  const jitter = 1 + (Math.random() * 2 - 1) * speedJitter;
-  const visibleMs = Math.max(300, Math.round(baseVisibleMs * jitter));
-
-  const g = CONFIG.SEGMENT_GAP;
-  const gap = Math.min(g.max, Math.max(g.min, visibleMs * g.ratio));
-
-  const segments = [];
-  for (let k = 0; k < taps; k++) {
-    segments.push({ impactAt: now + visibleMs + k * gap, resolved: false, result: null });
-  }
-
-  return {
-    id: ++_id,
-    dir,
-    needDir: OPPOSITE[dir],
-    spawnAt: now,
-    visibleMs,
-    taps,
-    segments,
-    segIndex: 0,        // 次に判定すべき分割
-    hpLost: false,      // この攻撃で既にHPを失ったか（1攻撃あたりHP減は最大1）
-    warmup: false,
-    resolved: false,    // 全分割が解決済みか
-    resolvedAt: 0,
-    result: null,       // 直近の分割結果（余韻演出用）
+  var OPPOSITE = { L: "R", R: "L", U: "D", UL: "DR", UR: "DL" };
+  var NEED_ANGLE = {
+    R: 0,
+    DR: Math.PI / 4,
+    D: Math.PI / 2,
+    DL: 3 * Math.PI / 4,
+    L: Math.PI
   };
-}
-
-function currentSegment(attack) {
-  return attack.segments[Math.min(attack.segIndex, attack.segments.length - 1)];
-}
-
-// 次に叩くべき分割への収束進捗 0..1（分割ごとにリングが再収束する）
-function ringProgress(attack, now) {
-  const i = attack.segIndex;
-  const to = currentSegment(attack).impactAt;
-  const from = i > 0 ? attack.segments[i - 1].impactAt : attack.spawnAt;
-  const span = Math.max(1, to - from);
-  return Math.max(0, Math.min(1.4, (now - from) / span));
-}
-
-function nextInterval(intervalMs) {
-  const j = CONFIG.INTERVAL_JITTER;
-  const factor = 1 + (Math.random() * 2 - 1) * j;
-  return intervalMs * factor;
-}
-
-
-  Object.assign(exports, { pickTaps, createAttack, currentSegment, ringProgress, nextInterval });
-  });
-
-  def('renderer', function(module, exports, require){
-// Canvas 2D 描画 要件 §4.4 §6.4
-// ビジュアル/演出強化版: タイミングリング・方向受け流し・衝撃波・スコアポップ・
-// コンボオーラ・背景アンビエント。
-const {CONFIG, NEED_ANGLE} = require('config');
-const {ringProgress} = require('enemy');
-const PLAYER_R = 27;
-
-class Renderer {
-  constructor(canvas) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
-    this.w = 0; this.h = 0; this.dpr = 1;
-    this.lineY = 0;
-    this.t = 0;
-    this.reducedMotion = false;
-
-    // 全画面フラッシュ / シェイク
-    this.flash = 0; this.flashColor = '#fff';
-    this.shake = 0;
-    this.vignette = 0; this.vignetteColor = '60,90,160';
-
-    // 透過的な演出要素
-    this.shockwaves = [];   // {x,y,t,dur,max,color,width}
-    this.popups = [];       // {x,y,vy,t,dur,text,color,size}
-    this.deflect = null;    // {dir,t,dur,color,result}
-    this.embers = [];
-
-    this.resize();
-    this._initEmbers();
-  }
-
-  resize() {
-    this.dpr = Math.min(window.devicePixelRatio || 1, CONFIG.DPR_CAP);
-    const rect = this.canvas.getBoundingClientRect();
-    this.w = rect.width;
-    this.h = rect.height;
-    this.canvas.width = Math.round(this.w * this.dpr);
-    this.canvas.height = Math.round(this.h * this.dpr);
-    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    this.lineY = this.h * 0.54;
-  }
-
-  _initEmbers() {
-    const n = 30;
-    this.embers = [];
-    for (let i = 0; i < n; i++) {
-      this.embers.push({
-        x: Math.random() * this.w,
-        y: Math.random() * this.h,
-        vy: -8 - Math.random() * 16,
-        vx: (Math.random() - 0.5) * 6,
-        r: 0.6 + Math.random() * 1.8,
-        a: 0.15 + Math.random() * 0.35,
-        ph: Math.random() * Math.PI * 2,
+  var lerp = (a, b, t) => a + (b - a) * t;
+  var smooth = (t) => t * t * (3 - 2 * t);
+  var clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  function buildTiers() {
+    const out = [];
+    for (let n = 0; n < CONFIG.MAX_TIER; n++) {
+      const speedT = smooth(clamp(n / 9, 0, 1));
+      const visibleMs = Math.round(lerp(980, 440, speedT));
+      const intervalMs = Math.round(lerp(1080, 540, speedT));
+      const speedJitter = +clamp(n / 9 * 0.35, 0, 0.35).toFixed(3);
+      const p2 = clamp((n - 9) * 0.07, 0, 0.5);
+      const p3 = clamp((n - 14) * 0.06, 0, 0.3);
+      const p1 = Math.max(0, 1 - p2 - p3);
+      const maxTaps = p3 > 0 ? 3 : p2 > 0 ? 2 : 1;
+      out.push({
+        successAt: Math.round(5 * n + 0.5 * n * n),
+        visibleMs,
+        intervalMs,
+        speedJitter,
+        tapWeights: [p1, p2, p3],
+        maxTaps
       });
     }
+    return out;
   }
-
-  // ---- 演出トリガ（game から呼ばれる）----
-  triggerFlash(color, intensity = 1) { this.flash = Math.max(this.flash, intensity); this.flashColor = color; }
-  triggerShake(px) { if (!this.reducedMotion) this.shake = Math.max(this.shake, px); }
-  triggerVignette(color, intensity) { this.vignette = Math.max(this.vignette, intensity); this.vignetteColor = color; }
-
-  triggerShockwave(result) {
-    const color = result === 'PERFECT' ? '255,220,120' : result === 'GOOD' ? '120,220,255' : '255,70,90';
-    const max = result === 'PERFECT' ? this.w * 0.9 : result === 'GOOD' ? this.w * 0.6 : this.w * 0.5;
-    this.shockwaves.push({ x: this.w / 2, y: this.lineY, t: 0, dur: result === 'PERFECT' ? 0.6 : 0.42, max, color, width: result === 'MISS' ? 3 : 5 });
-    if (result === 'PERFECT') {
-      // 二重リング
-      this.shockwaves.push({ x: this.w / 2, y: this.lineY, t: -0.06, dur: 0.7, max: this.w * 1.15, color, width: 2 });
+  CONFIG.TIERS = buildTiers();
+  function tierForSuccess(successCount) {
+    const tiers = CONFIG.TIERS;
+    let current = tiers[0];
+    for (const t of tiers) {
+      if (successCount >= t.successAt) current = t;
+      else break;
     }
+    return current;
   }
-
-  triggerDeflect(dir, result) {
-    this.deflect = { dir, t: 0, dur: 0.26, result, color: result === 'PERFECT' ? '#fff2c0' : '#bfefff' };
-  }
-
-  addScorePopup(amount, result) {
-    if (amount <= 0) return;
-    const color = result === 'PERFECT' ? '#ffd35b' : '#bfefff';
-    this.popups.push({
-      x: this.w / 2 + (Math.random() - 0.5) * 30,
-      y: this.lineY - PLAYER_R - 18,
-      vy: -64, t: 0, dur: 0.85,
-      text: '+' + amount, color,
-      size: result === 'PERFECT' ? 26 : 20,
-    });
-  }
-
-  // ---- メイン描画 ----
-  draw(dt, state, particles) {
-    const ctx = this.ctx;
-    this.t += dt;
-    this.flash = Math.max(0, this.flash - dt * 5.5);
-    this.shake = Math.max(0, this.shake - dt * 70);
-    this.vignette = Math.max(0, this.vignette - dt * 2.8);
-    this._updateTransients(dt);
-
-    ctx.save();
-    if (this.shake > 0.5) {
-      ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
+  function rankForScore(score) {
+    for (const r of CONFIG.RANKS) {
+      if (score >= r.min) return r.rank;
     }
+    return "C";
+  }
 
-    this._drawBackground(ctx, dt);
-    this._drawParryLine(ctx);
-
-    const combo = state.combo || 0;
-    this._drawComboAura(ctx, combo);
-    this._drawShockwaves(ctx);
-
-    // 攻撃（タイミングリング＋接近する斬撃）
-    if (state.attack && !state.attack.resolved) {
-      this._drawTimingRing(ctx, state.attack, state.now);
-      this._drawAttack(ctx, state.attack, state.now);
-    } else if (state.attack && state.attack.resolved && state.now - state.attack.resolvedAt < 220) {
-      this._drawResolved(ctx, state.attack, state.now);
+  // src/js/enemy.js
+  var _id = 0;
+  function pickTaps(weights) {
+    const r = Math.random();
+    let acc = 0;
+    for (let i = 0; i < weights.length; i++) {
+      acc += weights[i];
+      if (r < acc) return i + 1;
     }
+    return 1;
+  }
+  function createAttack(now, opts) {
+    const {
+      baseVisibleMs,
+      speedJitter = 0,
+      taps = 1,
+      dirs = CONFIG.DIRECTIONS
+    } = opts;
+    const dir = dirs[Math.random() * dirs.length | 0];
+    const jitter = 1 + (Math.random() * 2 - 1) * speedJitter;
+    const visibleMs = Math.max(300, Math.round(baseVisibleMs * jitter));
+    const g = CONFIG.SEGMENT_GAP;
+    const gap = Math.min(g.max, Math.max(g.min, visibleMs * g.ratio));
+    const segments = [];
+    for (let k = 0; k < taps; k++) {
+      segments.push({ impactAt: now + visibleMs + k * gap, resolved: false, result: null });
+    }
+    return {
+      id: ++_id,
+      dir,
+      needDir: OPPOSITE[dir],
+      spawnAt: now,
+      visibleMs,
+      taps,
+      segments,
+      segIndex: 0,
+      // 次に判定すべき分割
+      hpLost: false,
+      // この攻撃で既にHPを失ったか（1攻撃あたりHP減は最大1）
+      warmup: false,
+      resolved: false,
+      // 全分割が解決済みか
+      resolvedAt: 0,
+      result: null
+      // 直近の分割結果（余韻演出用）
+    };
+  }
+  function currentSegment(attack) {
+    return attack.segments[Math.min(attack.segIndex, attack.segments.length - 1)];
+  }
+  function ringProgress(attack, now) {
+    const i = attack.segIndex;
+    const to = currentSegment(attack).impactAt;
+    const from = i > 0 ? attack.segments[i - 1].impactAt : attack.spawnAt;
+    const span = Math.max(1, to - from);
+    return Math.max(0, Math.min(1.4, (now - from) / span));
+  }
+  function nextInterval(intervalMs) {
+    const j = CONFIG.INTERVAL_JITTER;
+    const factor = 1 + (Math.random() * 2 - 1) * j;
+    return intervalMs * factor;
+  }
 
-    this._drawPlayer(ctx, combo);
-    this._drawDeflect(ctx);
-    particles.draw(ctx);
-    this._drawPopups(ctx);
-    ctx.restore();
-
-    this._drawVignette(ctx);
-    if (this.flash > 0.01) {
+  // src/js/renderer.js
+  var PLAYER_R = 27;
+  var Renderer = class {
+    constructor(canvas2) {
+      this.canvas = canvas2;
+      this.ctx = canvas2.getContext("2d");
+      this.w = 0;
+      this.h = 0;
+      this.dpr = 1;
+      this.lineY = 0;
+      this.t = 0;
+      this.reducedMotion = false;
+      this.flash = 0;
+      this.flashColor = "#fff";
+      this.shake = 0;
+      this.vignette = 0;
+      this.vignetteColor = "60,90,160";
+      this.shockwaves = [];
+      this.popups = [];
+      this.deflect = null;
+      this.embers = [];
+      this.resize();
+      this._initEmbers();
+    }
+    resize() {
+      this.dpr = Math.min(window.devicePixelRatio || 1, CONFIG.DPR_CAP);
+      const rect = this.canvas.getBoundingClientRect();
+      this.w = rect.width;
+      this.h = rect.height;
+      this.canvas.width = Math.round(this.w * this.dpr);
+      this.canvas.height = Math.round(this.h * this.dpr);
+      this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      this.lineY = this.h * 0.54;
+    }
+    _initEmbers() {
+      const n = 30;
+      this.embers = [];
+      for (let i = 0; i < n; i++) {
+        this.embers.push({
+          x: Math.random() * this.w,
+          y: Math.random() * this.h,
+          vy: -8 - Math.random() * 16,
+          vx: (Math.random() - 0.5) * 6,
+          r: 0.6 + Math.random() * 1.8,
+          a: 0.15 + Math.random() * 0.35,
+          ph: Math.random() * Math.PI * 2
+        });
+      }
+    }
+    // ---- 演出トリガ（game から呼ばれる）----
+    triggerFlash(color, intensity = 1) {
+      this.flash = Math.max(this.flash, intensity);
+      this.flashColor = color;
+    }
+    triggerShake(px) {
+      if (!this.reducedMotion) this.shake = Math.max(this.shake, px);
+    }
+    triggerVignette(color, intensity) {
+      this.vignette = Math.max(this.vignette, intensity);
+      this.vignetteColor = color;
+    }
+    triggerShockwave(result) {
+      const color = result === "PERFECT" ? "255,220,120" : result === "GOOD" ? "120,220,255" : "255,70,90";
+      const max = result === "PERFECT" ? this.w * 0.9 : result === "GOOD" ? this.w * 0.6 : this.w * 0.5;
+      this.shockwaves.push({ x: this.w / 2, y: this.lineY, t: 0, dur: result === "PERFECT" ? 0.6 : 0.42, max, color, width: result === "MISS" ? 3 : 5 });
+      if (result === "PERFECT") {
+        this.shockwaves.push({ x: this.w / 2, y: this.lineY, t: -0.06, dur: 0.7, max: this.w * 1.15, color, width: 2 });
+      }
+    }
+    triggerDeflect(dir, result) {
+      this.deflect = { dir, t: 0, dur: 0.26, result, color: result === "PERFECT" ? "#fff2c0" : "#bfefff" };
+    }
+    addScorePopup(amount, result) {
+      if (amount <= 0) return;
+      const color = result === "PERFECT" ? "#ffd35b" : "#bfefff";
+      this.popups.push({
+        x: this.w / 2 + (Math.random() - 0.5) * 30,
+        y: this.lineY - PLAYER_R - 18,
+        vy: -64,
+        t: 0,
+        dur: 0.85,
+        text: "+" + amount,
+        color,
+        size: result === "PERFECT" ? 26 : 20
+      });
+    }
+    // ---- メイン描画 ----
+    draw(dt, state, particles2) {
+      const ctx = this.ctx;
+      this.t += dt;
+      this.flash = Math.max(0, this.flash - dt * 5.5);
+      this.shake = Math.max(0, this.shake - dt * 70);
+      this.vignette = Math.max(0, this.vignette - dt * 2.8);
+      this._updateTransients(dt);
       ctx.save();
-      ctx.globalAlpha = Math.min(0.9, this.flash);
-      ctx.fillStyle = this.flashColor;
+      if (this.shake > 0.5) {
+        ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
+      }
+      this._drawBackground(ctx, dt);
+      this._drawParryLine(ctx);
+      const combo = state.combo || 0;
+      this._drawComboAura(ctx, combo);
+      this._drawShockwaves(ctx);
+      if (state.attack && !state.attack.resolved) {
+        this._drawTimingRing(ctx, state.attack, state.now);
+        this._drawAttack(ctx, state.attack, state.now);
+      } else if (state.attack && state.attack.resolved && state.now - state.attack.resolvedAt < 220) {
+        this._drawResolved(ctx, state.attack, state.now);
+      }
+      this._drawPlayer(ctx, combo);
+      this._drawDeflect(ctx);
+      particles2.draw(ctx);
+      this._drawPopups(ctx);
+      ctx.restore();
+      this._drawVignette(ctx);
+      if (this.flash > 0.01) {
+        ctx.save();
+        ctx.globalAlpha = Math.min(0.9, this.flash);
+        ctx.fillStyle = this.flashColor;
+        ctx.fillRect(0, 0, this.w, this.h);
+        ctx.restore();
+      }
+    }
+    _updateTransients(dt) {
+      for (let i = this.shockwaves.length - 1; i >= 0; i--) {
+        this.shockwaves[i].t += dt;
+        if (this.shockwaves[i].t >= this.shockwaves[i].dur) this.shockwaves.splice(i, 1);
+      }
+      for (let i = this.popups.length - 1; i >= 0; i--) {
+        const p = this.popups[i];
+        p.t += dt;
+        p.y += p.vy * dt;
+        p.vy *= 1 - dt * 1.6;
+        if (p.t >= p.dur) this.popups.splice(i, 1);
+      }
+      if (this.deflect) {
+        this.deflect.t += dt;
+        if (this.deflect.t >= this.deflect.dur) this.deflect = null;
+      }
+    }
+    // ---- 背景 ----
+    _drawBackground(ctx, dt) {
+      const g = ctx.createLinearGradient(0, 0, 0, this.h);
+      g.addColorStop(0, "#0a0a18");
+      g.addColorStop(0.55, "#11152e");
+      g.addColorStop(1, "#06060e");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, this.w, this.h);
+      const cx = this.w / 2, cy = this.lineY;
+      const breathe = 0.16 + Math.sin(this.t * 1.4) * 0.05;
+      const rg = ctx.createRadialGradient(cx, cy, 8, cx, cy, this.w * 0.75);
+      rg.addColorStop(0, `rgba(60,90,180,${breathe})`);
+      rg.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = rg;
+      ctx.fillRect(0, 0, this.w, this.h);
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (const e of this.embers) {
+        e.x += e.vx * dt;
+        e.y += e.vy * dt;
+        e.ph += dt * 2;
+        if (e.y < -10) {
+          e.y = this.h + 10;
+          e.x = Math.random() * this.w;
+        }
+        if (e.x < -10) e.x = this.w + 10;
+        else if (e.x > this.w + 10) e.x = -10;
+        const a = e.a * (0.6 + 0.4 * Math.sin(e.ph));
+        ctx.globalAlpha = a;
+        ctx.fillStyle = "#7fb0ff";
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    _drawParryLine(ctx) {
+      const y = this.lineY;
+      ctx.save();
+      const lg = ctx.createLinearGradient(0, 0, this.w, 0);
+      lg.addColorStop(0, "rgba(255,255,255,0)");
+      lg.addColorStop(0.5, "rgba(255,255,255,0.22)");
+      lg.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.strokeStyle = lg;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(this.w, y);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // ---- コンボオーラ ----
+    _drawComboAura(ctx, combo) {
+      if (combo < 2) return;
+      const cx = this.w / 2, cy = this.lineY;
+      const lvl = Math.min(combo / 30, 1);
+      const hue = 190 - lvl * 150;
+      const pulse = 1 + Math.sin(this.t * 6) * 0.06 * lvl;
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const r = (PLAYER_R + 16 + lvl * 40) * pulse;
+      const rg = ctx.createRadialGradient(cx, cy, PLAYER_R, cx, cy, r);
+      rg.addColorStop(0, `hsla(${hue},100%,65%,${0.05 + lvl * 0.22})`);
+      rg.addColorStop(1, `hsla(${hue},100%,55%,0)`);
+      ctx.fillStyle = rg;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    // ---- タイミングリング（収束）----
+    _drawTimingRing(ctx, attack, now) {
+      const cx = this.w / 2, cy = this.lineY;
+      const p = ringProgress(attack, now);
+      const maxR = Math.min(this.w, this.h) * 0.42;
+      const r = PLAYER_R + (maxR - PLAYER_R) * (1 - Math.min(p, 1));
+      const near = Math.max(0, 1 - Math.abs(1 - p) * 4);
+      const col = `rgba(${255},${Math.round(255 - near * 40)},${Math.round(255 - near * 175)},`;
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = col + (0.5 + near * 0.5) + ")";
+      ctx.lineWidth = 2 + near * 2;
+      ctx.shadowColor = col + "1)";
+      ctx.shadowBlur = 10 + near * 16;
+      ctx.beginPath();
+      ctx.arc(cx, cy, Math.max(r, PLAYER_R), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(cx, cy, PLAYER_R + 4, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // ---- 攻撃（接近する斬撃＋トレイル）----
+    // 攻撃は上半分の5方向から（下部はボタン専用のため下からは来ない）
+    attackStart(dir) {
+      switch (dir) {
+        case "L":
+          return { x: -40, y: this.lineY };
+        case "R":
+          return { x: this.w + 40, y: this.lineY };
+        case "U":
+          return { x: this.w / 2, y: -50 };
+        case "UL":
+          return { x: -30, y: -40 };
+        case "UR":
+          return { x: this.w + 30, y: -40 };
+        default:
+          return { x: this.w / 2, y: -50 };
+      }
+    }
+    _drawAttack(ctx, attack, now) {
+      const p = ringProgress(attack, now);
+      const start = this.attackStart(attack.dir);
+      const cx = this.w / 2, cy = this.lineY;
+      const e = p * p;
+      const telGlow = Math.max(0, 1 - p) * 0.5 + 0.18;
+      this._drawEdgeGlow(ctx, attack.dir, telGlow);
+      this._drawIncomingArrow(ctx, attack.dir, telGlow, p);
+      const angle = Math.atan2(cy - start.y, cx - start.x);
+      const danger = p > 0.68;
+      const col = danger ? "#ff3b54" : "#ff9a5b";
+      const remaining = attack.segments.length - attack.segIndex;
+      const lenScale = 1 + (remaining - 1) * 0.6;
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (let k = 1; k <= 3; k++) {
+        const pe = Math.max(0, e - k * 0.05);
+        const tx = start.x + (cx - start.x) * pe;
+        const ty = start.y + (cy - start.y) * pe;
+        ctx.globalAlpha = 0.12 * (1 - k / 4) * Math.min(1, p + 0.3);
+        this._slash(ctx, tx, ty, angle, (50 + 30 * pe) * lenScale, col, 4);
+      }
+      ctx.restore();
+      const x = start.x + (cx - start.x) * e;
+      const y = start.y + (cy - start.y) * e;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, 0.4 + p);
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 18;
+      const len = (62 + 42 * e) * lenScale;
+      this._slash(ctx, x, y, angle, len, col, 5 + 6 * e);
+      if (remaining > 1) {
+        ctx.shadowBlur = 0;
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.fillStyle = "#fff";
+        for (let s = 1; s < remaining; s++) {
+          const px = -len / 2 + len / remaining * s;
+          ctx.beginPath();
+          ctx.arc(px, 0, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+      if (attack.taps > 1) this._drawTapPips(ctx, attack);
+    }
+    _drawTapPips(ctx, attack) {
+      const cx = this.w / 2, cy = this.lineY - 46;
+      const total = attack.taps;
+      const done = attack.segIndex;
+      const gap = 16;
+      const w = (total - 1) * gap;
+      ctx.save();
+      for (let i = 0; i < total; i++) {
+        const x = cx - w / 2 + i * gap;
+        const remaining = i >= done;
+        ctx.globalAlpha = remaining ? 1 : 0.3;
+        ctx.fillStyle = remaining ? "#ffd35b" : "rgba(255,255,255,0.5)";
+        ctx.beginPath();
+        ctx.arc(x, cy, remaining ? 5 : 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    _slash(ctx, x, y, angle, len, color, width) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(-len / 2, 0);
+      ctx.lineTo(len / 2, 0);
+      ctx.stroke();
+      ctx.restore();
+    }
+    _drawResolved(ctx, attack, now) {
+      const k = Math.max(0, Math.min(1, (now - attack.resolvedAt) / 220));
+      const cx = this.w / 2, cy = this.lineY;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - k) * 0.8;
+      ctx.strokeStyle = attack.result === "MISS" ? "#ff3b54" : "#ffd35b";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, PLAYER_R + k * 50, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // ---- プレイヤー（守りの構え）----
+    _drawPlayer(ctx, combo) {
+      const cx = this.w / 2, cy = this.lineY;
+      const pulse = 1 + Math.sin(this.t * 3) * 0.04;
+      ctx.save();
+      ctx.strokeStyle = "rgba(120,210,255,0.85)";
+      ctx.lineWidth = 3;
+      ctx.shadowColor = "rgba(120,210,255,0.8)";
+      ctx.shadowBlur = 16;
+      ctx.beginPath();
+      ctx.arc(cx, cy, PLAYER_R * pulse, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, 9);
+      cg.addColorStop(0, "#ffffff");
+      cg.addColorStop(1, "rgba(180,230,255,0.6)");
+      ctx.fillStyle = cg;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 7.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    // ---- 方向受け流し（成功時、反対側へ刀をフリック）----
+    _drawDeflect(ctx) {
+      if (!this.deflect) return;
+      const d = this.deflect;
+      const k = d.t / d.dur;
+      const cx = this.w / 2, cy = this.lineY;
+      const ang = NEED_ANGLE[d.dir] != null ? NEED_ANGLE[d.dir] : 0;
+      const ease = 1 - Math.pow(1 - k, 3);
+      const reach = PLAYER_R + 8 + ease * 64;
+      const alpha = Math.max(0, 1 - k);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(ang);
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = d.color;
+      ctx.lineWidth = d.result === "PERFECT" ? 6 : 4;
+      ctx.lineCap = "round";
+      ctx.shadowColor = d.color;
+      ctx.shadowBlur = 18;
+      ctx.beginPath();
+      ctx.moveTo(PLAYER_R * 0.4, 0);
+      ctx.lineTo(reach, 0);
+      ctx.stroke();
+      ctx.globalAlpha = alpha * 0.8;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      const sweep = 0.5 + ease * 0.7;
+      ctx.arc(0, 0, reach * 0.82, -sweep, sweep);
+      ctx.stroke();
+      ctx.restore();
+    }
+    _drawShockwaves(ctx) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (const s of this.shockwaves) {
+        const k = Math.max(0, s.t / s.dur);
+        if (k <= 0) continue;
+        const r = s.max * (1 - Math.pow(1 - k, 2));
+        ctx.globalAlpha = Math.max(0, 1 - k) * 0.7;
+        ctx.strokeStyle = `rgba(${s.color},1)`;
+        ctx.lineWidth = s.width * (1 - k) + 0.5;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    _drawPopups(ctx) {
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (const p of this.popups) {
+        const k = p.t / p.dur;
+        ctx.globalAlpha = Math.max(0, 1 - k * k);
+        ctx.fillStyle = p.color;
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 12;
+        ctx.font = `800 ${p.size}px -apple-system, sans-serif`;
+        ctx.fillText(p.text, p.x, p.y);
+      }
+      ctx.restore();
+    }
+    _drawVignette(ctx) {
+      if (this.vignette <= 0.01) return;
+      const cx = this.w / 2, cy = this.h / 2;
+      const rg = ctx.createRadialGradient(cx, cy, this.h * 0.25, cx, cy, this.h * 0.72);
+      rg.addColorStop(0, `rgba(${this.vignetteColor},0)`);
+      rg.addColorStop(1, `rgba(${this.vignetteColor},${Math.min(0.7, this.vignette)})`);
+      ctx.save();
+      ctx.fillStyle = rg;
       ctx.fillRect(0, 0, this.w, this.h);
       ctx.restore();
     }
-  }
-
-  _updateTransients(dt) {
-    for (let i = this.shockwaves.length - 1; i >= 0; i--) {
-      this.shockwaves[i].t += dt;
-      if (this.shockwaves[i].t >= this.shockwaves[i].dur) this.shockwaves.splice(i, 1);
-    }
-    for (let i = this.popups.length - 1; i >= 0; i--) {
-      const p = this.popups[i];
-      p.t += dt; p.y += p.vy * dt; p.vy *= (1 - dt * 1.6);
-      if (p.t >= p.dur) this.popups.splice(i, 1);
-    }
-    if (this.deflect) { this.deflect.t += dt; if (this.deflect.t >= this.deflect.dur) this.deflect = null; }
-  }
-
-  // ---- 背景 ----
-  _drawBackground(ctx, dt) {
-    const g = ctx.createLinearGradient(0, 0, 0, this.h);
-    g.addColorStop(0, '#0a0a18');
-    g.addColorStop(0.55, '#11152e');
-    g.addColorStop(1, '#06060e');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, this.w, this.h);
-
-    // 中央の墨だまり（呼吸）
-    const cx = this.w / 2, cy = this.lineY;
-    const breathe = 0.16 + Math.sin(this.t * 1.4) * 0.05;
-    const rg = ctx.createRadialGradient(cx, cy, 8, cx, cy, this.w * 0.75);
-    rg.addColorStop(0, `rgba(60,90,180,${breathe})`);
-    rg.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = rg;
-    ctx.fillRect(0, 0, this.w, this.h);
-
-    // 漂う火の粉
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (const e of this.embers) {
-      e.x += e.vx * dt; e.y += e.vy * dt; e.ph += dt * 2;
-      if (e.y < -10) { e.y = this.h + 10; e.x = Math.random() * this.w; }
-      if (e.x < -10) e.x = this.w + 10; else if (e.x > this.w + 10) e.x = -10;
-      const a = e.a * (0.6 + 0.4 * Math.sin(e.ph));
+    _drawEdgeGlow(ctx, dir, a) {
+      ctx.save();
       ctx.globalAlpha = a;
-      ctx.fillStyle = '#7fb0ff';
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
-      ctx.fill();
+      const c = "rgba(255,80,90,";
+      let grad;
+      if (dir === "L") {
+        grad = ctx.createLinearGradient(0, 0, this.w * 0.32, 0);
+        grad.addColorStop(0, c + "0.6)");
+        grad.addColorStop(1, c + "0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, this.w * 0.32, this.h);
+      } else if (dir === "R") {
+        grad = ctx.createLinearGradient(this.w, 0, this.w * 0.68, 0);
+        grad.addColorStop(0, c + "0.6)");
+        grad.addColorStop(1, c + "0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(this.w * 0.68, 0, this.w * 0.32, this.h);
+      } else if (dir === "U") {
+        grad = ctx.createLinearGradient(0, 0, 0, this.h * 0.32);
+        grad.addColorStop(0, c + "0.6)");
+        grad.addColorStop(1, c + "0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, this.w, this.h * 0.32);
+      } else {
+        const cxg = dir === "UL" ? 0 : this.w;
+        grad = ctx.createRadialGradient(cxg, 0, 10, cxg, 0, this.w * 0.55);
+        grad.addColorStop(0, c + "0.6)");
+        grad.addColorStop(1, c + "0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, this.w, this.h * 0.6);
+      }
+      ctx.restore();
     }
-    ctx.restore();
-  }
-
-  _drawParryLine(ctx) {
-    const y = this.lineY;
-    ctx.save();
-    const lg = ctx.createLinearGradient(0, 0, this.w, 0);
-    lg.addColorStop(0, 'rgba(255,255,255,0)');
-    lg.addColorStop(0.5, 'rgba(255,255,255,0.22)');
-    lg.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.strokeStyle = lg;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, y); ctx.lineTo(this.w, y); ctx.stroke();
-    ctx.restore();
-  }
-
-  // ---- コンボオーラ ----
-  _drawComboAura(ctx, combo) {
-    if (combo < 2) return;
-    const cx = this.w / 2, cy = this.lineY;
-    const lvl = Math.min(combo / 30, 1);
-    const hue = 190 - lvl * 150; // cyan → gold/orange
-    const pulse = 1 + Math.sin(this.t * 6) * 0.06 * lvl;
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const r = (PLAYER_R + 16 + lvl * 40) * pulse;
-    const rg = ctx.createRadialGradient(cx, cy, PLAYER_R, cx, cy, r);
-    rg.addColorStop(0, `hsla(${hue},100%,65%,${0.05 + lvl * 0.22})`);
-    rg.addColorStop(1, `hsla(${hue},100%,55%,0)`);
-    ctx.fillStyle = rg;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // ---- タイミングリング（収束）----
-  _drawTimingRing(ctx, attack, now) {
-    const cx = this.w / 2, cy = this.lineY;
-    const p = ringProgress(attack, now); // 0..(>1) 次の分割への収束
-    const maxR = Math.min(this.w, this.h) * 0.42;
-    // p=1 でプレイヤー外周(PLAYER_R)にちょうど一致
-    const r = PLAYER_R + (maxR - PLAYER_R) * (1 - Math.min(p, 1));
-    // 中心に近づくほど白→金。GOOD窓相当(残時間)で色づく
-    const near = Math.max(0, 1 - Math.abs(1 - p) * 4);
-    const col = `rgba(${255},${Math.round(255 - near * 40)},${Math.round(255 - near * 175)},`;
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.strokeStyle = col + (0.5 + near * 0.5) + ')';
-    ctx.lineWidth = 2 + near * 2;
-    ctx.shadowColor = col + '1)';
-    ctx.shadowBlur = 10 + near * 16;
-    ctx.beginPath();
-    ctx.arc(cx, cy, Math.max(r, PLAYER_R), 0, Math.PI * 2);
-    ctx.stroke();
-    // ターゲットの薄い基準リング（PERFECT帯）
-    ctx.shadowBlur = 0;
-    ctx.globalAlpha = 0.35;
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(cx, cy, PLAYER_R + 4, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  // ---- 攻撃（接近する斬撃＋トレイル）----
-  // 攻撃は上半分の5方向から（下部はボタン専用のため下からは来ない）
-  attackStart(dir) {
-    switch (dir) {
-      case 'L': return { x: -40, y: this.lineY };
-      case 'R': return { x: this.w + 40, y: this.lineY };
-      case 'U': return { x: this.w / 2, y: -50 };
-      case 'UL': return { x: -30, y: -40 };
-      case 'UR': return { x: this.w + 30, y: -40 };
-      default: return { x: this.w / 2, y: -50 };
+    // 攻撃が「来る方向」を示す矢印（脅威の提示。進行方向＝プレイヤーへ向かう向き）
+    _drawIncomingArrow(ctx, dir, a, p) {
+      const cx = this.w / 2, cy = this.lineY;
+      const off = 96 + Math.sin(this.t * 8) * 4;
+      const d = off * 0.72;
+      let x = cx, y = cy, ch = "▼";
+      if (dir === "L") {
+        x = cx - off;
+        ch = "▶";
+      } else if (dir === "R") {
+        x = cx + off;
+        ch = "◀";
+      } else if (dir === "U") {
+        y = cy - off;
+        ch = "▼";
+      } else if (dir === "UL") {
+        x = cx - d;
+        y = cy - d;
+        ch = "↘";
+      } else if (dir === "UR") {
+        x = cx + d;
+        y = cy - d;
+        ch = "↙";
+      }
+      ctx.save();
+      ctx.globalAlpha = 0.25 + a * 0.7;
+      ctx.fillStyle = p > 0.68 ? "#ff5566" : "#ffb05b";
+      ctx.font = "800 22px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(ch, x, y);
+      ctx.restore();
     }
-  }
-
-  _drawAttack(ctx, attack, now) {
-    const p = ringProgress(attack, now);
-    const start = this.attackStart(attack.dir);
-    const cx = this.w / 2, cy = this.lineY;
-    const e = p * p; // ease-in
-
-    const telGlow = Math.max(0, 1 - p) * 0.5 + 0.18;
-    this._drawEdgeGlow(ctx, attack.dir, telGlow);
-    this._drawIncomingArrow(ctx, attack.dir, telGlow, p);
-
-    const angle = Math.atan2(cy - start.y, cx - start.x);
-    const danger = p > 0.68;
-    const col = danger ? '#ff3b54' : '#ff9a5b';
-
-    // 残りタップ数ぶんバーを長く（＝重い分割攻撃に見せる）
-    const remaining = attack.segments.length - attack.segIndex;
-    const lenScale = 1 + (remaining - 1) * 0.6;
-
-    // トレイル（残像）
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (let k = 1; k <= 3; k++) {
-      const pe = Math.max(0, e - k * 0.05);
-      const tx = start.x + (cx - start.x) * pe;
-      const ty = start.y + (cy - start.y) * pe;
-      ctx.globalAlpha = (0.12) * (1 - k / 4) * Math.min(1, p + 0.3);
-      this._slash(ctx, tx, ty, angle, (50 + 30 * pe) * lenScale, col, 4);
+    burstColors(result) {
+      if (result === "PERFECT") return ["#fff", "#ffd35b", "#5bdcff", "#ffea9e"];
+      if (result === "GOOD") return ["#fff", "#5bdcff"];
+      return ["#ff3b54", "#ff8a5b"];
     }
-    ctx.restore();
+    clearTransients() {
+      this.shockwaves.length = 0;
+      this.popups.length = 0;
+      this.deflect = null;
+      this.flash = 0;
+      this.shake = 0;
+      this.vignette = 0;
+    }
+  };
 
-    // 本体
-    const x = start.x + (cx - start.x) * e;
-    const y = start.y + (cy - start.y) * e;
-    ctx.save();
-    ctx.globalAlpha = Math.min(1, 0.4 + p);
-    ctx.shadowColor = col; ctx.shadowBlur = 18;
-    const len = (62 + 42 * e) * lenScale;
-    this._slash(ctx, x, y, angle, len, col, 5 + 6 * e);
-    // 分割の刻み（残りタップ位置）
-    if (remaining > 1) {
-      ctx.shadowBlur = 0;
-      ctx.translate(x, y);
-      ctx.rotate(angle);
-      ctx.fillStyle = '#fff';
-      for (let s = 1; s < remaining; s++) {
-        const px = -len / 2 + (len / remaining) * s;
+  // src/js/particles.js
+  var MAX = 220;
+  var ParticlePool = class {
+    constructor() {
+      this.pool = new Array(MAX).fill(null).map(() => ({
+        active: false,
+        x: 0,
+        y: 0,
+        vx: 0,
+        vy: 0,
+        life: 0,
+        maxLife: 1,
+        size: 2,
+        color: "#fff",
+        gravity: 0
+      }));
+    }
+    spawnBurst(x, y, opts = {}) {
+      const {
+        count = 16,
+        speed = 320,
+        spread = Math.PI * 2,
+        angle = 0,
+        colors = ["#fff"],
+        size = 3,
+        life = 0.5,
+        gravity = 600
+      } = opts;
+      let spawned = 0;
+      for (let i = 0; i < this.pool.length && spawned < count; i++) {
+        const p = this.pool[i];
+        if (p.active) continue;
+        const a = angle + (Math.random() - 0.5) * spread;
+        const sp = speed * (0.4 + Math.random() * 0.6);
+        p.active = true;
+        p.x = x;
+        p.y = y;
+        p.vx = Math.cos(a) * sp;
+        p.vy = Math.sin(a) * sp;
+        p.maxLife = life * (0.6 + Math.random() * 0.6);
+        p.life = p.maxLife;
+        p.size = size * (0.6 + Math.random() * 0.8);
+        p.color = colors[Math.random() * colors.length | 0];
+        p.gravity = gravity;
+        spawned++;
+      }
+    }
+    update(dt) {
+      for (const p of this.pool) {
+        if (!p.active) continue;
+        p.life -= dt;
+        if (p.life <= 0) {
+          p.active = false;
+          continue;
+        }
+        p.vy += p.gravity * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+      }
+    }
+    draw(ctx) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (const p of this.pool) {
+        if (!p.active) continue;
+        const t = p.life / p.maxLife;
+        ctx.globalAlpha = Math.max(0, t);
+        ctx.fillStyle = p.color;
+        const s = p.size * (0.4 + t * 0.6);
         ctx.beginPath();
-        ctx.arc(px, 0, 3, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, s, 0, Math.PI * 2);
         ctx.fill();
       }
+      ctx.restore();
     }
-    ctx.restore();
-
-    // 残りタップ数のピップを プレイヤー上に表示
-    if (attack.taps > 1) this._drawTapPips(ctx, attack);
-  }
-
-  _drawTapPips(ctx, attack) {
-    const cx = this.w / 2, cy = this.lineY - 46;
-    const total = attack.taps;
-    const done = attack.segIndex;
-    const gap = 16;
-    const w = (total - 1) * gap;
-    ctx.save();
-    for (let i = 0; i < total; i++) {
-      const x = cx - w / 2 + i * gap;
-      const remaining = i >= done;
-      ctx.globalAlpha = remaining ? 1 : 0.3;
-      ctx.fillStyle = remaining ? '#ffd35b' : 'rgba(255,255,255,0.5)';
-      ctx.beginPath();
-      ctx.arc(x, cy, remaining ? 5 : 4, 0, Math.PI * 2);
-      ctx.fill();
+    clear() {
+      for (const p of this.pool) p.active = false;
     }
-    ctx.restore();
+  };
+
+  // src/js/judge.js
+  function judgeTiming(deltaMs, dirOk, cfg = CONFIG) {
+    if (!dirOk) return "MISS";
+    const a = Math.abs(deltaMs);
+    if (a <= cfg.PERFECT_WINDOW) return "PERFECT";
+    if (a <= cfg.GOOD_WINDOW) return "GOOD";
+    return "MISS";
   }
 
-  _slash(ctx, x, y, angle, len, color, width) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(angle);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = width;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(-len / 2, 0);
-    ctx.lineTo(len / 2, 0);
-    ctx.stroke();
-    ctx.restore();
+  // src/js/scoring.js
+  function comboMultiplier(combo, cfg = CONFIG) {
+    const mult = 1 + Math.floor(combo / cfg.COMBO_STEP) * cfg.COMBO_STEP_BONUS;
+    return Math.min(mult, cfg.COMBO_MAX_MULT);
+  }
+  function timingBonus(deltaMs, cfg = CONFIG) {
+    const ratio = 1 - Math.abs(deltaMs) / cfg.GOOD_WINDOW;
+    const bonus = Math.round(ratio * cfg.TIMING_BONUS_MAX);
+    return Math.max(0, Math.min(cfg.TIMING_BONUS_MAX, bonus));
+  }
+  function calcGain(judge, combo, deltaMs, cfg = CONFIG) {
+    const base = judge === "PERFECT" ? cfg.BASE_PERFECT : judge === "GOOD" ? cfg.BASE_GOOD : 0;
+    if (base === 0) return 0;
+    return Math.round(base * comboMultiplier(combo, cfg) + timingBonus(deltaMs, cfg));
   }
 
-  _drawResolved(ctx, attack, now) {
-    const k = Math.max(0, Math.min(1, (now - attack.resolvedAt) / 220));
-    const cx = this.w / 2, cy = this.lineY;
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, 1 - k) * 0.8;
-    ctx.strokeStyle = attack.result === 'MISS' ? '#ff3b54' : '#ffd35b';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, PLAYER_R + k * 50, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
+  // src/js/haptics.js
+  var enabled = true;
+  function setHapticsEnabled(v) {
+    enabled = !!v;
   }
-
-  // ---- プレイヤー（守りの構え）----
-  _drawPlayer(ctx, combo) {
-    const cx = this.w / 2, cy = this.lineY;
-    const pulse = 1 + Math.sin(this.t * 3) * 0.04;
-    ctx.save();
-    ctx.strokeStyle = 'rgba(120,210,255,0.85)';
-    ctx.lineWidth = 3;
-    ctx.shadowColor = 'rgba(120,210,255,0.8)';
-    ctx.shadowBlur = 16;
-    ctx.beginPath();
-    ctx.arc(cx, cy, PLAYER_R * pulse, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    // 内側コア
-    const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, 9);
-    cg.addColorStop(0, '#ffffff');
-    cg.addColorStop(1, 'rgba(180,230,255,0.6)');
-    ctx.fillStyle = cg;
-    ctx.beginPath();
-    ctx.arc(cx, cy, 7.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // ---- 方向受け流し（成功時、反対側へ刀をフリック）----
-  _drawDeflect(ctx) {
-    if (!this.deflect) return;
-    const d = this.deflect;
-    const k = d.t / d.dur;            // 0..1
-    const cx = this.w / 2, cy = this.lineY;
-    const ang = NEED_ANGLE[d.dir] != null ? NEED_ANGLE[d.dir] : 0;
-    const ease = 1 - Math.pow(1 - k, 3);
-    const reach = PLAYER_R + 8 + ease * 64;
-    const alpha = Math.max(0, 1 - k);
-
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(ang);
-    ctx.globalCompositeOperation = 'lighter';
-    // フリックする刀身
-    ctx.globalAlpha = alpha;
-    ctx.strokeStyle = d.color;
-    ctx.lineWidth = d.result === 'PERFECT' ? 6 : 4;
-    ctx.lineCap = 'round';
-    ctx.shadowColor = d.color; ctx.shadowBlur = 18;
-    ctx.beginPath();
-    ctx.moveTo(PLAYER_R * 0.4, 0);
-    ctx.lineTo(reach, 0);
-    ctx.stroke();
-    // 弧（受け流しの軌跡）
-    ctx.globalAlpha = alpha * 0.8;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    const sweep = (0.5 + ease * 0.7);
-    ctx.arc(0, 0, reach * 0.82, -sweep, sweep);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  _drawShockwaves(ctx) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (const s of this.shockwaves) {
-      const k = Math.max(0, s.t / s.dur);
-      if (k <= 0) continue;
-      const r = s.max * (1 - Math.pow(1 - k, 2));
-      ctx.globalAlpha = Math.max(0, 1 - k) * 0.7;
-      ctx.strokeStyle = `rgba(${s.color},1)`;
-      ctx.lineWidth = s.width * (1 - k) + 0.5;
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
-      ctx.stroke();
+  function vibrate(pattern) {
+    if (!enabled) return;
+    try {
+      if (navigator.vibrate) navigator.vibrate(pattern);
+    } catch {
     }
-    ctx.restore();
+  }
+  var HAPTICS = {
+    perfect: [10, 10, 10],
+    good: [15],
+    miss: [40]
+  };
+
+  // src/js/ui.js
+  var $ = (id) => document.getElementById(id);
+  var SCREENS = ["title", "howto", "settings", "ready", "pause", "result"];
+  function showScreen(name) {
+    SCREENS.forEach((s) => $("screen-" + s).classList.toggle("hidden", s !== name));
+  }
+  function hideAllScreens() {
+    SCREENS.forEach((s) => $("screen-" + s).classList.add("hidden"));
+  }
+  function setPlayUIVisible(visible) {
+    $("hud").classList.toggle("hidden", !visible);
+    $("controls").classList.toggle("hidden", !visible);
+  }
+  var _bannerTimer = null;
+  function showBanner(main, sub, duration = 1500) {
+    const el = $("banner");
+    $("banner-main").textContent = main || "";
+    $("banner-sub").textContent = sub || "";
+    $("banner-sub").style.display = sub ? "" : "none";
+    el.classList.remove("hidden");
+    el.classList.remove("show");
+    void el.offsetWidth;
+    el.classList.add("show");
+    if (_bannerTimer) clearTimeout(_bannerTimer);
+    _bannerTimer = setTimeout(() => {
+      el.classList.remove("show");
+      el.classList.add("hidden");
+    }, duration);
+  }
+  function hideBanner() {
+    if (_bannerTimer) clearTimeout(_bannerTimer);
+    $("banner").classList.add("hidden");
+    $("banner").classList.remove("show");
+  }
+  function updateHUD({ hp, score, combo }) {
+    const hearts = "♥".repeat(hp) + '<span style="opacity:.25">♥</span>'.repeat(CONFIG.MAX_HP - hp);
+    $("hearts").innerHTML = hearts;
+    $("score").textContent = score.toLocaleString();
+    const comboEl = $("combo");
+    comboEl.textContent = combo >= 2 ? `${combo} COMBO` : "";
+  }
+  function bumpCombo() {
+    const el = $("combo");
+    el.classList.remove("bump");
+    void el.offsetWidth;
+    el.classList.add("bump");
+  }
+  function popJudge(result, delta) {
+    const el = $("judge-pop");
+    el.className = "judge-pop";
+    void el.offsetWidth;
+    let text = result;
+    if (result === "PERFECT") text = "PERFECT!";
+    else if (result === "GOOD") text = delta < 0 ? "GOOD (早)" : delta > 0 ? "GOOD (遅)" : "GOOD";
+    else text = "MISS";
+    el.textContent = text;
+    el.classList.add("show", result.toLowerCase());
+  }
+  function setCountdown(n) {
+    const el = $("countdown");
+    el.textContent = n > 0 ? n : "START";
+    el.style.animation = "none";
+    void el.offsetWidth;
+    el.style.animation = "";
+  }
+  function showResult({ score, best, isBest, maxCombo, perfectRate, tier, rank }) {
+    $("result-rank").textContent = rank;
+    $("result-score").textContent = score.toLocaleString();
+    $("result-best-badge").classList.toggle("hidden", !isBest);
+    $("result-combo").textContent = maxCombo;
+    $("result-perfect").textContent = `${perfectRate}%`;
+    $("result-tier").textContent = tier;
+    showScreen("result");
+  }
+  function setBestLabel(best) {
+    $("title-best").textContent = best.toLocaleString();
+  }
+  function reflectSettings(s) {
+    $("set-vibrate").checked = s.vibrate;
+    $("set-motion").checked = s.reducedMotion;
   }
 
-  _drawPopups(ctx) {
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    for (const p of this.popups) {
-      const k = p.t / p.dur;
-      ctx.globalAlpha = Math.max(0, 1 - k * k);
-      ctx.fillStyle = p.color;
-      ctx.shadowColor = p.color; ctx.shadowBlur = 12;
-      ctx.font = `800 ${p.size}px -apple-system, sans-serif`;
-      ctx.fillText(p.text, p.x, p.y);
+  // src/js/storage.js
+  var RULE_VERSION = "r1-5dir-20260922";
+  var KEY_BEST = `paripari.best.${RULE_VERSION}`;
+  var KEY_SETTINGS = "paripari.settings";
+  var KEY_PLAYER_NAME = "paripari.player-name";
+  var DEFAULT_SETTINGS = {
+    vibrate: true,
+    reducedMotion: false
+  };
+  function safeGet(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
     }
-    ctx.restore();
   }
-
-  _drawVignette(ctx) {
-    if (this.vignette <= 0.01) return;
-    const cx = this.w / 2, cy = this.h / 2;
-    const rg = ctx.createRadialGradient(cx, cy, this.h * 0.25, cx, cy, this.h * 0.72);
-    rg.addColorStop(0, `rgba(${this.vignetteColor},0)`);
-    rg.addColorStop(1, `rgba(${this.vignetteColor},${Math.min(0.7, this.vignette)})`);
-    ctx.save();
-    ctx.fillStyle = rg;
-    ctx.fillRect(0, 0, this.w, this.h);
-    ctx.restore();
-  }
-
-  _drawEdgeGlow(ctx, dir, a) {
-    ctx.save();
-    ctx.globalAlpha = a;
-    const c = 'rgba(255,80,90,';
-    let grad;
-    if (dir === 'L') {
-      grad = ctx.createLinearGradient(0, 0, this.w * 0.32, 0);
-      grad.addColorStop(0, c + '0.6)'); grad.addColorStop(1, c + '0)');
-      ctx.fillStyle = grad; ctx.fillRect(0, 0, this.w * 0.32, this.h);
-    } else if (dir === 'R') {
-      grad = ctx.createLinearGradient(this.w, 0, this.w * 0.68, 0);
-      grad.addColorStop(0, c + '0.6)'); grad.addColorStop(1, c + '0)');
-      ctx.fillStyle = grad; ctx.fillRect(this.w * 0.68, 0, this.w * 0.32, this.h);
-    } else if (dir === 'U') {
-      grad = ctx.createLinearGradient(0, 0, 0, this.h * 0.32);
-      grad.addColorStop(0, c + '0.6)'); grad.addColorStop(1, c + '0)');
-      ctx.fillStyle = grad; ctx.fillRect(0, 0, this.w, this.h * 0.32);
-    } else {
-      // UL / UR: 上のコーナーから放射状に発光
-      const cxg = dir === 'UL' ? 0 : this.w;
-      grad = ctx.createRadialGradient(cxg, 0, 10, cxg, 0, this.w * 0.55);
-      grad.addColorStop(0, c + '0.6)'); grad.addColorStop(1, c + '0)');
-      ctx.fillStyle = grad; ctx.fillRect(0, 0, this.w, this.h * 0.6);
+  function safeSet(key, val) {
+    try {
+      localStorage.setItem(key, val);
+    } catch {
     }
-    ctx.restore();
   }
-
-  // 攻撃が「来る方向」を示す矢印（脅威の提示。進行方向＝プレイヤーへ向かう向き）
-  _drawIncomingArrow(ctx, dir, a, p) {
-    const cx = this.w / 2, cy = this.lineY;
-    const off = 96 + Math.sin(this.t * 8) * 4;
-    const d = off * 0.72;
-    let x = cx, y = cy, ch = '▼';
-    if (dir === 'L') { x = cx - off; ch = '▶'; }
-    else if (dir === 'R') { x = cx + off; ch = '◀'; }
-    else if (dir === 'U') { y = cy - off; ch = '▼'; }
-    else if (dir === 'UL') { x = cx - d; y = cy - d; ch = '↘'; }
-    else if (dir === 'UR') { x = cx + d; y = cy - d; ch = '↙'; }
-    ctx.save();
-    ctx.globalAlpha = 0.25 + a * 0.7;
-    ctx.fillStyle = p > 0.68 ? '#ff5566' : '#ffb05b';
-    ctx.font = '800 22px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(ch, x, y);
-    ctx.restore();
-  }
-
-  burstColors(result) {
-    if (result === 'PERFECT') return ['#fff', '#ffd35b', '#5bdcff', '#ffea9e'];
-    if (result === 'GOOD') return ['#fff', '#5bdcff'];
-    return ['#ff3b54', '#ff8a5b'];
-  }
-
-  clearTransients() {
-    this.shockwaves.length = 0;
-    this.popups.length = 0;
-    this.deflect = null;
-    this.flash = 0; this.shake = 0; this.vignette = 0;
-  }
-}
-
-
-  Object.assign(exports, { Renderer });
-  });
-
-  def('ui', function(module, exports, require){
-// DOM HUD / メニュー更新 要件 §4.1 §4.3
-const {CONFIG} = require('config');
-const $ = (id) => document.getElementById(id);
-
-const SCREENS = ['title', 'howto', 'settings', 'ready', 'pause', 'result'];
-
-function showScreen(name) {
-  SCREENS.forEach((s) => $('screen-' + s).classList.toggle('hidden', s !== name));
-}
-function hideAllScreens() {
-  SCREENS.forEach((s) => $('screen-' + s).classList.add('hidden'));
-}
-
-function setPlayUIVisible(visible) {
-  $('hud').classList.toggle('hidden', !visible);
-  $('controls').classList.toggle('hidden', !visible);
-}
-
-let _bannerTimer = null;
-function showBanner(main, sub, duration = 1500) {
-  const el = $('banner');
-  $('banner-main').textContent = main || '';
-  $('banner-sub').textContent = sub || '';
-  $('banner-sub').style.display = sub ? '' : 'none';
-  el.classList.remove('hidden');
-  el.classList.remove('show');
-  void el.offsetWidth;
-  el.classList.add('show');
-  if (_bannerTimer) clearTimeout(_bannerTimer);
-  _bannerTimer = setTimeout(() => {
-    el.classList.remove('show');
-    el.classList.add('hidden');
-  }, duration);
-}
-function hideBanner() {
-  if (_bannerTimer) clearTimeout(_bannerTimer);
-  $('banner').classList.add('hidden');
-  $('banner').classList.remove('show');
-}
-
-function updateHUD({ hp, score, combo }) {
-  const hearts = '♥'.repeat(hp) + '<span style="opacity:.25">♥</span>'.repeat(CONFIG.MAX_HP - hp);
-  $('hearts').innerHTML = hearts;
-  $('score').textContent = score.toLocaleString();
-  const comboEl = $('combo');
-  comboEl.textContent = combo >= 2 ? `${combo} COMBO` : '';
-}
-
-function bumpCombo() {
-  const el = $('combo');
-  el.classList.remove('bump');
-  void el.offsetWidth;
-  el.classList.add('bump');
-}
-
-function popJudge(result, delta) {
-  const el = $('judge-pop');
-  el.className = 'judge-pop';
-  void el.offsetWidth;
-  let text = result;
-  if (result === 'PERFECT') text = 'PERFECT!';
-  else if (result === 'GOOD') text = delta < 0 ? 'GOOD (早)' : delta > 0 ? 'GOOD (遅)' : 'GOOD';
-  else text = 'MISS';
-  el.textContent = text;
-  el.classList.add('show', result.toLowerCase());
-}
-
-function setCountdown(n) {
-  const el = $('countdown');
-  el.textContent = n > 0 ? n : 'START';
-  el.style.animation = 'none';
-  void el.offsetWidth;
-  el.style.animation = '';
-}
-
-function showResult({ score, best, isBest, maxCombo, perfectRate, tier, rank }) {
-  $('result-rank').textContent = rank;
-  $('result-score').textContent = score.toLocaleString();
-  $('result-best-badge').classList.toggle('hidden', !isBest);
-  $('result-combo').textContent = maxCombo;
-  $('result-perfect').textContent = `${perfectRate}%`;
-  $('result-tier').textContent = tier;
-  showScreen('result');
-}
-
-function setBestLabel(best) {
-  $('title-best').textContent = best.toLocaleString();
-}
-
-function reflectSettings(s) {
-  $('set-vibrate').checked = s.vibrate;
-  $('set-motion').checked = s.reducedMotion;
-}
-
-
-  Object.assign(exports, { showScreen, hideAllScreens, setPlayUIVisible, showBanner, hideBanner, updateHUD, bumpCombo, popJudge, setCountdown, showResult, setBestLabel, reflectSettings });
-  });
-
-  def('game', function(module, exports, require){
-// ゲーム状態機械・進行制御 要件 §2 §3 §5
-const {CONFIG, NEED_ANGLE, tierForSuccess, rankForScore} = require('config');
-const {judgeTiming} = require('judge');
-const {calcGain} = require('scoring');
-const {createAttack, nextInterval, pickTaps, currentSegment} = require('enemy');
-const {vibrate, HAPTICS} = require('haptics');
-const ui = require('ui');
-const {getBest, setBest} = require('storage');
-const PRACTICE_GOAL = 5;
-
-class Game {
-  constructor({ renderer, particles, settings, onGameOver }) {
-    this.r = renderer;
-    this.particles = particles;
-    this.settings = settings;
-    this.onGameOver = onGameOver || (() => {});
-
-    this.state = 'IDLE';
-    this.mode = 'normal';
-    this.gameTime = 0;
-
-    this.hitstopMs = 0;
-    this.slowmoMs = 0;
-
-    this._tierIndex = -1;
-    this._maxTaps = 1;
-    this._resetStats();
-  }
-
-  setSettings(s) { this.settings = s; if (this.r) this.r.reducedMotion = !!s.reducedMotion; }
-
-  _resetStats() {
-    this.hp = CONFIG.MAX_HP;
-    this.score = 0;
-    this.combo = 0;
-    this.maxCombo = 0;
-    this.successCount = 0;
-    this.perfectCount = 0;
-    this.perfectStreak = 0;
-    this.totalAttempts = 0;
-    this.attack = null;
-    this.nextSpawnAt = 0;
-    this.warmupRemaining = 0;
-    this._tierIndex = -1;
-    this._maxTaps = 1;
-  }
-
-  start(mode = 'normal') {
-    this.mode = mode;
-    this.state = 'PLAYING';
-    this._resetStats();
-    this.r.reducedMotion = !!this.settings.reducedMotion;
-    this.r.clearTransients();
-    this.particles.clear();
-    this.warmupRemaining = mode === 'normal' ? CONFIG.WARMUP.count : PRACTICE_GOAL;
-    this.nextSpawnAt = this.gameTime + 500;
-    if (mode === 'normal') ui.showBanner('WARM UP', '来た方向の【反対】を押す');
-    ui.updateHUD(this);
-  }
-
-  isPlaying() { return this.state === 'PLAYING'; }
-  inWarmup() { return this.warmupRemaining > 0; }
-
-  handleAction(dir) {
-    if (this.state !== 'PLAYING') return;
-    const a = this.attack;
-    if (!a || a.resolved || this.gameTime < a.spawnAt) return; // 空打ち
-    const seg = currentSegment(a);
-    if (!seg || seg.resolved) return;
-    const delta = this.gameTime - seg.impactAt;
-    const dirOk = dir === a.needDir;
-    const result = judgeTiming(delta, dirOk);
-    this._resolveSegment(a, seg, result, delta);
-  }
-
-  update(dtSec) {
-    const now = this.gameTime;
-    const a = this.attack;
-    if (a && !a.resolved) {
-      const seg = currentSegment(a);
-      if (seg && !seg.resolved && now >= seg.impactAt + CONFIG.GOOD_WINDOW) {
-        this._resolveSegment(a, seg, 'MISS', CONFIG.GOOD_WINDOW);
+  function normalizePlayerName(value) {
+    const cleaned = String(value ?? "").replace(/[\u0000-\u001f\u007f-\u009f]/g, "").trim();
+    try {
+      if (typeof Intl !== "undefined" && typeof Intl.Segmenter === "function") {
+        const segmenter = new Intl.Segmenter(void 0, { granularity: "grapheme" });
+        return Array.from(segmenter.segment(cleaned), ({ segment }) => segment).slice(0, 20).join("");
       }
+    } catch {
     }
-    if ((!this.attack || this.attack.resolved) && now >= this.nextSpawnAt && this.state === 'PLAYING') {
-      this._spawn();
-    }
-    this.particles.update(dtSec);
+    return Array.from(cleaned).slice(0, 20).join("");
   }
-
-  _tier() {
-    return this.mode === 'practice' ? CONFIG.TIERS[0] : tierForSuccess(this.successCount);
-  }
-
-  _spawn() {
-    const warm = this.inWarmup();
-    const tier = this._tier();
-    const opts = warm
-      ? { baseVisibleMs: CONFIG.WARMUP.visibleMs, speedJitter: 0, taps: 1 }
-      : { baseVisibleMs: tier.visibleMs, speedJitter: tier.speedJitter, taps: pickTaps(tier.tapWeights) };
-    this.attack = createAttack(this.gameTime, opts);
-    this.attack.warmup = warm;
-    this._checkTierUp();
-  }
-
-  _checkTierUp() {
-    if (this.inWarmup() || this.mode !== 'normal') return;
-    const tier = tierForSuccess(this.successCount);
-    const idx = CONFIG.TIERS.indexOf(tier);
-    if (this._tierIndex >= 0 && idx > this._tierIndex) {
-      if (tier.maxTaps > this._maxTaps && tier.maxTaps >= 2) {
-        ui.showBanner(`${tier.maxTaps}連 受け流し！`, '同じ向きに連続タップ', 1500);
-      } else {
-        ui.showBanner('SPEED UP', null, 900);
+  function parseBest(raw) {
+    if (!raw) return 0;
+    try {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed === "number") return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
+      if (parsed && parsed.version === RULE_VERSION && typeof parsed.score === "number") {
+        return Number.isFinite(parsed.score) ? Math.max(0, Math.floor(parsed.score)) : 0;
       }
+    } catch {
     }
-    this._tierIndex = idx;
-    this._maxTaps = tier.maxTaps;
+    return 0;
+  }
+  function getBest() {
+    return parseBest(safeGet(KEY_BEST));
+  }
+  function setBest(n) {
+    const score = Number(n);
+    if (!Number.isFinite(score)) return getBest();
+    const best = Math.max(getBest(), Math.floor(score), 0);
+    safeSet(KEY_BEST, JSON.stringify({ version: RULE_VERSION, score: best }));
+    return best;
+  }
+  function getPlayerName() {
+    return normalizePlayerName(safeGet(KEY_PLAYER_NAME));
+  }
+  function setPlayerName(value) {
+    const name = normalizePlayerName(value);
+    safeSet(KEY_PLAYER_NAME, name);
+    return name;
+  }
+  function getSettings() {
+    try {
+      const raw = safeGet(KEY_SETTINGS);
+      if (!raw) {
+        const prefersReduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        return { ...DEFAULT_SETTINGS, reducedMotion: !!prefersReduced };
+      }
+      const parsed = JSON.parse(raw);
+      return {
+        vibrate: typeof parsed?.vibrate === "boolean" ? parsed.vibrate : DEFAULT_SETTINGS.vibrate,
+        reducedMotion: typeof parsed?.reducedMotion === "boolean" ? parsed.reducedMotion : DEFAULT_SETTINGS.reducedMotion
+      };
+    } catch {
+      return { ...DEFAULT_SETTINGS };
+    }
+  }
+  function setSettings(s) {
+    safeSet(KEY_SETTINGS, JSON.stringify(s));
   }
 
-  _resolveSegment(a, seg, result, delta) {
-    seg.resolved = true;
-    seg.result = result;
-    a.resolvedAt = this.gameTime;
-    a.result = result;
-
-    const warmup = a.warmup;
-    const cx = this.r.w / 2;
-    const cy = this.r.lineY;
-    const reduced = this.settings.reducedMotion;
-
-    if (result === 'MISS') {
-      this.combo = 0;
-      this.perfectStreak = 0;
-      // 1攻撃あたりのHP減は最大1（分割を全部外しても即死しない）
-      if (this.mode === 'normal' && !warmup && !a.hpLost) {
-        this.hp = Math.max(0, this.hp - 1);
-        a.hpLost = true;
-      }
-      vibrate(HAPTICS.miss);
-      this.r.triggerFlash('#5a0a14', 0.45);
-      this.r.triggerVignette('150,20,40', warmup ? 0.4 : 0.7);
-      this.r.triggerShake(CONFIG.SHAKE_MISS);
-      this.r.triggerShockwave('MISS');
-      this.particles.spawnBurst(cx, cy, {
-        count: 16, speed: 240, colors: this.r.burstColors('MISS'), size: 3, life: 0.45, gravity: 700,
+  // src/js/game.js
+  var PRACTICE_GOAL = 5;
+  var Game = class {
+    constructor({ renderer: renderer2, particles: particles2, settings: settings2, onGameOver }) {
+      this.r = renderer2;
+      this.particles = particles2;
+      this.settings = settings2;
+      this.onGameOver = onGameOver || (() => {
       });
-      ui.popJudge('MISS', delta);
-    } else {
-      this.combo++;
-      this.maxCombo = Math.max(this.maxCombo, this.combo);
-      if (!warmup) {
-        this.successCount++;
-        this.totalAttempts++;
-        const gain = calcGain(result, this.combo, delta);
-        this.score += gain;
-        this.r.addScorePopup(gain, result);
-      }
-      this.r.triggerDeflect(a.needDir, result);
-      this.r.triggerShockwave(result);
-
-      if (result === 'PERFECT') {
-        if (!warmup) this.perfectCount++;
-        this.perfectStreak++;
-        vibrate(HAPTICS.perfect);
-        this.r.triggerFlash('#fff7df', 0.5);
-        this.hitstopMs = CONFIG.HITSTOP_PERFECT_MS;
-        if (!reduced) this.slowmoMs = CONFIG.SLOWMO_MS;
-        this.particles.spawnBurst(cx, cy, {
-          count: 34, speed: 460, colors: this.r.burstColors('PERFECT'), size: 4, life: 0.65, gravity: 480,
-        });
-        this.particles.spawnBurst(cx, cy, {
-          count: 12, speed: 520, spread: 0.7, angle: this._dirAngle(a.needDir),
-          colors: this.r.burstColors('PERFECT'), size: 3, life: 0.5, gravity: 300,
-        });
-        if (!warmup && this.perfectStreak > 0 && this.perfectStreak % CONFIG.HEAL_EVERY_PERFECT_STREAK === 0) {
-          this.hp = Math.min(CONFIG.MAX_HP, this.hp + 1);
-        }
-      } else {
-        this.perfectStreak = 0;
-        vibrate(HAPTICS.good);
-        this.r.triggerFlash('#bfefff', 0.3);
-        this.hitstopMs = CONFIG.HITSTOP_GOOD_MS;
-        this.particles.spawnBurst(cx, cy, {
-          count: 20, speed: 340, spread: 1.4, angle: this._dirAngle(a.needDir),
-          colors: this.r.burstColors('GOOD'), size: 3, life: 0.5, gravity: 600,
-        });
-      }
-      ui.popJudge(result, delta);
-      if (this.combo >= 2) ui.bumpCombo();
+      this.state = "IDLE";
+      this.mode = "normal";
+      this.gameTime = 0;
+      this.hitstopMs = 0;
+      this.slowmoMs = 0;
+      this._tierIndex = -1;
+      this._maxTaps = 1;
+      this._resetStats();
     }
-
-    ui.updateHUD(this);
-
-    a.segIndex++;
-    if (a.segIndex >= a.segments.length) this._onAttackResolved(a);
-  }
-
-  _onAttackResolved(a) {
-    a.resolved = true;
-
-    if (a.warmup) {
-      this.warmupRemaining--;
-      if (this.warmupRemaining <= 0 && this.mode === 'normal') {
+    setSettings(s) {
+      this.settings = s;
+      if (this.r) this.r.reducedMotion = !!s.reducedMotion;
+    }
+    _resetStats() {
+      this.hp = CONFIG.MAX_HP;
+      this.score = 0;
+      this.combo = 0;
+      this.maxCombo = 0;
+      this.successCount = 0;
+      this.perfectCount = 0;
+      this.perfectStreak = 0;
+      this.totalAttempts = 0;
+      this.attack = null;
+      this.nextSpawnAt = 0;
+      this.warmupRemaining = 0;
+      this._tierIndex = -1;
+      this._maxTaps = 1;
+    }
+    start(mode = "normal") {
+      this.mode = mode;
+      this.state = "PLAYING";
+      this._resetStats();
+      this.r.reducedMotion = !!this.settings.reducedMotion;
+      this.r.clearTransients();
+      this.particles.clear();
+      this.warmupRemaining = mode === "normal" ? CONFIG.WARMUP.count : PRACTICE_GOAL;
+      this.nextSpawnAt = this.gameTime + 500;
+      if (mode === "normal") showBanner("WARM UP", "来た方向の【反対】を押す");
+      updateHUD(this);
+    }
+    isPlaying() {
+      return this.state === "PLAYING";
+    }
+    inWarmup() {
+      return this.warmupRemaining > 0;
+    }
+    handleAction(dir) {
+      if (this.state !== "PLAYING") return;
+      const a = this.attack;
+      if (!a || a.resolved || this.gameTime < a.spawnAt) return;
+      const seg = currentSegment(a);
+      if (!seg || seg.resolved) return;
+      const delta = this.gameTime - seg.impactAt;
+      const dirOk = dir === a.needDir;
+      const result = judgeTiming(delta, dirOk);
+      this._resolveSegment(a, seg, result, delta);
+    }
+    update(dtSec) {
+      const now = this.gameTime;
+      const a = this.attack;
+      if (a && !a.resolved) {
+        const seg = currentSegment(a);
+        if (seg && !seg.resolved && now >= seg.impactAt + CONFIG.GOOD_WINDOW) {
+          this._resolveSegment(a, seg, "MISS", CONFIG.GOOD_WINDOW);
+        }
+      }
+      if ((!this.attack || this.attack.resolved) && now >= this.nextSpawnAt && this.state === "PLAYING") {
+        this._spawn();
+      }
+      this.particles.update(dtSec);
+    }
+    _tier() {
+      return this.mode === "practice" ? CONFIG.TIERS[0] : tierForSuccess(this.successCount);
+    }
+    _spawn() {
+      const warm = this.inWarmup();
+      const tier = this._tier();
+      const opts = warm ? { baseVisibleMs: CONFIG.WARMUP.visibleMs, speedJitter: 0, taps: 1 } : { baseVisibleMs: tier.visibleMs, speedJitter: tier.speedJitter, taps: pickTaps(tier.tapWeights) };
+      this.attack = createAttack(this.gameTime, opts);
+      this.attack.warmup = warm;
+      this._checkTierUp();
+    }
+    _checkTierUp() {
+      if (this.inWarmup() || this.mode !== "normal") return;
+      const tier = tierForSuccess(this.successCount);
+      const idx = CONFIG.TIERS.indexOf(tier);
+      if (this._tierIndex >= 0 && idx > this._tierIndex) {
+        if (tier.maxTaps > this._maxTaps && tier.maxTaps >= 2) {
+          showBanner(`${tier.maxTaps}連 受け流し！`, "同じ向きに連続タップ", 1500);
+        } else {
+          showBanner("SPEED UP", null, 900);
+        }
+      }
+      this._tierIndex = idx;
+      this._maxTaps = tier.maxTaps;
+    }
+    _resolveSegment(a, seg, result, delta) {
+      seg.resolved = true;
+      seg.result = result;
+      a.resolvedAt = this.gameTime;
+      a.result = result;
+      const warmup = a.warmup;
+      const cx = this.r.w / 2;
+      const cy = this.r.lineY;
+      const reduced = this.settings.reducedMotion;
+      if (result === "MISS") {
         this.combo = 0;
         this.perfectStreak = 0;
-        const t0 = tierForSuccess(0);
-        this._tierIndex = CONFIG.TIERS.indexOf(t0);
-        this._maxTaps = t0.maxTaps;
-        ui.showBanner('START!', null, 800);
+        if (this.mode === "normal" && !warmup && !a.hpLost) {
+          this.hp = Math.max(0, this.hp - 1);
+          a.hpLost = true;
+        }
+        vibrate(HAPTICS.miss);
+        this.r.triggerFlash("#5a0a14", 0.45);
+        this.r.triggerVignette("150,20,40", warmup ? 0.4 : 0.7);
+        this.r.triggerShake(CONFIG.SHAKE_MISS);
+        this.r.triggerShockwave("MISS");
+        this.particles.spawnBurst(cx, cy, {
+          count: 16,
+          speed: 240,
+          colors: this.r.burstColors("MISS"),
+          size: 3,
+          life: 0.45,
+          gravity: 700
+        });
+        popJudge("MISS", delta);
+      } else {
+        this.combo++;
+        this.maxCombo = Math.max(this.maxCombo, this.combo);
+        if (!warmup) {
+          this.successCount++;
+          this.totalAttempts++;
+          const gain = calcGain(result, this.combo, delta);
+          this.score += gain;
+          this.r.addScorePopup(gain, result);
+        }
+        this.r.triggerDeflect(a.needDir, result);
+        this.r.triggerShockwave(result);
+        if (result === "PERFECT") {
+          if (!warmup) this.perfectCount++;
+          this.perfectStreak++;
+          vibrate(HAPTICS.perfect);
+          this.r.triggerFlash("#fff7df", 0.5);
+          this.hitstopMs = CONFIG.HITSTOP_PERFECT_MS;
+          if (!reduced) this.slowmoMs = CONFIG.SLOWMO_MS;
+          this.particles.spawnBurst(cx, cy, {
+            count: 34,
+            speed: 460,
+            colors: this.r.burstColors("PERFECT"),
+            size: 4,
+            life: 0.65,
+            gravity: 480
+          });
+          this.particles.spawnBurst(cx, cy, {
+            count: 12,
+            speed: 520,
+            spread: 0.7,
+            angle: this._dirAngle(a.needDir),
+            colors: this.r.burstColors("PERFECT"),
+            size: 3,
+            life: 0.5,
+            gravity: 300
+          });
+          if (!warmup && this.perfectStreak > 0 && this.perfectStreak % CONFIG.HEAL_EVERY_PERFECT_STREAK === 0) {
+            this.hp = Math.min(CONFIG.MAX_HP, this.hp + 1);
+          }
+        } else {
+          this.perfectStreak = 0;
+          vibrate(HAPTICS.good);
+          this.r.triggerFlash("#bfefff", 0.3);
+          this.hitstopMs = CONFIG.HITSTOP_GOOD_MS;
+          this.particles.spawnBurst(cx, cy, {
+            count: 20,
+            speed: 340,
+            spread: 1.4,
+            angle: this._dirAngle(a.needDir),
+            colors: this.r.burstColors("GOOD"),
+            size: 3,
+            life: 0.5,
+            gravity: 600
+          });
+        }
+        popJudge(result, delta);
+        if (this.combo >= 2) bumpCombo();
+      }
+      updateHUD(this);
+      a.segIndex++;
+      if (a.segIndex >= a.segments.length) this._onAttackResolved(a);
+    }
+    _onAttackResolved(a) {
+      a.resolved = true;
+      if (a.warmup) {
+        this.warmupRemaining--;
+        if (this.warmupRemaining <= 0 && this.mode === "normal") {
+          this.combo = 0;
+          this.perfectStreak = 0;
+          const t0 = tierForSuccess(0);
+          this._tierIndex = CONFIG.TIERS.indexOf(t0);
+          this._maxTaps = t0.maxTaps;
+          showBanner("START!", null, 800);
+        }
+      }
+      const intervalMs = this.inWarmup() ? CONFIG.WARMUP.intervalMs : this._tier().intervalMs;
+      this.nextSpawnAt = this.gameTime + nextInterval(intervalMs);
+      if (this.mode === "normal" && this.hp <= 0) {
+        this._gameOver();
+      } else if (this.mode === "practice" && this.warmupRemaining <= 0) {
+        this.state = "IDLE";
+        this.attack = null;
+        this.onGameOver({ practiceDone: true });
       }
     }
-
-    const intervalMs = this.inWarmup() ? CONFIG.WARMUP.intervalMs : this._tier().intervalMs;
-    this.nextSpawnAt = this.gameTime + nextInterval(intervalMs);
-
-    if (this.mode === 'normal' && this.hp <= 0) {
-      this._gameOver();
-    } else if (this.mode === 'practice' && this.warmupRemaining <= 0) {
-      this.state = 'IDLE';
-      this.attack = null;
-      this.onGameOver({ practiceDone: true });
+    _dirAngle(dir) {
+      return NEED_ANGLE[dir] != null ? NEED_ANGLE[dir] : 0;
     }
-  }
+    _gameOver() {
+      this.state = "OVER";
+      this.attack = null;
+      const best = getBest();
+      const isBest = this.score > best;
+      if (isBest) setBest(this.score);
+      const perfectRate = this.totalAttempts > 0 ? Math.round(this.perfectCount / Math.max(1, this.successCount) * 100) : 0;
+      const tierNum = CONFIG.TIERS.indexOf(tierForSuccess(this.successCount)) + 1;
+      this.onGameOver({
+        practiceDone: false,
+        score: this.score,
+        best: Math.max(best, this.score),
+        isBest,
+        maxCombo: this.maxCombo,
+        perfectRate,
+        tier: tierNum,
+        rank: rankForScore(this.score)
+      });
+    }
+    getRenderState() {
+      return { now: this.gameTime, attack: this.attack, combo: this.combo, hp: this.hp, warmup: this.inWarmup() };
+    }
+  };
 
-  _dirAngle(dir) {
-    return NEED_ANGLE[dir] != null ? NEED_ANGLE[dir] : 0;
+  // src/js/input.js
+  var KEY_DIR = {
+    ArrowLeft: "L",
+    a: "L",
+    A: "L",
+    ArrowRight: "R",
+    d: "R",
+    D: "R",
+    ArrowDown: "D",
+    s: "D",
+    S: "D",
+    q: "DL",
+    Q: "DL",
+    z: "DL",
+    Z: "DL",
+    e: "DR",
+    E: "DR",
+    c: "DR",
+    C: "DR"
+  };
+  function spawnRipple(btn, e) {
+    const rect = btn.getBoundingClientRect();
+    const pt = e.touches && e.touches[0] || e;
+    const x = (pt.clientX != null ? pt.clientX : rect.left + rect.width / 2) - rect.left;
+    const y = (pt.clientY != null ? pt.clientY : rect.top + rect.height / 2) - rect.top;
+    const span = document.createElement("span");
+    span.className = "ripple";
+    span.style.left = x + "px";
+    span.style.top = y + "px";
+    btn.appendChild(span);
+    span.addEventListener("animationend", () => span.remove());
+    setTimeout(() => span.remove(), 600);
   }
-
-  _gameOver() {
-    this.state = 'OVER';
-    this.attack = null;
-    const best = getBest();
-    const isBest = this.score > best;
-    if (isBest) setBest(this.score);
-    const perfectRate = this.totalAttempts > 0
-      ? Math.round((this.perfectCount / Math.max(1, this.successCount)) * 100) : 0;
-    const tierNum = CONFIG.TIERS.indexOf(tierForSuccess(this.successCount)) + 1;
-    this.onGameOver({
-      practiceDone: false,
-      score: this.score,
-      best: Math.max(best, this.score),
-      isBest,
-      maxCombo: this.maxCombo,
-      perfectRate,
-      tier: tierNum,
-      rank: rankForScore(this.score),
+  function isEditingTarget(target) {
+    const el = target && target.nodeType === 1 ? target : target?.parentElement;
+    if (!el) return false;
+    return !!(el.closest && el.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]'));
+  }
+  function setupInput({ onAction, onFirstGesture, canHandleAction = () => true }) {
+    let firstGestureDone = false;
+    let composing = false;
+    const fireFirst = () => {
+      if (firstGestureDone) return;
+      firstGestureDone = true;
+      onFirstGesture && onFirstGesture();
+    };
+    const buttons = document.querySelectorAll("[data-dir]");
+    const pointerSupported = "PointerEvent" in window;
+    const downEvent = pointerSupported ? "pointerdown" : "touchstart";
+    buttons.forEach((btn) => {
+      btn.addEventListener(downEvent, (e) => {
+        e.preventDefault();
+        fireFirst();
+        const dir = btn.getAttribute("data-dir");
+        const time = e.timeStamp && e.timeStamp > 0 ? e.timeStamp : performance.now();
+        btn.classList.add("pressed");
+        spawnRipple(btn, e);
+        onAction({ dir, time });
+      }, { passive: false });
+      btn.addEventListener(pointerSupported ? "pointerup" : "touchend", () => {
+        btn.classList.remove("pressed");
+      });
+      btn.addEventListener(pointerSupported ? "pointercancel" : "touchcancel", () => {
+        btn.classList.remove("pressed");
+      });
+      btn.addEventListener("pointerleave", () => btn.classList.remove("pressed"));
+    });
+    window.addEventListener("keydown", (e) => {
+      if (e.repeat) return;
+      const dir = KEY_DIR[e.key];
+      if (!dir) return;
+      if (composing || e.isComposing || e.keyCode === 229 || isEditingTarget(e.target)) return;
+      if (!canHandleAction()) return;
+      e.preventDefault();
+      fireFirst();
+      onAction({ dir, time: e.timeStamp || performance.now() });
+    });
+    window.addEventListener("compositionstart", () => {
+      composing = true;
+    });
+    window.addEventListener("compositionend", () => {
+      composing = false;
+    });
+    const clearPressed = () => buttons.forEach((btn) => btn.classList.remove("pressed"));
+    window.addEventListener("blur", clearPressed);
+    document.addEventListener("visibilitychange", clearPressed);
+    window.addEventListener(downEvent, fireFirst, { passive: true, once: false });
+  }
+  function lockGestures({ targets = [], isEnabled = () => true } = {}) {
+    const gestureTargets = Array.from(targets).filter(Boolean);
+    let lastTouchEnd = 0;
+    const options = { passive: false };
+    gestureTargets.forEach((target) => {
+      target.addEventListener("touchend", (e) => {
+        if (!isEnabled()) {
+          lastTouchEnd = 0;
+          return;
+        }
+        const now = Date.now();
+        if (now - lastTouchEnd <= 300) e.preventDefault();
+        lastTouchEnd = now;
+      }, options);
+      target.addEventListener("gesturestart", (e) => {
+        if (isEnabled()) e.preventDefault();
+      }, options);
+      target.addEventListener("gesturechange", (e) => {
+        if (isEnabled()) e.preventDefault();
+      }, options);
+      target.addEventListener("touchmove", (e) => {
+        if (isEnabled() && e.scale && e.scale !== 1) e.preventDefault();
+      }, options);
     });
   }
 
-  getRenderState() {
-    return { now: this.gameTime, attack: this.attack, combo: this.combo, hp: this.hp, warmup: this.inWarmup() };
+  // src/js/platform.js
+  var OFFICIAL_GAME_URL = "";
+  function officialGameUrl() {
+    return OFFICIAL_GAME_URL || null;
   }
-}
-
-
-  Object.assign(exports, { Game });
-  });
-
-  def('main', function(module, exports, require){
-// エントリポイント: 起動・rAFループ・状態遷移の配線 要件 §4.1 §6.2
-const {CONFIG} = require('config');
-const {Renderer} = require('renderer');
-const {ParticlePool} = require('particles');
-const {Game} = require('game');
-const {setupInput, lockGestures} = require('input');
-const {setHapticsEnabled} = require('haptics');
-const ui = require('ui');
-const storage = require('storage');
-const $ = (id) => document.getElementById(id);
-
-const canvas = $('game-canvas');
-const renderer = new Renderer(canvas);
-const particles = new ParticlePool();
-
-let settings = storage.getSettings();
-setHapticsEnabled(settings.vibrate);
-renderer.reducedMotion = !!settings.reducedMotion;
-
-let pendingResult = null;   // リザルト表示用
-let countdownTimer = null;
-
-const game = new Game({
-  renderer, particles, settings,
-  onGameOver: (data) => {
-    if (data.practiceDone) {
-      // 練習完了 → 本番カウントダウンへ
-      startCountdown(() => game.start('normal'));
-      return;
+  function setStatus(statusElement, message) {
+    if (statusElement) statusElement.textContent = message;
+  }
+  async function shareOrCopy({ text, title, statusElement, textElement, url = officialGameUrl() }) {
+    setStatus(statusElement, "");
+    const shareText = String(text ?? "");
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        const data = { title: title || "パリパリ", text: shareText };
+        if (url && !shareText.includes(url)) data.url = url;
+        await navigator.share(data);
+        setStatus(statusElement, "共有しました。");
+        return "shared";
+      } catch (error) {
+        if (error && error.name === "AbortError") return "cancelled";
+      }
     }
-    pendingResult = data;
-    ui.hideBanner();
-    ui.setPlayUIVisible(false);
-    ui.setBestLabel(data.best);
-    ui.showResult(data);
-  },
-});
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        await navigator.clipboard.writeText(shareText);
+        setStatus(statusElement, "シェア文をコピーしました。");
+        return "copied";
+      }
+      throw new Error("clipboard unavailable");
+    } catch {
+      if (textElement && typeof textElement.focus === "function") {
+        textElement.value = shareText;
+        textElement.focus({ preventScroll: true });
+        textElement.select();
+        setStatus(statusElement, "シェア文を選択しました。コピーしてご利用ください。");
+        return "selected";
+      }
+      setStatus(statusElement, "シェア文を表示できませんでした。");
+      return "unavailable";
+    }
+  }
 
-// ---------- 入力 ----------
-setupInput({
-  onAction: ({ dir }) => {
-    if (game.isPlaying()) game.handleAction(dir);
-  },
-});
-lockGestures();
-
-// ---------- 画面遷移ヘルパ ----------
-function gotoTitle() {
-  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
-  game.state = 'IDLE';
-  game.attack = null;
-  ui.hideBanner();
-  ui.setPlayUIVisible(false);
-  ui.setBestLabel(storage.getBest());
-  ui.showScreen('title');
-}
-
-function startCountdown(onDone) {
-  ui.hideAllScreens();
-  ui.setPlayUIVisible(false);
-  ui.showScreen('ready');
-  let n = 3;
-  ui.setCountdown(n);
-  if (countdownTimer) clearInterval(countdownTimer);
-  countdownTimer = setInterval(() => {
-    n--;
-    if (n <= 0) {
+  // src/js/main.js
+  var $2 = (id) => document.getElementById(id);
+  var canvas = $2("game-canvas");
+  var renderer = new Renderer(canvas);
+  var particles = new ParticlePool();
+  var settings = getSettings();
+  setHapticsEnabled(settings.vibrate);
+  renderer.reducedMotion = !!settings.reducedMotion;
+  var countdownTimer = null;
+  var playerName = getPlayerName();
+  var game = new Game({
+    renderer,
+    particles,
+    settings,
+    onGameOver: (data) => {
+      if (data.practiceDone) {
+        hideBanner();
+        setPlayUIVisible(false);
+        showScreen("howto");
+        return;
+      }
+      hideBanner();
+      setPlayUIVisible(false);
+      setBestLabel(data.best);
+      showResult(data);
+      renderResultShare(data);
+    }
+  });
+  setupInput({
+    canHandleAction: () => game.isPlaying(),
+    onAction: ({ dir }) => {
+      if (game.isPlaying()) game.handleAction(dir);
+    }
+  });
+  lockGestures({
+    targets: [canvas, $2("controls")],
+    isEnabled: () => game.isPlaying()
+  });
+  function shareTextForHome() {
+    const url = officialGameUrl();
+    return [
+      "パリパリ：来た方向と反対を、ちょうどの瞬間に弾け。",
+      url || "（正式な公開URLは準備中です）",
+      "#パリパリ #ミニゲーム"
+    ].join("\n");
+  }
+  function shareTextForResult(data) {
+    const url = officialGameUrl();
+    return [
+      `${playerName || "プレイヤー"}さんのパリパリ結果：${data.score.toLocaleString()}点、ランク${data.rank}！`,
+      `最大コンボ${data.maxCombo}・PERFECT率${data.perfectRate}%・到達ティア${data.tier}`,
+      url || "（正式な公開URLは準備中です）",
+      "#パリパリ #ミニゲーム"
+    ].join("\n");
+  }
+  function renderHomeShare() {
+    const text = shareTextForHome();
+    const el = $2("home-share-text");
+    if (el) el.value = text;
+  }
+  function renderResultShare(data) {
+    const text = shareTextForResult(data);
+    $2("result-player").textContent = playerName ? `${playerName}さんの結果` : "プレイヤーの結果";
+    $2("result-share-text").value = text;
+    $2("result-share-status").textContent = "";
+  }
+  function readPlayerName() {
+    const input = $2("player-name");
+    const name = normalizePlayerName(input.value);
+    input.value = name;
+    if (!name) {
+      $2("name-error").textContent = "名前を入力してから開始してください。";
+      input.focus({ preventScroll: true });
+      return false;
+    }
+    playerName = setPlayerName(name);
+    $2("name-error").textContent = "";
+    return true;
+  }
+  function gotoTitle() {
+    if (countdownTimer) {
       clearInterval(countdownTimer);
       countdownTimer = null;
-      ui.hideAllScreens();
-      ui.setPlayUIVisible(true);
-      onDone();
-    } else {
-      ui.setCountdown(n);
     }
-  }, 700);
-}
-
-function beginNormalGame() {
-  startCountdown(() => game.start('normal'));
-}
-
-function beginPractice() {
-  ui.hideAllScreens();
-  ui.setPlayUIVisible(true);
-  game.start('practice');
-}
-
-// ---------- DOM ボタン配線 ----------
-$('btn-play').addEventListener('click', beginNormalGame);
-$('btn-howto').addEventListener('click', () => ui.showScreen('howto'));
-$('btn-howto-back').addEventListener('click', () => ui.showScreen('title'));
-$('btn-howto-try').addEventListener('click', beginPractice);
-$('btn-settings').addEventListener('click', () => { ui.reflectSettings(settings); ui.showScreen('settings'); });
-$('btn-settings-back').addEventListener('click', () => ui.showScreen('title'));
-
-$('btn-pause').addEventListener('click', pauseGame);
-$('btn-resume').addEventListener('click', resumeGame);
-$('btn-pause-retry').addEventListener('click', () => { ui.showScreen('ready'); beginNormalGame(); });
-$('btn-pause-home').addEventListener('click', gotoTitle);
-
-$('btn-retry').addEventListener('click', beginNormalGame);
-$('btn-result-home').addEventListener('click', gotoTitle);
-
-// 設定トグル
-function bindToggle(id, key, apply) {
-  $(id).addEventListener('change', (e) => {
-    settings = { ...settings, [key]: e.target.checked };
-    storage.setSettings(settings);
-    game.setSettings(settings);
-    apply && apply(e.target.checked);
+    game.state = "IDLE";
+    game.attack = null;
+    hideBanner();
+    setPlayUIVisible(false);
+    setBestLabel(getBest());
+    playerName = getPlayerName() || playerName;
+    $2("player-name").value = playerName;
+    $2("name-error").textContent = "";
+    renderHomeShare();
+    showScreen("title");
+  }
+  function startCountdown(onDone) {
+    hideAllScreens();
+    setPlayUIVisible(false);
+    showScreen("ready");
+    let n = 3;
+    setCountdown(n);
+    if (countdownTimer) clearInterval(countdownTimer);
+    countdownTimer = setInterval(() => {
+      n--;
+      if (n <= 0) {
+        clearInterval(countdownTimer);
+        countdownTimer = null;
+        hideAllScreens();
+        setPlayUIVisible(true);
+        onDone();
+      } else {
+        setCountdown(n);
+      }
+    }, 700);
+  }
+  function beginNormalGame() {
+    if (!readPlayerName()) return;
+    startCountdown(() => game.start("normal"));
+  }
+  function beginRetryGame() {
+    if (!playerName) {
+      gotoTitle();
+      $2("name-error").textContent = "名前を入力してから開始してください。";
+      return;
+    }
+    startCountdown(() => game.start("normal"));
+  }
+  function beginPractice() {
+    hideAllScreens();
+    setPlayUIVisible(true);
+    game.start("practice");
+  }
+  $2("btn-play").addEventListener("click", beginNormalGame);
+  $2("btn-howto").addEventListener("click", () => showScreen("howto"));
+  $2("btn-howto-back").addEventListener("click", () => showScreen("title"));
+  $2("btn-howto-try").addEventListener("click", beginPractice);
+  var nameComposing = false;
+  $2("player-name").addEventListener("input", () => {
+    $2("name-error").textContent = "";
   });
-}
-bindToggle('set-vibrate', 'vibrate', (v) => setHapticsEnabled(v));
-bindToggle('set-motion', 'reducedMotion', (v) => { renderer.reducedMotion = v; });
-
-// ---------- ポーズ ----------
-let pausedState = null;
-function pauseGame() {
-  if (!game.isPlaying()) return;
-  pausedState = 'PLAYING';
-  game.state = 'IDLE'; // ループ更新を止める（描画は継続）
-  ui.showScreen('pause');
-}
-function resumeGame() {
-  if (pausedState === 'PLAYING') {
-    ui.hideAllScreens();
-    game.state = 'PLAYING';
-    // 中断時間ぶん次攻撃を後ろ倒し（理不尽防止）
-    pausedState = null;
+  $2("player-name").addEventListener("compositionstart", () => {
+    nameComposing = true;
+  });
+  $2("player-name").addEventListener("compositionend", () => {
+    setTimeout(() => {
+      nameComposing = false;
+    }, 0);
+  });
+  $2("player-name").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !nameComposing && !e.isComposing && e.keyCode !== 229) {
+      e.preventDefault();
+      beginNormalGame();
+    }
+  });
+  $2("btn-home-share").addEventListener("click", () => shareOrCopy({
+    text: shareTextForHome(),
+    title: "パリパリ",
+    statusElement: $2("home-share-status"),
+    textElement: $2("home-share-text")
+  }));
+  $2("btn-result-share").addEventListener("click", () => shareOrCopy({
+    text: $2("result-share-text").value,
+    title: "パリパリの結果",
+    statusElement: $2("result-share-status"),
+    textElement: $2("result-share-text")
+  }));
+  $2("btn-settings").addEventListener("click", () => {
+    reflectSettings(settings);
+    showScreen("settings");
+  });
+  $2("btn-settings-back").addEventListener("click", () => showScreen("title"));
+  $2("btn-pause").addEventListener("click", pauseGame);
+  $2("btn-resume").addEventListener("click", resumeGame);
+  $2("btn-pause-retry").addEventListener("click", beginRetryGame);
+  $2("btn-pause-home").addEventListener("click", gotoTitle);
+  $2("btn-retry").addEventListener("click", beginRetryGame);
+  $2("btn-result-home").addEventListener("click", gotoTitle);
+  function bindToggle(id, key, apply) {
+    $2(id).addEventListener("change", (e) => {
+      settings = { ...settings, [key]: e.target.checked };
+      setSettings(settings);
+      game.setSettings(settings);
+      apply && apply(e.target.checked);
+    });
   }
-}
-
-// タブ離脱で自動ポーズ
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden && game.isPlaying()) pauseGame();
-});
-
-// ---------- リサイズ / 回転 ----------
-function handleResize() {
-  renderer.resize();
-  checkOrientation();
-}
-function checkOrientation() {
-  const landscape = window.innerWidth > window.innerHeight && window.innerWidth > 480;
-  $('rotate-hint').classList.toggle('hidden', !landscape);
-  if (landscape && game.isPlaying()) pauseGame();
-}
-window.addEventListener('resize', handleResize);
-window.addEventListener('orientationchange', () => setTimeout(handleResize, 200));
-if (window.visualViewport) window.visualViewport.addEventListener('resize', handleResize);
-
-// ---------- メインループ ----------
-let last = performance.now();
-function loop(now) {
-  let dtMs = now - last;
-  last = now;
-  if (dtMs > 50) dtMs = 50; // 大きなフレーム飛びをクランプ
-
-  // 演出タイマー（壁時計）と時間スケール
-  let scale = 1;
-  if (game.hitstopMs > 0) { game.hitstopMs -= dtMs; scale = 0; }
-  else if (game.slowmoMs > 0) { game.slowmoMs -= dtMs; scale = CONFIG.SLOWMO_SCALE; }
-
-  const playing = game.isPlaying();
-  const dtScaled = dtMs * scale;
-  // ゲーム時間はプレイ中のみ進める（ポーズ中の即時タイムアウトを防止）
-  if (playing) {
-    game.gameTime += dtScaled;
-    game.update(dtScaled / 1000);
+  bindToggle("set-vibrate", "vibrate", (v) => setHapticsEnabled(v));
+  bindToggle("set-motion", "reducedMotion", (v) => {
+    renderer.reducedMotion = v;
+  });
+  var pausedState = null;
+  function pauseGame() {
+    if (!game.isPlaying()) return;
+    pausedState = "PLAYING";
+    game.state = "IDLE";
+    showScreen("pause");
   }
-  // 描画はメニュー/ポーズ中も継続（背景アニメ・余韻）
-  const renderDtSec = (playing ? dtScaled : dtMs) / 1000;
-  renderer.draw(renderDtSec, game.getRenderState(), particles);
-
+  function resumeGame() {
+    if (pausedState === "PLAYING") {
+      hideAllScreens();
+      game.state = "PLAYING";
+      pausedState = null;
+    }
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && game.isPlaying()) pauseGame();
+  });
+  function handleResize() {
+    renderer.resize();
+    checkOrientation();
+  }
+  function isHandheldDevice() {
+    const nav = typeof navigator !== "undefined" ? navigator : {};
+    const ua = String(nav.userAgent || "");
+    const uaDataMobile = nav.userAgentData && nav.userAgentData.mobile === true;
+    const mobileUA = /Android|iPhone|iPad|iPod|Windows Phone|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    const iPadOSDesktop = nav.platform === "MacIntel" && Number(nav.maxTouchPoints || 0) > 1;
+    return !!(uaDataMobile || mobileUA || iPadOSDesktop);
+  }
+  function isLandscapeOrientation() {
+    const orientationType = typeof screen !== "undefined" && screen.orientation && screen.orientation.type;
+    if (orientationType) return /landscape/i.test(orientationType);
+    if (window.matchMedia) return window.matchMedia("(orientation: landscape)").matches;
+    return window.innerWidth > window.innerHeight;
+  }
+  function checkOrientation() {
+    const shouldRotate = isLandscapeOrientation() && isHandheldDevice();
+    $2("rotate-hint").classList.toggle("hidden", !shouldRotate);
+    if (shouldRotate && game.isPlaying()) pauseGame();
+  }
+  window.addEventListener("resize", handleResize);
+  window.addEventListener("orientationchange", () => setTimeout(handleResize, 200));
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", handleResize);
+  var last = performance.now();
+  function loop(now) {
+    let dtMs = now - last;
+    last = now;
+    if (dtMs > 50) dtMs = 50;
+    let scale = 1;
+    if (game.hitstopMs > 0) {
+      game.hitstopMs -= dtMs;
+      scale = 0;
+    } else if (game.slowmoMs > 0) {
+      game.slowmoMs -= dtMs;
+      scale = CONFIG.SLOWMO_SCALE;
+    }
+    const playing = game.isPlaying();
+    const dtScaled = dtMs * scale;
+    if (playing) {
+      game.gameTime += dtScaled;
+      game.update(dtScaled / 1e3);
+    }
+    const renderDtSec = (playing ? dtScaled : dtMs) / 1e3;
+    renderer.draw(renderDtSec, game.getRenderState(), particles);
+    requestAnimationFrame(loop);
+  }
+  handleResize();
+  gotoTitle();
   requestAnimationFrame(loop);
-}
-
-// ---------- 起動 ----------
-handleResize();
-gotoTitle();
-requestAnimationFrame(loop);
-
-// デバッグ/自動テスト用ハンドル（本番動作には影響しない）
-window.PariPari = { game, renderer };
-
-
-  });
-
-  require('main');
 })();
+
 </script>
 </body>
 </html>

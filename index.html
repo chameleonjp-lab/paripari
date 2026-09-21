@@ -52,9 +52,18 @@
         <h1 class="logo">パリパリ</h1>
         <p class="tagline">来た方向と<b>反対</b>を、ちょうどで弾け。</p>
         <div class="best">BEST <span id="title-best">0</span></div>
+        <label class="name-label" for="player-name">表示名（1〜20文字）</label>
+        <input id="player-name" class="name-input" type="text"
+          autocomplete="nickname" autocapitalize="none" spellcheck="false"
+          placeholder="名前を入力してください">
+        <p id="name-error" class="platform-status error" role="alert" aria-live="polite"></p>
         <button id="btn-play" class="btn btn-primary">プレイ</button>
         <button id="btn-howto" class="btn">遊び方</button>
         <button id="btn-settings" class="btn">設定</button>
+        <button id="btn-home-share" class="btn">ゲームをシェア</button>
+        <p id="home-share-status" class="platform-status" role="status" aria-live="polite"></p>
+        <textarea id="home-share-text" class="share-preview" readonly aria-label="ゲームのシェア文"></textarea>
+        <a class="platform-link" href="https://chameleonjp-lab.github.io/chameleonjp_lab/" target="_blank" rel="noopener noreferrer">カメレオンJPの実験場へ</a>
       </div>
     </section>
 
@@ -119,6 +128,11 @@
         </div>
         <button id="btn-retry" class="btn btn-primary">もう一回</button>
         <button id="btn-result-home" class="btn">ホーム</button>
+        <p id="result-player" class="platform-status"></p>
+        <textarea id="result-share-text" class="share-preview" readonly aria-label="結果のシェア文"></textarea>
+        <button id="btn-result-share" class="btn">結果をシェア</button>
+        <p id="result-share-status" class="platform-status" role="status" aria-live="polite"></p>
+        <a class="platform-link" href="https://chameleonjp-lab.github.io/chameleonjp_lab/" target="_blank" rel="noopener noreferrer">カメレオンJPの実験場へ</a>
       </div>
     </section>
 
