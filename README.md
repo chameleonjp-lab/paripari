@@ -1,5 +1,11 @@
 # パリパリ（PariPari）⚔️
 
+> **完成版の現在の計画**： [docs/plans/current/README.md](docs/plans/current/README.md)
+>
+> 2系統の試作を統合する [実装計画書 v2.0](docs/plans/current/IMPLEMENTATION_PLAN.md)、[受入検査](docs/plans/current/ACCEPTANCE_TESTS.md)、[進捗](docs/plans/current/PROGRESS.md) を追加しました。
+> 今回は計画書のみで、完成版の実装・公開は未実施です。ランキング連携は対象外です。
+> 以下の説明と旧 `docs/requirements.md` / `docs/implementation-plan.md` は試作時点の内容です。完成版との相違は新しい計画を優先し、旧説明の「検査済み」等を今回の検査結果として扱わないでください。
+
 > 来た方向と**反対**を、ちょうどで弾け。
 > iPhone SE のブラウザで快適に遊べる、ジャストタイミング受け流しゲーム。
 
