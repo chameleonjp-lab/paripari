@@ -569,10 +569,63 @@ async function runOrientationTouchRegression(browser, browserName, origin) {
       await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded', timeout: DEFAULT_TIMEOUT });
       await waitForReady(page, label);
       await page.setViewportSize({ width: 667, height: 375 });
-      await page.waitForTimeout(100);
-      const hint = page.locator('#rotate-hint').first();
-      assert(await hint.count() && await hint.isVisible(), `${label}:スマホ横向きの案内が表示されません`);
+      let landscapeHintShown = false;
+      try {
+        // 製品側はorientationchangeを200ms遅延処理するため、固定100msでは
+        // resize/orientationchangeの配送順による偽失敗になる。表示状態を待ち、
+        // 失敗時にはWebKitが返した向きの値を証拠として残す。
+        await page.waitForFunction(() => {
+          const element = document.querySelector('#rotate-hint');
+          return !!element && !element.classList.contains('hidden')
+            && getComputedStyle(element).display !== 'none';
+        }, undefined, { timeout: DEFAULT_TIMEOUT });
+        landscapeHintShown = true;
+      } catch (_) {
+        // 下の診断付きassertで失敗理由を返す。
+      }
+      const landscapeDiagnostics = await page.evaluate(() => ({
+        inner: [window.innerWidth, window.innerHeight],
+        outer: [window.outerWidth, window.outerHeight],
+        screen: [window.screen.width, window.screen.height],
+        orientation: window.screen.orientation ? {
+          type: window.screen.orientation.type,
+          angle: window.screen.orientation.angle,
+        } : null,
+        windowOrientation: window.orientation,
+        mediaLandscape: window.matchMedia?.('(orientation: landscape)').matches ?? null,
+        hintClass: document.querySelector('#rotate-hint')?.className || null,
+        hintDisplay: document.querySelector('#rotate-hint')
+          ? getComputedStyle(document.querySelector('#rotate-hint')).display : null,
+      }));
+      assert(landscapeHintShown,
+        `${label}:スマホ横向きの案内が表示されません ${JSON.stringify(landscapeDiagnostics)}`);
       await saveScreenshot(page, label, 'hint');
+
+      await page.setViewportSize({ width: 375, height: 667 });
+      let portraitHintHidden = false;
+      try {
+        await page.waitForFunction(() => {
+          const element = document.querySelector('#rotate-hint');
+          return !!element && (element.classList.contains('hidden')
+            || getComputedStyle(element).display === 'none');
+        }, undefined, { timeout: DEFAULT_TIMEOUT });
+        portraitHintHidden = true;
+      } catch (_) {
+        // 下の診断付きassertで失敗理由を返す。
+      }
+      const portraitDiagnostics = await page.evaluate(() => ({
+        inner: [window.innerWidth, window.innerHeight],
+        screen: [window.screen.width, window.screen.height],
+        orientation: window.screen.orientation ? {
+          type: window.screen.orientation.type,
+          angle: window.screen.orientation.angle,
+        } : null,
+        windowOrientation: window.orientation,
+        mediaLandscape: window.matchMedia?.('(orientation: landscape)').matches ?? null,
+        hintClass: document.querySelector('#rotate-hint')?.className || null,
+      }));
+      assert(portraitHintHidden,
+        `${label}:縦復帰後も回転案内が残っています ${JSON.stringify(portraitDiagnostics)}`);
       assertHealthy(observation, label);
     } finally {
       await page.close();
