@@ -18,6 +18,17 @@ R6では、公開設定を変更せずに、公開前に確認できるものを
 | プレビュー画像 | 未作成 | 実ゲームの最終画面を確認してから作成する |
 | iPhone 17 Pro Safari | 未実施 | 実機での確認が必要。模擬画面やWebKit検査を実機確認とは扱わない |
 
+## 自動検査の結果
+
+- `npm test`：91件成功（スクリプト33件、Nodeテスト58件）
+- `npm run build:check`：成功。分割ソースと配布HTMLの一致を確認
+- `LICENSE`：MIT本文を確認。`package.json` のライセンス指定と一致
+- マージ後main Quality #22：Chromium、WebKit、verifyが全件成功
+- R6 Draft PR #12 Quality #23：Chromium、WebKit、verifyが全件成功
+- Sol High相当の独立レビュー：承認、必須修正なし
+
+この自動検査は、iPhone Safariの実機操作、正式URL、公開元、プレビュー画像の確認を代替しません。
+
 ## 実機確認の記録欄
 
 次の確認は、この環境から実機操作を完了したとは言えないため、未実施として残します。
