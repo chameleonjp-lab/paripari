@@ -75,28 +75,33 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = (t) => t * t * (3 - 2 * t);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
+// R4で固定する成功数の境界。段階は成功数がこの値に達した時点で上がる。
+export const DIFFICULTY_SUCCESS_BOUNDARIES = Object.freeze(
+  [0, 3, 6, 9, 12, 16, 20, 24, 28, 32, 36, 41, 46, 51, 56, 62, 68, 74, 81, 88],
+);
+
 /**
  * 20段階のティアを生成する。
  * 前半(〜ティア10): 速度を詰めつつ「速度ランダム性(speedJitter)」を 0→最大 へ。
- * 後半(ティア11〜): 速度ランダム性は出揃い、必要タップ数を 1→最大3 へ段階的に。
+ * 段階7（成功20）から2連、段階13（成功46）から3連を抽選する。
  * tapWeights: [p(1回), p(2回), p(3回)] の確率分布。
  */
 function buildTiers() {
   const out = [];
-  for (let n = 0; n < CONFIG.MAX_TIER; n++) {
+  for (let n = 0; n < DIFFICULTY_SUCCESS_BOUNDARIES.length; n++) {
     const speedT = smooth(clamp(n / 9, 0, 1));      // ティア10で速度は床に到達
     const visibleMs = Math.round(lerp(980, 440, speedT));
     const intervalMs = Math.round(lerp(1080, 540, speedT));
     const speedJitter = +clamp((n / 9) * 0.35, 0, 0.35).toFixed(3); // ±割合。ティア10で最大0.35
 
-    // マルチタップの確率（ティア11〜で2回、ティア16〜で3回が混ざる）
-    const p2 = clamp((n - 9) * 0.07, 0, 0.5);
-    const p3 = clamp((n - 14) * 0.06, 0, 0.3);
+    // 速度を詰めた後に分割攻撃を増やし、突然すべてが3連にならないようにする。
+    const p2 = n < 6 ? 0 : clamp(0.08 + (n - 6) * 0.04, 0, 0.5);
+    const p3 = n < 12 ? 0 : clamp(0.06 + (n - 12) * 0.04, 0, 0.3);
     const p1 = Math.max(0, 1 - p2 - p3);
     const maxTaps = p3 > 0 ? 3 : p2 > 0 ? 2 : 1;
 
     out.push({
-      successAt: Math.round(5 * n + 0.5 * n * n),
+      successAt: DIFFICULTY_SUCCESS_BOUNDARIES[n],
       visibleMs,
       intervalMs,
       speedJitter,

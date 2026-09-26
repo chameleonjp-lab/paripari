@@ -1,6 +1,6 @@
 // localStorage wrapper (best score, settings, player name, tutorial completion).
 // Keep old score keys intact; rule-versioned keys prevent scores from mixing.
-export const RULE_VERSION = 'r3-practice-20260927';
+export const RULE_VERSION = 'r4-difficulty-20260927';
 const KEY_BEST = `paripari.best.${RULE_VERSION}`;
 const KEY_SETTINGS = 'paripari.settings';
 const KEY_PLAYER_NAME = 'paripari.player-name';
