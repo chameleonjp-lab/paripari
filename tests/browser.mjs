@@ -743,7 +743,8 @@ async function runInputAndResultFlow(page, label) {
   });
 
   // 3分割の成功も内部オブジェクトだけを準備し、3回のキー入力は実配線を通す。
-  await prepareAttack(page, { needDir: 'R', taps: 3, hp: 3 });
+  // 再開時の3-2-1カウントダウンを挟んでも、残りの試験用区間が期限切れにならないようにする。
+  await prepareAttack(page, { needDir: 'R', taps: 3, hp: 3, gapMs: 1_000 });
   await page.evaluate(() => globalThis.__testGame
     ._ui('updateAttackProgress', { required: 3, remaining: 3 }));
   const progress = page.locator('#attack-progress');
