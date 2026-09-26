@@ -3,7 +3,7 @@
 > **完成版の現在の計画**： [docs/plans/current/README.md](docs/plans/current/README.md)
 >
 > 2系統の試作を統合する [実装計画書 v2.0](docs/plans/current/IMPLEMENTATION_PLAN.md)、[受入検査](docs/plans/current/ACCEPTANCE_TESTS.md)、[進捗](docs/plans/current/PROGRESS.md) を追加しました。
-> R1〜R3はPR #6〜#9でマージ済みです。現在は **R4（難しさ・連続攻撃・日本語説明）** の実装段階です。検査結果と残作業は[進捗](docs/plans/current/PROGRESS.md)と[R4実装記録](docs/plans/current/R4_IMPLEMENTATION_REPORT.md)を参照してください。完成版の公開とランキング連携は行っていません。
+> R1〜R4はPR #6〜#10でマージ済みです。現在は **R5（公開候補の検証）** の実装段階です。検査結果と残作業は[進捗](docs/plans/current/PROGRESS.md)と[R5実装記録](docs/plans/current/R5_IMPLEMENTATION_REPORT.md)を参照してください。完成版の公開とランキング連携は行っていません。
 > 以下の説明と旧 `docs/requirements.md` / `docs/implementation-plan.md` は試作時点の内容です。完成版との相違は新しい計画を優先し、旧説明の「検査済み」等を今回の検査結果として扱わないでください。
 
 ## 現在の開発・検査手順
@@ -23,7 +23,7 @@ npm run test:browser
 
 ブラウザ検査は分割版と単一HTMLを実際に開きます。証拠の出力先は `PARIPARI_ARTIFACT_DIR` で指定できます。端末の通常の記録とは別のブラウザ環境を使い、検査用のゲーム操作口を本番には公開しません。PRのQuality検査は公開や外部得点送信を行いません。
 
-R1では正式公開URLを空欄にしています。共有には現在の開発URLを使わず、公開URLが準備中であることを文面で案内します。URLの確定はR6で行います。入力時刻と停止復帰はR2、初回練習と画面品質の仕上げはR3、難しさ・連続攻撃・日本語説明はR4で調整します。
+R1では正式公開URLを空欄にしています。共有には現在の開発URLを使わず、公開URLが準備中であることを文面で案内します。URLの確定はR6で行います。入力時刻と停止復帰はR2、初回練習と画面品質の仕上げはR3、難しさ・連続攻撃と日本語説明はR4、公開候補の長時間・再挑戦・配布回帰はR5で確認します。
 
 R2の時刻・入力順・停止の保証範囲と検査結果は[R2実装記録](docs/plans/current/R2_IMPLEMENTATION_REPORT.md)にまとめます。配送遅れ0〜50ミリ秒を保証するため、入力と期限切れを発生時刻順に確定します。250ミリ秒を超えて描画が途絶えた場合は一時停止し、復帰直後にまとめて失敗へ進めません。
 
