@@ -58,6 +58,9 @@ async function installFrameDiagnostics(context) {
       requestAnimationFrame(observeFrame);
     }
     requestAnimationFrame(observeFrame);
+    window.addEventListener('keydown', (event) => retain(history.events, {
+      type: 'keydown', key: event.key, eventTime: event.timeStamp, wall: performance.now(),
+    }), { capture: true });
     for (const type of ['visibilitychange', 'pagehide', 'orientationchange', 'resize']) {
       const target = type === 'visibilitychange' ? document : window;
       target.addEventListener(type, () => retain(history.events, {
@@ -85,6 +88,7 @@ async function closeObservedPage(page) {
     const diagnostic = await page.evaluate(() => ({
       url: location.pathname,
       wall: performance.now(),
+      clockMode: globalThis.__browserClockMode || 'native',
       frames: globalThis.__browserFrameDiagnostics ?? null,
       screen: [...document.querySelectorAll('[id^="screen-"]')]
         .filter((element) => !element.classList.contains('hidden')).map((element) => element.id),
@@ -294,7 +298,7 @@ function addStorageAndShareBlock(context) {
   });
 }
 
-async function newContext(browser, { mobile = false, short = false, blocked = false } = {}) {
+async function newContext(browser, { mobile = false, short = false, blocked = false, clocked = false } = {}) {
   const context = await browser.newContext({
     viewport: mobile
       ? { width: 375, height: short ? 500 : 667 }
@@ -306,6 +310,11 @@ async function newContext(browser, { mobile = false, short = false, blocked = fa
       ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
       : undefined,
   });
+  if (clocked) {
+    // 診断用rAFを含め、ページ側で時刻APIを使う前に導入する。
+    await context.clock.install();
+    await context.addInitScript(() => { globalThis.__browserClockMode = 'controlled'; });
+  }
   await installFrameDiagnostics(context);
   if (blocked) addStorageAndShareBlock(context);
   return context;
@@ -374,12 +383,21 @@ async function assertNoRotationHint(page, label) {
   assert(!/縦向きでプレイしてください/.test(visibleText), `${label}: 回転案内の文言が残っています`);
 }
 
-async function waitForPlaying(page, { hook = false, label = 'ゲーム' } = {}) {
+async function waitForPlaying(page, { hook = false, label = 'ゲーム', clocked = false } = {}) {
+  if (clocked) {
+    const countdown = await page.evaluate(() => {
+      const state = String(globalThis.__testSession?.state || '').toUpperCase();
+      return state === 'COUNTDOWN' || state === 'RESUME_COUNTDOWN';
+    });
+    if (countdown) await page.clock.runFor(2_300);
+  }
   if (hook) {
     await page.waitForFunction(() => {
       const game = globalThis.__testGame;
       const state = game && String(game.state || '').toUpperCase();
-      return state === 'PLAYING' || state === 'RUNNING';
+      const sessionState = globalThis.__testSession?.state;
+      return (state === 'PLAYING' || state === 'RUNNING')
+        && (sessionState === 'PLAYING' || sessionState === 'PRACTICE');
     }, undefined, { timeout: DEFAULT_TIMEOUT });
   } else {
     await page.waitForFunction(() => {
@@ -398,7 +416,7 @@ async function waitForReady(page, label) {
   await firstVisible(page, ['#screen-title', 'h1'], `${label}のホーム`, DEFAULT_TIMEOUT);
 }
 
-async function startByName(page, { hook = false, label = 'ゲーム' } = {}) {
+async function startByName(page, { hook = false, label = 'ゲーム', clocked = false } = {}) {
   const nameSelectors = [
     '#player-name',
     '[data-testid="player-name"]',
@@ -474,7 +492,21 @@ async function startByName(page, { hook = false, label = 'ゲーム' } = {}) {
   await markBrowserEvent(page, 'start-click-before');
   await start.click();
   await markBrowserEvent(page, 'start-click-after');
-  await waitForPlaying(page, { hook, label });
+  await waitForPlaying(page, { hook, label, clocked });
+}
+
+async function pauseClockAtHome(page, label) {
+  const home = await page.evaluate(() => ({
+    state: String(globalThis.__testSession?.state || '').toUpperCase(),
+    titleVisible: !!document.querySelector('#screen-title')
+      && !document.querySelector('#screen-title').classList.contains('hidden'),
+  }));
+  assert(home.state === 'HOME' && home.titleVisible,
+    `${label}: clock停止前にHOMEではありません ${JSON.stringify(home)}`);
+  // Keep the page live through initialization, then pause its timers while the
+  // user is still at HOME. A generous virtual offset avoids racing protocol
+  // latency while advancing no gameplay state.
+  await page.clock.pauseAt(new Date(Date.now() + 60_000));
 }
 
 async function prepareAttack(page, {
@@ -495,19 +527,31 @@ async function prepareAttack(page, {
   }) => {
     const game = globalThis.__testGame;
     const clock = globalThis.__testClock;
-    if (!game || !clock || typeof clock.now !== 'function') {
-      throw new Error('R2 test hookのGame/Clockがありません');
+    const session = globalThis.__testSession;
+    const expectedMode = requestedMode === 'practice' ? 'practice' : 'normal';
+    const expectedSessionState = expectedMode === 'practice' ? 'PRACTICE' : 'PLAYING';
+    if (!game || !clock || !session || typeof clock.now !== 'function') {
+      throw new Error('R2 test hookのGame/Clock/Sessionがありません');
+    }
+    if (!game.isPlaying() || String(game.state).toUpperCase() !== 'PLAYING'
+      || game.mode !== expectedMode || String(session.state).toUpperCase() !== expectedSessionState
+      || session.mode !== expectedMode || !clock.running) {
+      throw new Error(`fixtureを準備できない状態です: ${JSON.stringify({
+        gameState: game.state,
+        gameMode: game.mode,
+        sessionState: session.state,
+        sessionMode: session.mode,
+        clockRunning: clock.running,
+        pauseReason: session.pauseReason,
+      })}`);
     }
     const now = clock.now(performance.now());
     if (!Number.isFinite(now)) throw new Error('R2 test clockの現在時刻を取得できません');
     if (typeof game.clearInputs === 'function') game.clearInputs();
-    game.mode = requestedMode === 'practice' ? 'practice' : 'normal';
-    game.state = 'PLAYING';
-    if ('warmupRemaining' in game) {
-      game.warmupRemaining = requestedMode === 'practice'
-        ? Math.max(1, Number(game.warmupRemaining) || 5)
-        : 0;
+    if (requestedMode === 'practice' && !(game.warmupRemaining > 0)) {
+      throw new Error('練習の残数がありません');
     }
+    if (requestedMode === 'normal') game.warmupRemaining = 0;
     if ('hp' in game) game.hp = requestedHp;
     game.nextSpawnAt = Number.POSITIVE_INFINITY;
     const opposite = { L: 'R', R: 'L', D: 'U', DL: 'UR', DR: 'UL' };
@@ -539,19 +583,113 @@ async function prepareAttack(page, {
   }, { needDir, taps, hp, mode, impactOffset, gapMs });
 }
 
-async function pressFixtureSegment(page, index, label) {
+async function fixtureDiagnostics(page, index) {
+  return page.evaluate((segmentIndex) => {
+    const game = globalThis.__testGame;
+    const clock = globalThis.__testClock;
+    const session = globalThis.__testSession;
+    const wall = performance.now();
+    const attack = game?.attack;
+    const segment = attack?.segments?.[segmentIndex] || null;
+    return {
+      inputEvents: globalThis.__browserFrameDiagnostics?.events?.filter((event) => event.type === 'keydown'),
+      clocks: {
+        wall,
+        gameNow: clock && Number.isFinite(wall) ? clock.now(wall) : null,
+        running: clock?.running ?? null,
+        elapsed: clock?._elapsed ?? null,
+        activeStart: clock?._activeStart ?? null,
+      },
+      game: game && {
+        state: game.state,
+        mode: game.mode,
+        gameTime: game.gameTime,
+        hp: game.hp,
+        score: game.score,
+        successCount: game.successCount,
+        inputQueue: game._inputQueue?.map(({ dir, time, receivedAt, roundId }) => ({
+          dir, time, receivedAt, roundId,
+        })) || [],
+      },
+      attack: attack && {
+        result: attack.result,
+        resolved: attack.resolved,
+        resolvedAt: attack.resolvedAt,
+        segIndex: attack.segIndex,
+        segment,
+      },
+      session: session && {
+        state: session.state,
+        mode: session.mode,
+        pauseReason: session.pauseReason,
+        resumeState: session.resumeState,
+        lastPresentedWall: session.lastPresentedWall,
+      },
+    };
+  }, index);
+}
+
+async function withFixtureDiagnostics(page, index, label, action) {
+  try {
+    return await action();
+  } catch (error) {
+    let diagnostics = null;
+    try { diagnostics = await fixtureDiagnostics(page, index); } catch (_) { /* page may have closed */ }
+    throw new Error(`${label}: fixture segment ${index} failed: ${describeError(error)}\nfixture=${JSON.stringify(diagnostics)}`);
+  }
+}
+
+async function advanceToFixtureSegment(page, index, { clocked = false } = {}) {
+  if (clocked) {
+    const advanceMs = await page.evaluate((segmentIndex) => {
+      const game = globalThis.__testGame;
+      const clock = globalThis.__testClock;
+      const segment = game?.attack?.segments?.[segmentIndex];
+      if (!segment || !clock) throw new Error(`fixture segment ${segmentIndex} is missing`);
+      const remaining = segment.impactAt - 20 - clock.now(performance.now());
+      if (!Number.isFinite(remaining) || remaining < 0) {
+        throw new Error(`fixture segment ${segmentIndex} input window is already late (${remaining}ms)`);
+      }
+      return remaining;
+    }, index);
+    await page.clock.runFor(advanceMs);
+    return;
+  }
   await page.waitForFunction((segmentIndex) => {
     const game = globalThis.__testGame;
     const clock = globalThis.__testClock;
     const segment = game?.attack?.segments?.[segmentIndex];
     return !!segment && !!clock && clock.now(performance.now()) >= segment.impactAt - 20;
   }, index, { timeout: DEFAULT_TIMEOUT });
-  await page.keyboard.press('ArrowRight');
-  await page.waitForFunction((segmentIndex) => {
-    const segment = globalThis.__testGame?.attack?.segments?.[segmentIndex];
-    return !!segment?.resolved;
-  }, index, { timeout: DEFAULT_TIMEOUT });
-  if (label) await page.waitForTimeout(0);
+}
+
+async function advancePastFixtureTimeout(page, index = 0) {
+  const advanceMs = await page.evaluate((segmentIndex) => {
+    const game = globalThis.__testGame;
+    const clock = globalThis.__testClock;
+    const segment = game?.attack?.segments?.[segmentIndex];
+    if (!segment || !clock) throw new Error(`fixture segment ${segmentIndex} is missing`);
+    // The timeout closes after impact + GOOD_WINDOW + the 50ms delivery watermark.
+    const remaining = segment.impactAt + 240 - clock.now(performance.now());
+    if (!Number.isFinite(remaining) || remaining < 0) {
+      throw new Error(`fixture segment ${segmentIndex} timeout is already late (${remaining}ms)`);
+    }
+    return remaining;
+  }, index);
+  await page.clock.runFor(advanceMs);
+}
+
+async function pressFixtureSegment(page, index, label, { clocked = false } = {}) {
+  return withFixtureDiagnostics(page, index, label, async () => {
+    await advanceToFixtureSegment(page, index, { clocked });
+    await page.keyboard.press('ArrowRight');
+    if (clocked) await page.clock.runFor(80);
+    await page.waitForFunction((segmentIndex) => {
+      const segment = globalThis.__testGame?.attack?.segments?.[segmentIndex];
+      return !!segment?.resolved;
+    }, index, { timeout: DEFAULT_TIMEOUT });
+    if (label && !clocked) await page.waitForTimeout(0);
+  });
 }
 
 async function currentGameStats(page) {
@@ -570,12 +708,12 @@ async function currentGameStats(page) {
 }
 
 async function runInputAndResultFlow(page, label) {
-  await waitForPlaying(page, { hook: true, label });
+  await waitForPlaying(page, { hook: true, label, clocked: true });
 
   // 単発の成功はGameの内部状態だけを準備し、判定そのものは実キー配線で行う。
   await prepareAttack(page, { needDir: 'R', taps: 1, hp: 3 });
   const beforeSuccess = await currentGameStats(page);
-  await pressFixtureSegment(page, 0, label);
+  await pressFixtureSegment(page, 0, label, { clocked: true });
   await page.waitForFunction((previous) => {
     const game = globalThis.__testGame;
     return game && Number(game.successCount) > Number(previous);
@@ -583,25 +721,26 @@ async function runInputAndResultFlow(page, label) {
 
   // 方向違いは同じ実キー配線からMISSになり、ライフを1だけ失う。
   await prepareAttack(page, { needDir: 'R', taps: 1, hp: 3 });
-  await page.waitForFunction(() => {
-    const game = globalThis.__testGame;
-    const clock = globalThis.__testClock;
-    return game?.attack?.segments?.[0] && clock
-      && clock.now(performance.now()) >= game.attack.segments[0].impactAt - 20;
-  }, undefined, { timeout: DEFAULT_TIMEOUT });
-  await page.keyboard.press('ArrowLeft');
-  await page.waitForFunction(() => globalThis.__testGame && globalThis.__testGame.hp === 2,
-    undefined, { timeout: DEFAULT_TIMEOUT });
+  await withFixtureDiagnostics(page, 0, `${label} wrong direction`, async () => {
+    await advanceToFixtureSegment(page, 0, { clocked: true });
+    await page.keyboard.press('ArrowLeft');
+    await page.clock.runFor(80);
+    await page.waitForFunction(() => globalThis.__testGame && globalThis.__testGame.hp === 2,
+      undefined, { timeout: DEFAULT_TIMEOUT });
+  });
 
-  // timeoutも更新ループの実時間で確認する（予定時刻境界の厳密な検査はR2）。
+  // 制御したブラウザ時間を進め、製品の更新ループでtimeoutを確定させる。
   await prepareAttack(page, { needDir: 'R', taps: 1, hp: 3 });
-  await page.waitForFunction(() => globalThis.__testGame && globalThis.__testGame.hp === 2,
-    undefined, { timeout: DEFAULT_TIMEOUT });
+  await withFixtureDiagnostics(page, 0, `${label} timeout`, async () => {
+    await advancePastFixtureTimeout(page);
+    await page.waitForFunction(() => globalThis.__testGame && globalThis.__testGame.hp === 2,
+      undefined, { timeout: DEFAULT_TIMEOUT });
+  });
 
   // 3分割の成功も内部オブジェクトだけを準備し、3回のキー入力は実配線を通す。
   await prepareAttack(page, { needDir: 'R', taps: 3, hp: 3 });
   const beforeThree = await currentGameStats(page);
-  for (let i = 0; i < 3; i++) await pressFixtureSegment(page, i, label);
+  for (let i = 0; i < 3; i++) await pressFixtureSegment(page, i, label, { clocked: true });
   await page.waitForFunction((previous) => {
     const game = globalThis.__testGame;
     return game && Number(game.successCount) >= Number(previous) + 3;
@@ -610,22 +749,20 @@ async function runInputAndResultFlow(page, label) {
   // ライフ0→リザルトを確認する。結果生成は1試合につき1回だけでよいが、
   // ここでは表示到達と直後のリトライ導線を受入条件にする。
   await prepareAttack(page, { needDir: 'R', taps: 1, hp: 1 });
-  await page.waitForFunction(() => {
-    const game = globalThis.__testGame;
-    const clock = globalThis.__testClock;
-    return game?.attack?.segments?.[0] && clock
-      && clock.now(performance.now()) >= game.attack.segments[0].impactAt - 20;
-  }, undefined, { timeout: DEFAULT_TIMEOUT });
-  await page.keyboard.press('ArrowLeft');
-  await page.waitForFunction(() => {
-    const game = globalThis.__testGame;
-    const result = document.querySelector('#screen-result');
-    return game && String(game.state || '').toUpperCase() === 'OVER'
-      && result && !result.classList.contains('hidden')
-      && getComputedStyle(result).display !== 'none';
-  }, undefined, { timeout: DEFAULT_TIMEOUT });
+  await withFixtureDiagnostics(page, 0, `${label} result`, async () => {
+    await advanceToFixtureSegment(page, 0, { clocked: true });
+    await page.keyboard.press('ArrowLeft');
+    await page.clock.runFor(80);
+    await page.waitForFunction(() => {
+      const game = globalThis.__testGame;
+      const result = document.querySelector('#screen-result');
+      return game && String(game.state || '').toUpperCase() === 'OVER'
+        && result && !result.classList.contains('hidden')
+        && getComputedStyle(result).display !== 'none';
+    }, undefined, { timeout: DEFAULT_TIMEOUT });
+  });
   await saveScreenshot(page, label, 'result');
-  await settleAfterScreenshot(page);
+  await settleAfterScreenshot(page, { clocked: true });
 
   const retry = await firstVisible(page, [
     '#btn-retry',
@@ -634,7 +771,143 @@ async function runInputAndResultFlow(page, label) {
     'button:has-text("リトライ")',
   ], `${label}のリトライ`);
   await retry.click();
-  await waitForPlaying(page, { hook: true, label: `${label} retry` });
+  await waitForPlaying(page, { hook: true, label: `${label} retry`, clocked: true });
+}
+
+async function runLongGapRegression(page, label) {
+  await prepareAttack(page, { impactOffset: 500 });
+  const ready = await page.evaluate(() => {
+    const game = globalThis.__testGame;
+    const clock = globalThis.__testClock;
+    const session = globalThis.__testSession;
+    if (!game?.isPlaying() || game.state !== 'PLAYING' || game.mode !== 'normal'
+      || session?.state !== 'PLAYING' || session.mode !== 'normal' || !clock?.running) {
+      throw new Error(`longgap開始状態が不正です: ${JSON.stringify({
+        gameState: game?.state, gameMode: game?.mode,
+        sessionState: session?.state, sessionMode: session?.mode,
+        clockRunning: clock?.running, pauseReason: session?.pauseReason,
+      })}`);
+    }
+    game.clearInputs();
+    globalThis.__longGapEnqueueRecords = [];
+    const enqueue = game.enqueueAction;
+    game.enqueueAction = function (action = {}) {
+      const accepted = enqueue.call(this, action);
+      const queued = this._inputQueue[this._inputQueue.length - 1] || null;
+      globalThis.__longGapEnqueueRecords.push({
+        dir: action.dir,
+        time: action.time,
+        receivedAt: action.receivedAt,
+        roundId: action.roundId,
+        accepted,
+        queued: queued && {
+          dir: queued.dir, time: queued.time, receivedAt: queued.receivedAt, roundId: queued.roundId,
+        },
+      });
+      return accepted;
+    };
+    return {
+      gameTime: game.gameTime,
+      hp: game.hp,
+      score: game.score,
+      presentedWall: session.lastPresentedWall,
+      clockAtPresented: clock.now(session.lastPresentedWall),
+      attackId: game.attack.id,
+      impactAt: game.attack.segments[0].impactAt,
+    };
+  });
+
+  await page.keyboard.press('ArrowRight');
+  const beforeGap = await page.evaluate(() => ({
+    records: globalThis.__longGapEnqueueRecords || [],
+    queued: globalThis.__testGame?._inputQueue?.map(({ dir, time, receivedAt, roundId }) => ({
+      dir, time, receivedAt, roundId,
+    })) || [],
+    gameTime: globalThis.__testGame?.gameTime,
+    hp: globalThis.__testGame?.hp,
+    score: globalThis.__testGame?.score,
+    roundId: globalThis.__testGame?.roundId,
+  }));
+  const dispatch = beforeGap.records[0];
+  assert(beforeGap.records.length === 1 && dispatch?.accepted && dispatch.dir === 'R'
+    && dispatch.queued?.dir === 'R' && beforeGap.queued.length === 1,
+  `${label}: longgap前の実キーが1件のR入力としてqueueされません ${JSON.stringify(beforeGap)}`);
+  assert(Number.isFinite(dispatch.time) && Number.isFinite(dispatch.receivedAt)
+    && dispatch.time >= 0 && dispatch.receivedAt >= dispatch.time
+    && dispatch.receivedAt - dispatch.time <= 50,
+  `${label}: longgap前の実キー時刻が不正です ${JSON.stringify(dispatch)}`);
+
+  await page.clock.fastForward(1_000);
+  const afterGap = await page.evaluate(() => {
+    const game = globalThis.__testGame;
+    const clock = globalThis.__testClock;
+    const session = globalThis.__testSession;
+    return {
+      gameState: game?.state,
+      gameTime: game?.gameTime,
+      hp: game?.hp,
+      score: game?.score,
+      inputQueue: game?._inputQueue?.length ?? null,
+      clockRunning: clock?.running ?? null,
+      clockNow: clock && Number.isFinite(performance.now()) ? clock.now(performance.now()) : null,
+      sessionState: session?.state,
+      pauseReason: session?.pauseReason,
+      lastPresentedWall: session?.lastPresentedWall,
+      attackId: game?.attack?.id,
+      attackResolved: game?.attack?.resolved,
+      segmentResolved: game?.attack?.segments[0]?.resolved,
+      impactAt: game?.attack?.segments[0]?.impactAt,
+    };
+  });
+  const pausedUI = await page.locator('#screen-pause').isVisible();
+  const gapEvidence = { ready, beforeGap, afterGap, pausedUI };
+  assert(afterGap.sessionState === 'PAUSED' && afterGap.pauseReason === 'stall'
+    && afterGap.gameState === 'PAUSED' && pausedUI,
+  `${label}: fastForward後にstall pause UIへ遷移しません ${JSON.stringify(gapEvidence)}`);
+  assert(afterGap.gameTime === ready.gameTime && afterGap.hp === ready.hp
+    && afterGap.score === ready.score && afterGap.clockRunning === false
+    && afterGap.clockNow === ready.clockAtPresented && afterGap.inputQueue === 0
+    && afterGap.attackId === ready.attackId && afterGap.impactAt === ready.impactAt
+    && afterGap.attackResolved === false && afterGap.segmentResolved === false,
+  `${label}: stall時に最後のpresented状態を保持できません ${JSON.stringify(gapEvidence)}`);
+
+  await page.clock.runFor(500);
+  const stillPaused = await page.evaluate(() => ({
+    sessionState: globalThis.__testSession?.state,
+    pauseReason: globalThis.__testSession?.pauseReason,
+    gameState: globalThis.__testGame?.state,
+  }));
+  assert(stillPaused.sessionState === 'PAUSED' && stillPaused.pauseReason === 'stall'
+    && stillPaused.gameState === 'PAUSED' && await page.locator('#screen-pause').isVisible(),
+  `${label}: stall後に自動再開しました ${JSON.stringify(stillPaused)}`);
+
+  const resume = await firstVisible(page, ['#btn-resume'], `${label}のstall再開`);
+  await resume.click();
+  const countdownStart = await page.evaluate(() => ({
+    state: globalThis.__testSession?.state,
+    screenVisible: !document.querySelector('#screen-ready')?.classList.contains('hidden'),
+    text: document.querySelector('#countdown')?.textContent?.trim(),
+  }));
+  assert(countdownStart.state === 'RESUME_COUNTDOWN' && countdownStart.screenVisible
+    && countdownStart.text === '3',
+  `${label}: 明示resume後の3カウントが始まりません ${JSON.stringify(countdownStart)}`);
+  // 700ms境界の直後では最後のrAFがまだ境界前のことがあるため、
+  // 各表示区間の内側を読む。厳密な境界はSessionの単体検査で確認する。
+  await page.clock.runFor(1_000);
+  const countdownTwo = await page.locator('#countdown').innerText();
+  assert(countdownTwo.trim() === '2', `${label}: resume countdown 2を確認できません: ${countdownTwo}`);
+  await page.clock.runFor(700);
+  const countdownOne = await page.locator('#countdown').innerText();
+  assert(countdownOne.trim() === '1', `${label}: resume countdown 1を確認できません: ${countdownOne}`);
+  await page.clock.runFor(700);
+  const resumed = await page.evaluate(() => ({
+    sessionState: globalThis.__testSession?.state,
+    gameState: globalThis.__testGame?.state,
+    clockRunning: globalThis.__testClock?.running,
+  }));
+  assert(resumed.sessionState === 'PLAYING' && resumed.gameState === 'PLAYING'
+    && resumed.clockRunning === true,
+  `${label}: 明示resumeの3-2-1後にPLAYINGへ戻りません ${JSON.stringify(resumed)}`);
 }
 
 function artifactPath(label, suffix) {
@@ -659,8 +932,12 @@ async function markBrowserEvent(page, type, details = {}) {
 
 // WebKitの画面取得はrAFを長く止める場合がある。HOME/RESULTで撮影した後は、
 // 実際に描画が戻ったことを確認してから新しい試合を始める。製品時計は操作しない。
-async function settleAfterScreenshot(page) {
-  const gaps = await page.evaluate(({ timeout, threshold }) => new Promise((resolveFrames, reject) => {
+async function settleAfterScreenshot(page, { clocked = false } = {}) {
+  if (clocked) {
+    await page.clock.runFor(64);
+    return;
+  }
+  const settling = page.evaluate(({ timeout, threshold }) => new Promise((resolveFrames, reject) => {
     let previous = null;
     let stable = 0;
     let stopped = false;
@@ -685,6 +962,7 @@ async function settleAfterScreenshot(page) {
     };
     requestAnimationFrame(sample);
   }), { timeout: DEFAULT_TIMEOUT, threshold: 250 });
+  const gaps = await settling;
   await markBrowserEvent(page, 'screenshot-frames-restored', { gaps });
 }
 
@@ -820,7 +1098,7 @@ async function runOrientationTouchRegression(browser, browserName, origin) {
 }
 
 async function runHookFlow(browser, browserName, origin, variant) {
-  const context = await newContext(browser);
+  const context = await newContext(browser, { clocked: true });
   try {
     const page = await context.newPage();
     const observation = observe(page, origin);
@@ -833,8 +1111,10 @@ async function runHookFlow(browser, browserName, origin, variant) {
       await waitForReady(page, label);
       await page.waitForFunction(() => globalThis.__testHookReady && globalThis.__testGame,
         undefined, { timeout: DEFAULT_TIMEOUT });
-      await startByName(page, { hook: true, label });
+      await pauseClockAtHome(page, label);
+      await startByName(page, { hook: true, label, clocked: true });
       await runInputAndResultFlow(page, label);
+      await runLongGapRegression(page, label);
       // 描画取得後はこのpageで入力時刻の検査を続けない。
       await saveScreenshot(page, label, 'playing');
       assertHealthy(observation, label);
@@ -897,6 +1177,7 @@ async function runMobileFlow(browser, browserName, origin, variant, short) {
 }
 
 async function runPointerLifecycleRegression(page, label) {
+  await runNativeKeyRegression(page, label);
   await markBrowserEvent(page, 'pointer-lifecycle-start');
   const button = page.locator('[data-dir]').first();
   assert(await button.count() === 1, `${label}: pointer回帰用ボタンがありません`);
@@ -979,6 +1260,43 @@ async function runPointerLifecycleRegression(page, label) {
   const home = await firstVisible(page, ['#btn-pause-home'], `${label}のホームボタン`, DEFAULT_TIMEOUT);
   await home.click();
   await firstVisible(page, ['#screen-title'], `${label}のホーム復帰`, DEFAULT_TIMEOUT);
+}
+
+async function runNativeKeyRegression(page, label) {
+  // 時間制御を使わず、実際のEvent.timeStamp→GameClock→Game受付を残す。
+  // 攻撃なしの場面なので、検査通信に80msの入力期限を競わせない。
+  await page.evaluate(() => {
+    const game = globalThis.__testGame;
+    if (globalThis.__browserClockMode === 'controlled' || !game?.isPlaying()
+      || globalThis.__testSession?.state !== 'PLAYING' || game.attack != null) {
+      throw new Error('実時間キー検査には通常時計・本番中・攻撃なしが必要です');
+    }
+    const original = game.enqueueAction;
+    const probe = { original, records: [] };
+    globalThis.__nativeKeyProbe = probe;
+    game.enqueueAction = function (action) {
+      const accepted = original.call(this, action);
+      probe.records.push({ ...action, accepted });
+      return accepted;
+    };
+  });
+  let records;
+  try {
+    await page.keyboard.press('ArrowRight');
+    records = await page.evaluate(() => globalThis.__nativeKeyProbe.records);
+  } finally {
+    await page.evaluate(() => {
+      globalThis.__testGame.enqueueAction = globalThis.__nativeKeyProbe.original;
+      globalThis.__testGame.clearInputs();
+      delete globalThis.__nativeKeyProbe;
+    });
+  }
+  const action = records?.[0];
+  assert(records?.length === 1 && action.accepted && action.dir === 'R'
+    && Number.isFinite(action.time) && Number.isFinite(action.receivedAt)
+    && action.time >= 0 && action.receivedAt >= action.time
+    && action.receivedAt - action.time <= 50,
+  `${label}: 実時間のキー入力を1件受理できません ${JSON.stringify(records)}`);
 }
 
 async function beginCountdownByName(page, label) {
@@ -1220,7 +1538,7 @@ async function runFileFlow(browser, browserName) {
 }
 
 async function runPracticeBlankNameRegression(browser, browserName, origin) {
-  const context = await newContext(browser);
+  const context = await newContext(browser, { clocked: true });
   // 旧保存名が残る状態から、ホーム上の表示名を空に戻す経路を再現する。
   await context.addInitScript(() => {
     try { localStorage.setItem('paripari.player-name', '旧保存名'); } catch (_) { /* 検査対象外 */ }
@@ -1234,6 +1552,7 @@ async function runPracticeBlankNameRegression(browser, browserName, origin) {
       await waitForReady(page, label);
       await page.waitForFunction(() => globalThis.__testHookReady && globalThis.__testGame,
         undefined, { timeout: DEFAULT_TIMEOUT });
+      await pauseClockAtHome(page, label);
       const input = await firstVisible(page, ['#player-name', 'input[name="name"]'], `${label}の名前欄`);
       assert(await input.inputValue() === '旧保存名', `${label}: 保存済みの旧名を再現できません`);
       await input.fill('');
@@ -1245,10 +1564,7 @@ async function runPracticeBlankNameRegression(browser, browserName, origin) {
         'button:has-text("練習してみる")',
       ], `${label}の練習開始`);
       await practice.click();
-      await page.waitForFunction(() => {
-        const game = globalThis.__testGame;
-        return game && String(game.state || '').toUpperCase() === 'PLAYING';
-      }, undefined, { timeout: DEFAULT_TIMEOUT });
+      await waitForPlaying(page, { hook: true, label, clocked: true });
 
       // 練習の5攻撃を実際のGame.updateで失敗確定させ、GameがpracticeDoneを
       // 通知する自然な経路を通す。攻撃予定は現在のGameClockから相対設定し、
@@ -1256,10 +1572,10 @@ async function runPracticeBlankNameRegression(browser, browserName, origin) {
       for (let i = 0; i < 5; i++) {
         const beforeWarmup = await page.evaluate(() => globalThis.__testGame?.warmupRemaining);
         await prepareAttack(page, { mode: 'practice', taps: 1, hp: 3, impactOffset: 80 });
+        await advancePastFixtureTimeout(page);
         await page.waitForFunction((previous) => {
           const game = globalThis.__testGame;
-          const state = String(game?.state || '').toUpperCase();
-          return state !== 'PLAYING' || Number(game?.warmupRemaining) < Number(previous);
+          return Number(game?.warmupRemaining) === Number(previous) - 1;
         }, beforeWarmup, { timeout: DEFAULT_TIMEOUT });
       }
       await firstVisible(page, ['#screen-howto', 'h2:has-text("遊び方")'],
@@ -1275,7 +1591,7 @@ async function runPracticeBlankNameRegression(browser, browserName, origin) {
       await blankInput.fill('仮');
       await blankInput.dispatchEvent('compositionstart');
       await page.keyboard.press('Enter');
-      await page.waitForTimeout(100);
+      await page.clock.runFor(100);
       const afterCompositionState = await page.evaluate(() => ({
         state: String(globalThis.__testGame?.state || '').toUpperCase(),
         ready: !document.querySelector('#screen-ready')?.classList.contains('hidden'),
