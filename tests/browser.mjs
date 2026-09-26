@@ -1149,6 +1149,173 @@ async function runHookFlow(browser, browserName, origin, variant) {
   }
 }
 
+async function runReleaseRetryStress(browser, browserName, origin, variant) {
+  const context = await newContext(browser, { clocked: true });
+  try {
+    await context.addInitScript(() => {
+      const nativeSetTimeout = window.setTimeout.bind(window);
+      const nativeClearTimeout = window.clearTimeout.bind(window);
+      const nativeRequestAnimationFrame = window.requestAnimationFrame.bind(window);
+      const nativeCancelAnimationFrame = window.cancelAnimationFrame.bind(window);
+      const timers = new Set();
+      const frames = new Set();
+      const probe = { timers, frames, peakTimers: 0, peakFrames: 0 };
+      globalThis.__r5ResourceProbe = probe;
+
+      window.setTimeout = (callback, delay, ...args) => {
+        let id;
+        const wrapped = () => {
+          timers.delete(id);
+          return typeof callback === 'function' ? callback(...args) : undefined;
+        };
+        id = nativeSetTimeout(wrapped, delay);
+        timers.add(id);
+        probe.peakTimers = Math.max(probe.peakTimers, timers.size);
+        return id;
+      };
+      window.clearTimeout = (id) => {
+        timers.delete(id);
+        return nativeClearTimeout(id);
+      };
+      window.requestAnimationFrame = (callback) => {
+        let id;
+        const wrapped = (time) => {
+          frames.delete(id);
+          return callback(time);
+        };
+        id = nativeRequestAnimationFrame(wrapped);
+        frames.add(id);
+        probe.peakFrames = Math.max(probe.peakFrames, frames.size);
+        return id;
+      };
+      window.cancelAnimationFrame = (id) => {
+        frames.delete(id);
+        return nativeCancelAnimationFrame(id);
+      };
+    });
+    const page = await context.newPage();
+    const observation = observe(page, origin);
+    const label = `${browserName}-${variant}-r5-retry-stress`;
+    try {
+      await page.goto(`${origin}${variant === 'split' ? '/' : '/dist.html'}`, {
+        waitUntil: 'domcontentloaded',
+        timeout: DEFAULT_TIMEOUT,
+      });
+      await waitForReady(page, label);
+      await page.waitForFunction(() => globalThis.__testHookReady && globalThis.__testGame,
+        undefined, { timeout: DEFAULT_TIMEOUT });
+      await pauseClockAtHome(page, label);
+      await startByName(page, { hook: true, label, clocked: true });
+
+      const cycles = 100;
+      const initialResourceState = await page.evaluate(() => ({
+        timers: globalThis.__r5ResourceProbe?.timers?.size ?? null,
+        frames: globalThis.__r5ResourceProbe?.frames?.size ?? null,
+        buttons: document.querySelectorAll('[data-dir]').length,
+      }));
+      assert(initialResourceState.buttons === 5
+        && Number.isFinite(initialResourceState.timers)
+        && Number.isFinite(initialResourceState.frames),
+        `${label}: 初期の方向ボタン数が不一致です ${JSON.stringify(initialResourceState)}`);
+      for (let cycle = 0; cycle < cycles; cycle++) {
+        const beforeRound = await page.evaluate(() => ({
+          roundId: globalThis.__testGame?.roundId,
+          matchId: globalThis.__testSession?.matchId,
+          state: globalThis.__testSession?.state,
+        }));
+        assert(beforeRound.state === 'PLAYING',
+          `${label}: ${cycle + 1}回目開始前の状態が不正です ${JSON.stringify(beforeRound)}`);
+        await prepareAttack(page, {
+          needDir: 'R',
+          taps: 1,
+          hp: 1,
+          impactOffset: 80,
+        });
+        await advancePastFixtureTimeout(page);
+        await page.waitForFunction(() => {
+          const result = document.querySelector('#screen-result');
+          return globalThis.__testSession?.state === 'RESULT'
+            && result && !result.classList.contains('hidden');
+        }, undefined, { timeout: DEFAULT_TIMEOUT });
+
+        const resultState = await page.evaluate(() => ({
+          session: globalThis.__testSession?.state,
+          game: globalThis.__testGame?.state,
+          roundId: globalThis.__testGame?.roundId,
+          resultRoundId: globalThis.__testSession?.result?.roundId,
+          inputQueue: globalThis.__testGame?._inputQueue?.length ?? null,
+          attack: globalThis.__testGame?.attack,
+          timers: globalThis.__r5ResourceProbe?.timers?.size ?? null,
+          frames: globalThis.__r5ResourceProbe?.frames?.size ?? null,
+          buttons: document.querySelectorAll('[data-dir]').length,
+        }));
+        assert(resultState.session === 'RESULT' && resultState.game === 'OVER'
+          && resultState.roundId === beforeRound.roundId
+          && resultState.resultRoundId === beforeRound.roundId
+          && resultState.inputQueue === 0 && resultState.attack === null
+          && resultState.buttons === 5
+          && resultState.timers <= initialResourceState.timers + 2
+          && resultState.frames <= initialResourceState.frames + 1,
+        `${label}: ${cycle + 1}回目の結果状態が不正です ${JSON.stringify(resultState)}`);
+
+        await page.locator('#btn-retry').click();
+        await page.waitForFunction(() => globalThis.__testSession?.state === 'COUNTDOWN',
+          undefined, { timeout: DEFAULT_TIMEOUT });
+        await waitForPlaying(page, { hook: true, label: `${label} retry ${cycle + 1}`, clocked: true });
+        const afterRetry = await page.evaluate(() => ({
+          session: globalThis.__testSession?.state,
+          game: globalThis.__testGame?.state,
+          roundId: globalThis.__testGame?.roundId,
+          matchId: globalThis.__testSession?.matchId,
+          result: globalThis.__testSession?.result,
+          inputQueue: globalThis.__testGame?._inputQueue?.length ?? null,
+          attack: globalThis.__testGame?.attack,
+          timers: globalThis.__r5ResourceProbe?.timers?.size ?? null,
+          frames: globalThis.__r5ResourceProbe?.frames?.size ?? null,
+          buttons: document.querySelectorAll('[data-dir]').length,
+        }));
+        assert(afterRetry.session === 'PLAYING' && afterRetry.game === 'PLAYING'
+          && afterRetry.roundId === beforeRound.roundId + 1
+          && afterRetry.matchId === beforeRound.matchId + 1
+          && afterRetry.result === null && afterRetry.inputQueue === 0
+          && afterRetry.attack === null && afterRetry.buttons === 5
+          && afterRetry.timers <= initialResourceState.timers + 2
+          && afterRetry.frames <= initialResourceState.frames + 1,
+        `${label}: ${cycle + 1}回目の再挑戦状態が不正です ${JSON.stringify(afterRetry)}`);
+      }
+
+      const finalState = await page.evaluate(() => ({
+        session: globalThis.__testSession?.state,
+        game: globalThis.__testGame?.state,
+        roundId: globalThis.__testGame?.roundId,
+        matchId: globalThis.__testSession?.matchId,
+        inputQueue: globalThis.__testGame?._inputQueue?.length ?? null,
+        attack: globalThis.__testGame?.attack,
+        result: globalThis.__testSession?.result,
+        timers: globalThis.__r5ResourceProbe?.timers?.size ?? null,
+        frames: globalThis.__r5ResourceProbe?.frames?.size ?? null,
+        peakTimers: globalThis.__r5ResourceProbe?.peakTimers ?? null,
+        peakFrames: globalThis.__r5ResourceProbe?.peakFrames ?? null,
+        buttons: document.querySelectorAll('[data-dir]').length,
+      }));
+      assert(finalState.session === 'PLAYING' && finalState.game === 'PLAYING'
+        && finalState.roundId === cycles + 1 && finalState.matchId === cycles + 1
+        && finalState.result === null && finalState.inputQueue === 0 && finalState.attack === null
+        && finalState.buttons === 5
+        && finalState.timers <= initialResourceState.timers + 2
+        && finalState.frames <= initialResourceState.frames + 1
+        && finalState.peakTimers <= initialResourceState.timers + 8
+        && finalState.peakFrames <= initialResourceState.frames + 2,
+      `${label}: 100回後の状態が不正です ${JSON.stringify(finalState)}`);
+      assertHealthy(observation, label);
+    } finally {
+      await closeObservedPage(page);
+    }
+  } finally {
+    await context.close();
+  }
+}
+
 async function runMobileFlow(browser, browserName, origin, variant, short) {
   const context = await newContext(browser, { mobile: true, short });
   try {
@@ -1883,6 +2050,8 @@ async function main() {
             () => runMenuLayoutRegression(browser, browserName, hookOrigin, variant));
           await runCase(`${browserName}: ${variant}の名前→成功/誤方向/timeout→結果→retry`,
             () => runHookFlow(browser, browserName, hookOrigin, variant));
+          await runCase(`${browserName}: ${variant}のR5 100回再挑戦ストレス`,
+            () => runReleaseRetryStress(browser, browserName, hookOrigin, variant));
           await runCase(`${browserName}: ${variant}のR2初期countdown/pagehide/縦横復帰`,
             () => runBrowserSessionRegression(browser, browserName, hookOrigin, variant));
           await runCase(`${browserName}: ${variant}スマホ5ボタン`,
