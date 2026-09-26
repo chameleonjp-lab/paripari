@@ -1211,11 +1211,15 @@ async function runReleaseRetryStress(browser, browserName, origin, variant) {
       const initialResourceState = await page.evaluate(() => ({
         timers: globalThis.__r5ResourceProbe?.timers?.size ?? null,
         frames: globalThis.__r5ResourceProbe?.frames?.size ?? null,
+        roundId: globalThis.__testGame?.roundId ?? null,
+        matchId: globalThis.__testSession?.matchId ?? null,
         buttons: document.querySelectorAll('[data-dir]').length,
       }));
       assert(initialResourceState.buttons === 5
         && Number.isFinite(initialResourceState.timers)
-        && Number.isFinite(initialResourceState.frames),
+        && Number.isFinite(initialResourceState.frames)
+        && Number.isFinite(initialResourceState.roundId)
+        && Number.isFinite(initialResourceState.matchId),
         `${label}: 初期の方向ボタン数が不一致です ${JSON.stringify(initialResourceState)}`);
       for (let cycle = 0; cycle < cycles; cycle++) {
         const beforeRound = await page.evaluate(() => ({
@@ -1299,7 +1303,8 @@ async function runReleaseRetryStress(browser, browserName, origin, variant) {
         buttons: document.querySelectorAll('[data-dir]').length,
       }));
       assert(finalState.session === 'PLAYING' && finalState.game === 'PLAYING'
-        && finalState.roundId === cycles + 1 && finalState.matchId === cycles + 1
+        && finalState.roundId === initialResourceState.roundId + cycles
+        && finalState.matchId === initialResourceState.matchId + cycles
         && finalState.result === null && finalState.inputQueue === 0 && finalState.attack === null
         && finalState.buttons === 5
         && finalState.timers <= initialResourceState.timers + 2
