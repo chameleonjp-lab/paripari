@@ -18,6 +18,7 @@ const DIRECTION_NAMES = {
 let _playUIVisible = false;
 let _practiceVisible = false;
 let _practiceGuide = null;
+let _attackProgress = null;
 
 function focusScreen(screen) {
   const heading = screen.querySelector('h1, h2, h3, [role="heading"]');
@@ -93,6 +94,7 @@ export function setPlayUIVisible(visible) {
     judge.className = 'judge-pop';
     judge.textContent = '';
   }
+  renderAttackProgress();
   syncPracticeGuide();
 }
 
@@ -100,7 +102,32 @@ export function setPracticeVisible(visible) {
   _practiceVisible = !!visible;
   const homeButton = $('btn-practice-home');
   if (homeButton) homeButton.classList.toggle('hidden', !_practiceVisible);
+  renderAttackProgress();
   syncPracticeGuide();
+}
+
+function renderAttackProgress() {
+  const el = $('attack-progress');
+  if (!el) return;
+  const required = Number(_attackProgress?.required);
+  const remaining = Number(_attackProgress?.remaining);
+  const visible = _playUIVisible && !_practiceVisible
+    && Number.isFinite(required) && required > 1
+    && Number.isFinite(remaining) && remaining > 0;
+  el.classList.toggle('hidden', !visible);
+  if (visible) el.textContent = `${Math.floor(required)}回攻撃　残り${Math.floor(remaining)}回`;
+}
+
+export function updateAttackProgress(progress) {
+  if (!progress) {
+    _attackProgress = null;
+  } else {
+    _attackProgress = {
+      required: Number(progress.required),
+      remaining: Number(progress.remaining),
+    };
+  }
+  renderAttackProgress();
 }
 
 export function setPracticeGuide({ step, total, dir, needDir } = {}) {

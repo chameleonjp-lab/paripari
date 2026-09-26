@@ -743,9 +743,27 @@ async function runInputAndResultFlow(page, label) {
   });
 
   // 3分割の成功も内部オブジェクトだけを準備し、3回のキー入力は実配線を通す。
-  await prepareAttack(page, { needDir: 'R', taps: 3, hp: 3 });
+  // 再開時の3-2-1カウントダウンを挟んでも、残りの試験用区間が期限切れにならないようにする。
+  await prepareAttack(page, { needDir: 'R', taps: 3, hp: 3, gapMs: 1_000 });
+  await page.evaluate(() => globalThis.__testGame
+    ._ui('updateAttackProgress', { required: 3, remaining: 3 }));
+  const progress = page.locator('#attack-progress');
+  assert(await progress.isVisible() && (await progress.textContent()).includes('3回攻撃')
+    && (await progress.textContent()).includes('残り3回'), `${label}: 3連の必要回数表示がありません`);
   const beforeThree = await currentGameStats(page);
-  for (let i = 0; i < 3; i++) await pressFixtureSegment(page, i, label, { clocked: true });
+  await pressFixtureSegment(page, 0, label, { clocked: true });
+  assert((await progress.textContent()).includes('残り2回'), `${label}: 3連1回目の残り表示が不一致です`);
+  await page.locator('#btn-pause').click();
+  await firstVisible(page, ['#screen-pause'], `${label}の3連中ポーズ`);
+  assert(await progress.isHidden(), `${label}: ポーズ中の残り表示を隠せません`);
+  await page.locator('#btn-resume').click();
+  await waitForPlaying(page, { hook: true, label: `${label} 3連再開`, clocked: true });
+  assert(await progress.isVisible() && (await progress.textContent()).includes('残り2回'),
+    `${label}: 再開後に3連の残り表示を復元できません`);
+  await pressFixtureSegment(page, 1, label, { clocked: true });
+  assert((await progress.textContent()).includes('残り1回'), `${label}: 3連2回目の残り表示が不一致です`);
+  await pressFixtureSegment(page, 2, label, { clocked: true });
+  assert(await progress.isHidden(), `${label}: 3連完了後も残り表示が残っています`);
   await page.waitForFunction((previous) => {
     const game = globalThis.__testGame;
     return game && Number(game.successCount) >= Number(previous) + 3;

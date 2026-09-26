@@ -146,6 +146,25 @@ html, body {
 .practice-step { color: var(--gold); font-size: 14px; font-weight: 800; }
 .practice-instruction { margin: 0; font-size: 16px; font-weight: 700; }
 
+.attack-progress {
+  position: absolute;
+  right: 0;
+  bottom: calc(var(--controls-height) - 60px);
+  left: 0;
+  z-index: 18;
+  height: 60px;
+  padding: .15rem .5rem;
+  color: var(--gold);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
 /* ---------- 判定ポップ ---------- */
 .judge-pop {
   position: absolute;
@@ -508,6 +527,7 @@ kbd {
       <div id="practice-step" class="practice-step"></div>
       <p id="practice-instruction" class="practice-instruction"></p>
     </aside>
+    <div id="attack-progress" class="attack-progress hidden" aria-live="polite" aria-atomic="true"></div>
 
     <!-- 判定ポップ -->
     <div id="judge-pop" class="judge-pop"></div>
@@ -702,19 +722,22 @@ kbd {
   var lerp = (a, b, t) => a + (b - a) * t;
   var smooth = (t) => t * t * (3 - 2 * t);
   var clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  var DIFFICULTY_SUCCESS_BOUNDARIES = Object.freeze(
+    [0, 3, 6, 9, 12, 16, 20, 24, 28, 32, 36, 41, 46, 51, 56, 62, 68, 74, 81, 88]
+  );
   function buildTiers() {
     const out = [];
-    for (let n = 0; n < CONFIG.MAX_TIER; n++) {
+    for (let n = 0; n < DIFFICULTY_SUCCESS_BOUNDARIES.length; n++) {
       const speedT = smooth(clamp(n / 9, 0, 1));
       const visibleMs = Math.round(lerp(980, 440, speedT));
       const intervalMs = Math.round(lerp(1080, 540, speedT));
       const speedJitter = +clamp(n / 9 * 0.35, 0, 0.35).toFixed(3);
-      const p2 = clamp((n - 9) * 0.07, 0, 0.5);
-      const p3 = clamp((n - 14) * 0.06, 0, 0.3);
+      const p2 = n < 6 ? 0 : clamp(0.08 + (n - 6) * 0.04, 0, 0.5);
+      const p3 = n < 12 ? 0 : clamp(0.06 + (n - 12) * 0.04, 0, 0.3);
       const p1 = Math.max(0, 1 - p2 - p3);
       const maxTaps = p3 > 0 ? 3 : p2 > 0 ? 2 : 1;
       out.push({
-        successAt: Math.round(5 * n + 0.5 * n * n),
+        successAt: DIFFICULTY_SUCCESS_BOUNDARIES[n],
         visibleMs,
         intervalMs,
         speedJitter,
@@ -1562,6 +1585,7 @@ kbd {
     showBanner: () => showBanner,
     showResult: () => showResult,
     showScreen: () => showScreen,
+    updateAttackProgress: () => updateAttackProgress,
     updateHUD: () => updateHUD
   });
   var $ = (id) => document.getElementById(id);
@@ -1579,6 +1603,7 @@ kbd {
   var _playUIVisible = false;
   var _practiceVisible = false;
   var _practiceGuide = null;
+  var _attackProgress = null;
   function focusScreen(screen2) {
     const heading = screen2.querySelector('h1, h2, h3, [role="heading"]');
     const firstAction = screen2.querySelector(
@@ -1643,13 +1668,35 @@ kbd {
       judge.className = "judge-pop";
       judge.textContent = "";
     }
+    renderAttackProgress();
     syncPracticeGuide();
   }
   function setPracticeVisible(visible) {
     _practiceVisible = !!visible;
     const homeButton = $("btn-practice-home");
     if (homeButton) homeButton.classList.toggle("hidden", !_practiceVisible);
+    renderAttackProgress();
     syncPracticeGuide();
+  }
+  function renderAttackProgress() {
+    const el = $("attack-progress");
+    if (!el) return;
+    const required = Number(_attackProgress?.required);
+    const remaining = Number(_attackProgress?.remaining);
+    const visible = _playUIVisible && !_practiceVisible && Number.isFinite(required) && required > 1 && Number.isFinite(remaining) && remaining > 0;
+    el.classList.toggle("hidden", !visible);
+    if (visible) el.textContent = `${Math.floor(required)}回攻撃　残り${Math.floor(remaining)}回`;
+  }
+  function updateAttackProgress(progress) {
+    if (!progress) {
+      _attackProgress = null;
+    } else {
+      _attackProgress = {
+        required: Number(progress.required),
+        remaining: Number(progress.remaining)
+      };
+    }
+    renderAttackProgress();
   }
   function setPracticeGuide({ step, total, dir, needDir } = {}) {
     const safeTotal = Number.isFinite(Number(total)) && Number(total) > 0 ? Math.floor(Number(total)) : 5;
@@ -1748,7 +1795,7 @@ kbd {
   }
 
   // src/js/storage.js
-  var RULE_VERSION = "r3-practice-20260927";
+  var RULE_VERSION = "r4-difficulty-20260927";
   var KEY_BEST = `paripari.best.${RULE_VERSION}`;
   var KEY_SETTINGS = "paripari.settings";
   var KEY_PLAYER_NAME = "paripari.player-name";
@@ -1980,6 +2027,7 @@ kbd {
       this._callRenderer("clearTransients");
       this._callParticles("clear");
       this.warmupRemaining = this.mode === "practice" ? PRACTICE_GOAL : 0;
+      this._ui("updateAttackProgress", null);
       this.nextSpawnAt = 500;
       if (this.mode === "practice") {
         this._ui("setPracticeGuide", { step: 1, total: PRACTICE_GOAL, dir: "L", needDir: "R" });
@@ -2181,6 +2229,10 @@ kbd {
           needDir: this.attack.needDir
         });
       }
+      this._ui("updateAttackProgress", {
+        required: this.attack.taps,
+        remaining: this.attack.segments.length - this.attack.segIndex
+      });
       this._checkTierUp();
       return this.attack;
     }
@@ -2190,7 +2242,7 @@ kbd {
       const idx = CONFIG.TIERS.indexOf(tier);
       if (this._tierIndex >= 0 && idx > this._tierIndex) {
         if (tier.maxTaps > this._maxTaps && tier.maxTaps >= 2) {
-          this._ui("showBanner", `${tier.maxTaps}連 受け流し！`, "同じ向きに連続タップ", 1500);
+          this._ui("showBanner", `${tier.maxTaps}回攻撃に備える`, "同じ方向を順番に押す", 1500);
         } else {
           this._ui("showBanner", "難しさアップ", null, 900);
         }
@@ -2297,6 +2349,10 @@ kbd {
         return true;
       }
       a.segIndex++;
+      this._ui("updateAttackProgress", {
+        required: a.taps,
+        remaining: a.resolved ? 0 : a.segments.length - a.segIndex
+      });
       if (a.segIndex >= a.segments.length) this._onAttackResolved(a);
       return true;
     }
@@ -2310,6 +2366,7 @@ kbd {
       const intervalMs = this.inWarmup() ? CONFIG.WARMUP.intervalMs : this._tier().intervalMs;
       const interval = nextInterval(intervalMs, this.random);
       a.intervalMs = interval;
+      this._ui("updateAttackProgress", null);
       this.nextSpawnAt = a.lastImpactAt + CONFIG.GOOD_WINDOW + interval;
       if (this.mode === "practice" && this.warmupRemaining <= 0) {
         this._finishPractice();

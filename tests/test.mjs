@@ -60,9 +60,11 @@ eq(T[0].speedJitter, 0, '最初のティアは速度ランダム性なし');
 eq(T[0].maxTaps, 1, '序盤は単発(1タップ)');
 eq(T.some((t) => t.maxTaps === 2), true, '途中で2連が登場');
 eq(T.some((t) => t.maxTaps === 3), true, '終盤で3連が登場');
-// 速度ランダム性が出揃った後にマルチタップが始まる
+// 速度を詰めながら、計画で定めた段階7から2連を混ぜ始める
 const firstMulti = T.findIndex((t) => t.maxTaps >= 2);
-eq(T[firstMulti].speedJitter >= 0.34, true, 'マルチタップ開始時には速度ランダム性が最大付近');
+eq(T[firstMulti].successAt, 20, '2連は成功20の段階7から始まる');
+eq(T[firstMulti].speedJitter < 0.34, true, '2連開始時は速度を詰める途中');
+eq(T[9].speedJitter, 0.35, '速度ランダム性は段階10で上限');
 // tapWeights は確率分布（合計≈1, 非負）
 let distOk = true;
 for (const t of T) {

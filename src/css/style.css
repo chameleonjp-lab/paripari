@@ -136,6 +136,25 @@ html, body {
 .practice-step { color: var(--gold); font-size: 14px; font-weight: 800; }
 .practice-instruction { margin: 0; font-size: 16px; font-weight: 700; }
 
+.attack-progress {
+  position: absolute;
+  right: 0;
+  bottom: calc(var(--controls-height) - 60px);
+  left: 0;
+  z-index: 18;
+  height: 60px;
+  padding: .15rem .5rem;
+  color: var(--gold);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
 /* ---------- 判定ポップ ---------- */
 .judge-pop {
   position: absolute;

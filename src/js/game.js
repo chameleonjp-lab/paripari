@@ -108,6 +108,7 @@ export class Game {
     this._callRenderer('clearTransients');
     this._callParticles('clear');
     this.warmupRemaining = this.mode === 'practice' ? PRACTICE_GOAL : 0;
+    this._ui('updateAttackProgress', null);
     // 出現予定時刻はここから固定され、攻撃の早期解決で前倒ししない。
     this.nextSpawnAt = 500;
     if (this.mode === 'practice') {
@@ -377,6 +378,10 @@ export class Game {
         needDir: this.attack.needDir,
       });
     }
+    this._ui('updateAttackProgress', {
+      required: this.attack.taps,
+      remaining: this.attack.segments.length - this.attack.segIndex,
+    });
     this._checkTierUp();
     return this.attack;
   }
@@ -387,7 +392,7 @@ export class Game {
     const idx = CONFIG.TIERS.indexOf(tier);
     if (this._tierIndex >= 0 && idx > this._tierIndex) {
       if (tier.maxTaps > this._maxTaps && tier.maxTaps >= 2) {
-        this._ui('showBanner', `${tier.maxTaps}連 受け流し！`, '同じ向きに連続タップ', 1500);
+        this._ui('showBanner', `${tier.maxTaps}回攻撃に備える`, '同じ方向を順番に押す', 1500);
       } else {
         this._ui('showBanner', '難しさアップ', null, 900);
       }
@@ -508,6 +513,10 @@ export class Game {
     }
 
     a.segIndex++;
+    this._ui('updateAttackProgress', {
+      required: a.taps,
+      remaining: a.resolved ? 0 : a.segments.length - a.segIndex,
+    });
     if (a.segIndex >= a.segments.length) this._onAttackResolved(a);
     return true;
   }
@@ -526,6 +535,7 @@ export class Game {
       : this._tier().intervalMs;
     const interval = nextInterval(intervalMs, this.random);
     a.intervalMs = interval;
+    this._ui('updateAttackProgress', null);
     // The schedule is anchored to the planned final impact, never resolution or
     // presentation time. This remains stable under early input and hit effects.
     this.nextSpawnAt = a.lastImpactAt + CONFIG.GOOD_WINDOW + interval;
