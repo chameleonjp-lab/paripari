@@ -298,7 +298,7 @@ function addStorageAndShareBlock(context) {
   });
 }
 
-async function newContext(browser, { mobile = false, short = false, blocked = false } = {}) {
+async function newContext(browser, { mobile = false, short = false, blocked = false, clocked = false } = {}) {
   const context = await browser.newContext({
     viewport: mobile
       ? { width: 375, height: short ? 500 : 667 }
@@ -310,14 +310,14 @@ async function newContext(browser, { mobile = false, short = false, blocked = fa
       ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
       : undefined,
   });
+  if (clocked) {
+    // 診断用rAFを含め、ページ側で時刻APIを使う前に導入する。
+    await context.clock.install();
+    await context.addInitScript(() => { globalThis.__browserClockMode = 'controlled'; });
+  }
   await installFrameDiagnostics(context);
   if (blocked) addStorageAndShareBlock(context);
   return context;
-}
-
-async function installControlledClock(page) {
-  await page.clock.install();
-  await page.addInitScript(() => { globalThis.__browserClockMode = 'controlled'; });
 }
 
 function observe(page, origin) {
@@ -891,13 +891,15 @@ async function runLongGapRegression(page, label) {
   assert(countdownStart.state === 'RESUME_COUNTDOWN' && countdownStart.screenVisible
     && countdownStart.text === '3',
   `${label}: 明示resume後の3カウントが始まりません ${JSON.stringify(countdownStart)}`);
-  await page.clock.runFor(710);
+  // 700ms境界の直後では最後のrAFがまだ境界前のことがあるため、
+  // 各表示区間の内側を読む。厳密な境界はSessionの単体検査で確認する。
+  await page.clock.runFor(1_000);
   const countdownTwo = await page.locator('#countdown').innerText();
   assert(countdownTwo.trim() === '2', `${label}: resume countdown 2を確認できません: ${countdownTwo}`);
-  await page.clock.runFor(710);
+  await page.clock.runFor(700);
   const countdownOne = await page.locator('#countdown').innerText();
   assert(countdownOne.trim() === '1', `${label}: resume countdown 1を確認できません: ${countdownOne}`);
-  await page.clock.runFor(710);
+  await page.clock.runFor(700);
   const resumed = await page.evaluate(() => ({
     sessionState: globalThis.__testSession?.state,
     gameState: globalThis.__testGame?.state,
@@ -1096,10 +1098,9 @@ async function runOrientationTouchRegression(browser, browserName, origin) {
 }
 
 async function runHookFlow(browser, browserName, origin, variant) {
-  const context = await newContext(browser);
+  const context = await newContext(browser, { clocked: true });
   try {
     const page = await context.newPage();
-    await installControlledClock(page);
     const observation = observe(page, origin);
     const label = `${browserName}-${variant}-hook`;
     try {
@@ -1537,14 +1538,13 @@ async function runFileFlow(browser, browserName) {
 }
 
 async function runPracticeBlankNameRegression(browser, browserName, origin) {
-  const context = await newContext(browser);
+  const context = await newContext(browser, { clocked: true });
   // 旧保存名が残る状態から、ホーム上の表示名を空に戻す経路を再現する。
   await context.addInitScript(() => {
     try { localStorage.setItem('paripari.player-name', '旧保存名'); } catch (_) { /* 検査対象外 */ }
   });
   try {
     const page = await context.newPage();
-    await installControlledClock(page);
     const observation = observe(page, origin);
     const label = `${browserName}-practice-empty-name`;
     try {
