@@ -63,7 +63,7 @@ session = new SessionController({
         ui.hideBanner();
         ui.setPlayUIVisible(false);
         ui.setBestLabel(storage.getBest());
-        playerName = storage.getPlayerName() || playerName;
+        playerName = storage.getPlayerName();
         $('player-name').value = playerName;
         $('name-error').textContent = '';
         renderHomeShare();
@@ -89,10 +89,17 @@ session = new SessionController({
       case SESSION_STATES.PLAYING:
       case SESSION_STATES.PRACTICE:
         ui.hideAllScreens();
+        ui.setPracticeVisible(state === SESSION_STATES.PRACTICE);
         ui.setPlayUIVisible(true);
+        break;
+      case SESSION_STATES.PRACTICE_COMPLETE:
+        ui.hideBanner();
+        ui.setPlayUIVisible(false);
+        ui.showScreen('practice-complete');
         break;
       case SESSION_STATES.PAUSED:
         ui.setPlayUIVisible(false);
+        $('btn-pause-retry').classList.toggle('hidden', context.mode === 'practice');
         ui.showScreen('pause');
         break;
       case SESSION_STATES.RESULT:
@@ -112,6 +119,7 @@ session = new SessionController({
     ui.setBestLabel(data.best);
     renderResultShare(data);
   },
+  onPracticeComplete: () => storage.setTutorialCompleted(),
 });
 lockGestures({
   targets: [canvas, $('controls')],
@@ -132,7 +140,7 @@ function shareTextForResult(data) {
   const url = officialGameUrl();
   return [
     `${playerName || 'プレイヤー'}さんのパリパリ結果：${data.score.toLocaleString()}点、ランク${data.rank}！`,
-    `最大コンボ${data.maxCombo}・PERFECT率${data.perfectRate}%・到達ティア${data.tier}`,
+    `最大連続成功${data.maxCombo}・成功のうち、ぴったりの割合${data.perfectRate}%・到達した難しさ${data.tier}`,
     url || '（正式な公開URLは準備中です）',
     '#パリパリ #ミニゲーム',
   ].join('\n');
@@ -172,7 +180,9 @@ function gotoTitle() {
 
 function beginNormalGame() {
   if (!readPlayerName()) return;
-  session.start('normal', performance.now());
+  $('player-name').blur();
+  if (storage.getTutorialCompleted()) session.start('normal', performance.now());
+  else session.start('practice', performance.now(), { tutorial: true });
 }
 
 function beginRetryGame() {
@@ -194,6 +204,9 @@ $('btn-play').addEventListener('click', beginNormalGame);
 $('btn-howto').addEventListener('click', () => session.navigate(SESSION_STATES.HOWTO));
 $('btn-howto-back').addEventListener('click', () => session.navigate(SESSION_STATES.HOME));
 $('btn-howto-try').addEventListener('click', beginPractice);
+$('btn-practice-again').addEventListener('click', beginPractice);
+$('btn-practice-done-home').addEventListener('click', gotoTitle);
+$('btn-practice-home').addEventListener('click', gotoTitle);
 let nameComposing = false;
 $('player-name').addEventListener('input', () => { $('name-error').textContent = ''; });
 $('player-name').addEventListener('compositionstart', () => { nameComposing = true; });
@@ -260,6 +273,10 @@ window.addEventListener('pagehide', () => {
 
 // ---------- リサイズ / 回転 ----------
 function handleResize() {
+  const viewport = window.visualViewport;
+  if (viewport && viewport.scale === 1) {
+    document.documentElement.style.setProperty('--visible-height', `${viewport.height}px`);
+  }
   renderer.resize();
   checkOrientation();
 }
