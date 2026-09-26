@@ -24,7 +24,7 @@ R6では、公開設定を変更せずに、公開前に確認できるものを
 - `npm run build:check`：成功。分割ソースと配布HTMLの一致を確認
 - `LICENSE`：MIT本文を確認。`package.json` のライセンス指定と一致
 - マージ後main Quality #22：Chromium、WebKit、verifyが全件成功
-- R6 Draft PR #12 Quality #23：Chromium、WebKit、verifyが全件成功
+- R6 Draft PR #12の最終head Quality #24：Chromium、WebKit、verifyが全件成功
 - Sol High相当の独立レビュー：承認、必須修正なし
 
 この自動検査は、iPhone Safariの実機操作、正式URL、公開元、プレビュー画像の確認を代替しません。

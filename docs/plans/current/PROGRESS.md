@@ -19,7 +19,7 @@ R2のPR #7と、そのマージ後に失敗したブラウザ検査を修正す�
 | R3 一巡する画面 | PR #9マージ済み、マージ後Quality成功 | R4へ引き継ぐ |
 | R4 難易度と説明 | PR #10マージ済み、Quality成功 | R5へ引き継ぐ |
 | R5 公開候補の検証 | [PR #11](https://github.com/chameleonjp-lab/paripari/pull/11)マージ済み、Quality #21でChromium/WebKit/verify成功、独立レビュー承認 | R6へ引き継ぐ |
-| R6 公開準備 | 公開前の文書・ライセンス・保留条件を整理中 | 実機確認・正式URL・公開予定パス・プレビューを確認する。実公開は別の指示後 |
+| R6 公開準備 | [PR #12](https://github.com/chameleonjp-lab/paripari/pull/12) Draft、Quality #24でChromium/WebKit/verify成功、独立レビュー承認 | 実機確認・正式URL・公開予定パス・プレビューを確認する。実公開は別の指示後 |
 
 ## 次の工程
 
