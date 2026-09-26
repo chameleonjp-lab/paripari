@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0a0a12">
   <title>パリパリ - PariPari</title>
@@ -24,9 +24,16 @@
         <div id="combo" class="combo"></div>
       </div>
       <div class="hud-right">
+        <button id="btn-practice-home" class="icon-btn hidden" aria-label="練習を終えてホームへ" title="練習を終えてホームへ">⌂</button>
         <button id="btn-pause" class="icon-btn" aria-label="ポーズ">⏸</button>
       </div>
     </header>
+
+    <!-- 練習中の方向案内。HUDとは独立させ、ポーズ中は内容を保ったまま隠す。 -->
+    <aside id="practice-guide" class="practice-guide hidden" aria-label="練習ガイド" aria-live="polite" aria-atomic="true">
+      <div id="practice-step" class="practice-step"></div>
+      <p id="practice-instruction" class="practice-instruction"></p>
+    </aside>
 
     <!-- 判定ポップ -->
     <div id="judge-pop" class="judge-pop"></div>
@@ -49,9 +56,9 @@
     <!-- タイトル -->
     <section id="screen-title" class="screen">
       <div class="title-wrap">
-        <h1 class="logo">パリパリ</h1>
+        <h1 class="logo" tabindex="-1">パリパリ</h1>
         <p class="tagline">来た方向と<b>反対</b>を、ちょうどで弾け。</p>
-        <div class="best">BEST <span id="title-best">0</span></div>
+        <div class="best">自己ベスト <span id="title-best">0</span></div>
         <label class="name-label" for="player-name">表示名（1〜20文字）</label>
         <input id="player-name" class="name-input" type="text"
           autocomplete="nickname" autocapitalize="none" spellcheck="false"
@@ -70,18 +77,21 @@
     <!-- 遊び方 -->
     <section id="screen-howto" class="screen hidden">
       <div class="panel">
-        <h2>遊び方</h2>
+        <h2 tabindex="-1">遊び方</h2>
         <ol class="howto-list">
-          <li>攻撃は上半分の<b>5方向</b>（左・右・上・左斜め上・右斜め上）から来ます。</li>
-          <li>線に届く<b>ちょうど</b>その瞬間に、来た方向と<b>反対</b>を1回タップ！</li>
-          <li>下部の5ボタンが受け流す向き：<br>左→<b>右</b> / 右→<b>左</b> / 上→<b>下</b> / 左斜め上→<b>右下</b> / 右斜め上→<b>左下</b></li>
-          <li>早すぎ・遅すぎ・逆方向は失敗。3回ミスで終了。</li>
-          <li>開始時はノーダメージの<b>ウォームアップ</b>で慣らせます。</li>
+          <li>攻撃は左・右・上・左上・右上の<b>5方向</b>から来ます。線に届く瞬間に、来た方向と反対のボタンを押します。</li>
+          <li>対応は、左→<b>右</b>／右→<b>左</b>／上→<b>下</b>／左上→<b>右下</b>／右上→<b>左下</b>です。</li>
+          <li>初回は5方向を1回ずつ成功させる案内付き練習から始まります。練習中はライフが減らず、失敗した方向を成功するまで繰り返します。遊び方から何度でも練習できます。</li>
+          <li>1回の攻撃は1〜3回押すことがあります。失敗しても、ライフが減るのは1回の攻撃につき最大1つです。</li>
+          <li>本番のライフは3つ。なくなると終了です。</li>
+          <li>誤差60ミリ秒以内は<b>ぴったり</b>、140ミリ秒以内は<b>成功</b>。それより早い・遅い入力や逆方向は失敗です。</li>
+          <li>ぴったり成功を10回連続するとライフが1つ回復します（最大3つ）。</li>
+          <li class="howto-keys">PCキー：左 <kbd>←</kbd>/<kbd>A</kbd>、右 <kbd>→</kbd>/<kbd>D</kbd>、下 <kbd>↓</kbd>/<kbd>S</kbd>、左下 <kbd>Q</kbd>/<kbd>Z</kbd>、右下 <kbd>E</kbd>/<kbd>C</kbd></li>
         </ol>
         <p class="howto-judge">
-          <span class="tag perfect">PERFECT</span> ど真ん中
-          <span class="tag good">GOOD</span> セーフ
-          <span class="tag miss">MISS</span> 失敗
+          <span class="tag perfect">ぴったり</span> 誤差60ミリ秒以内
+          <span class="tag good">成功</span> 誤差140ミリ秒以内
+          <span class="tag miss">失敗</span> 早い・遅い・逆方向
         </p>
         <button id="btn-howto-try" class="btn btn-primary">練習してみる</button>
         <button id="btn-howto-back" class="btn">もどる</button>
@@ -91,7 +101,7 @@
     <!-- 設定 -->
     <section id="screen-settings" class="screen hidden">
       <div class="panel">
-        <h2>設定</h2>
+        <h2 tabindex="-1">設定</h2>
         <label class="toggle"><span>振動（対応端末のみ）</span><input type="checkbox" id="set-vibrate"></label>
         <label class="toggle"><span>モーション低減</span><input type="checkbox" id="set-motion"></label>
         <button id="btn-settings-back" class="btn btn-primary">もどる</button>
@@ -100,14 +110,14 @@
 
     <!-- カウントダウン -->
     <section id="screen-ready" class="screen hidden">
-      <div id="countdown" class="countdown">3</div>
+      <div id="countdown" class="countdown" role="heading" aria-level="1" tabindex="-1">3</div>
       <p class="ready-hint">来た方向と<b>反対</b>を押す！</p>
     </section>
 
     <!-- ポーズ -->
     <section id="screen-pause" class="screen hidden">
       <div class="panel">
-        <h2>ポーズ</h2>
+        <h2 tabindex="-1">ポーズ</h2>
         <button id="btn-resume" class="btn btn-primary">再開</button>
         <button id="btn-pause-retry" class="btn">リトライ</button>
         <button id="btn-pause-home" class="btn">ホーム</button>
@@ -118,21 +128,34 @@
     <section id="screen-result" class="screen hidden">
       <div class="panel result-panel">
         <div id="result-rank" class="result-rank">A</div>
-        <div class="result-score-label">SCORE</div>
+        <div class="result-score-label">スコア</div>
         <div id="result-score" class="result-score">0</div>
         <div id="result-best-badge" class="best-badge hidden">★ ベスト更新！</div>
+        <div class="result-actions">
+          <button id="btn-retry" class="btn btn-primary">もう一回</button>
+          <button id="btn-result-home" class="btn">ホーム</button>
+        </div>
         <div class="result-stats">
           <div><span id="result-combo">0</span><small>最大コンボ</small></div>
-          <div><span id="result-perfect">0%</span><small>PERFECT率</small></div>
-          <div><span id="result-tier">1</span><small>到達ティア</small></div>
+          <div><span id="result-perfect">0%</span><small>成功のうち、ぴったりの割合</small></div>
+          <div><span id="result-tier">1</span><small>到達段階</small></div>
+          <div><span id="result-best">0</span><small>自己ベスト</small></div>
         </div>
-        <button id="btn-retry" class="btn btn-primary">もう一回</button>
-        <button id="btn-result-home" class="btn">ホーム</button>
         <p id="result-player" class="platform-status"></p>
         <textarea id="result-share-text" class="share-preview" readonly aria-label="結果のシェア文"></textarea>
         <button id="btn-result-share" class="btn">結果をシェア</button>
         <p id="result-share-status" class="platform-status" role="status" aria-live="polite"></p>
         <a class="platform-link" href="https://chameleonjp-lab.github.io/chameleonjp_lab/" target="_blank" rel="noopener noreferrer">カメレオンJPの実験場へ</a>
+      </div>
+    </section>
+
+    <!-- 任意練習の終了後は、ユーザーが選ぶまでこの画面に留まる。 -->
+    <section id="screen-practice-complete" class="screen hidden">
+      <div class="panel practice-complete-panel">
+        <h2 tabindex="-1">練習おつかれさま！</h2>
+        <p>5方向の練習が終わりました。次に進む操作を選んでください。</p>
+        <button id="btn-practice-again" class="btn btn-primary">もう一度練習</button>
+        <button id="btn-practice-done-home" class="btn">ホームへ</button>
       </div>
     </section>
 

@@ -43,6 +43,9 @@ export async function shareOrCopy({ text, title, statusElement, textElement, url
   } catch {
     // 結果画面/ホームに現在見えている欄だけを選択し、隠し要素へ移動しない。
     if (textElement && typeof textElement.focus === 'function') {
+      // A share/clipboard promise can finish after the user changes screens.
+      if (textElement.isConnected === false || (typeof textElement.getClientRects === 'function'
+          && textElement.getClientRects().length === 0)) return 'unavailable';
       textElement.value = shareText;
       textElement.focus({ preventScroll: true });
       textElement.select();

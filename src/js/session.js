@@ -12,6 +12,7 @@ export const SESSION_STATES = Object.freeze({
   COUNTDOWN: 'COUNTDOWN',
   PLAYING: 'PLAYING',
   PRACTICE: 'PRACTICE',
+  PRACTICE_COMPLETE: 'PRACTICE_COMPLETE',
   PAUSED: 'PAUSED',
   RESUME_COUNTDOWN: 'RESUME_COUNTDOWN',
   RESULT: 'RESULT',
@@ -58,6 +59,7 @@ export class SessionController {
     onStart = noop,
     onPause = noop,
     onResult = noop,
+    onPracticeComplete = noop,
     onInvalidate = noop,
     countdownStepMs = COUNTDOWN_STEP_MS,
     stallThresholdMs = STALL_THRESHOLD_MS,
@@ -74,6 +76,8 @@ export class SessionController {
     this.onStart = onStart;
     this.onPause = onPause;
     this.onResult = onResult;
+    this.onPracticeComplete = onPracticeComplete;
+    this.practiceToNormal = false;
     this.onInvalidate = onInvalidate;
     this.countdownStepMs = countdownStepMs;
     this.stallThresholdMs = stallThresholdMs;
@@ -228,26 +232,28 @@ export class SessionController {
   }
 
   /** Begin a normal match at a 3-2-1 countdown. */
-  start(mode = 'normal', wall = this.wallNow()) {
+  start(mode = 'normal', wall = this.wallNow(), { tutorial = false } = {}) {
     if (!finiteWall(wall)) return false;
     if (mode !== 'normal' && mode !== 'practice') mode = 'normal';
     const allowed = mode === 'practice'
-      ? this.state === SESSION_STATES.HOWTO
-      : [SESSION_STATES.HOME, SESSION_STATES.RESULT, SESSION_STATES.PAUSED].includes(this.state);
+      ? (tutorial ? this.state === SESSION_STATES.HOME
+        : [SESSION_STATES.HOWTO, SESSION_STATES.PRACTICE_COMPLETE].includes(this.state))
+      : [SESSION_STATES.HOME, SESSION_STATES.RESULT, SESSION_STATES.PAUSED].includes(this.state)
+        && !(this.state === SESSION_STATES.PAUSED && this.mode === 'practice');
     if (!allowed || !this.environmentReady()) return false;
     this._invalidate('start');
     this._stopGame();
     this.matchId += 1;
     this.roundId = null;
     this.mode = mode;
+    this.practiceToNormal = mode === 'practice' && tutorial;
     this.result = null;
     this.pauseReason = null;
     this.resumeState = null;
     this.resumeGameStarted = mode === 'practice';
     this.lastPresentedWall = wall;
     if (mode === 'practice') {
-      // Optional practice starts immediately from HOWTO. It is still on the
-      // same rAF/game clock and receives the same pause/stall handling.
+      // Both guided first use and optional practice use the common game clock.
       this._countdown = { mode, resume: false, generation: this._generation, startedAt: wall, shown: 0 };
       return this._activate(mode, wall, false, this._generation);
     }
@@ -269,6 +275,7 @@ export class SessionController {
     this._pauseClock(wall);
     this._stopGame();
     this.mode = null;
+    this.practiceToNormal = false;
     this.roundId = null;
     this.result = null;
     this.pauseReason = null;
@@ -397,6 +404,7 @@ export class SessionController {
   finish(data, roundId = this.roundId) {
     if (!(this.state === SESSION_STATES.PLAYING || this.state === SESSION_STATES.PRACTICE)) return false;
     if (roundId != null && this.roundId != null && roundId !== this.roundId) return false;
+    if (!!data?.practiceDone !== (this.state === SESSION_STATES.PRACTICE)) return false;
     this._generation += 1;
     this._countdown = null;
     this._pauseClock(this.wallNow());
@@ -404,8 +412,22 @@ export class SessionController {
     this._clearPressed();
     this.result = data;
     if (data && data.practiceDone) {
-      // 任意練習は本番や結果へ暗黙に進めず、遊び方へ戻す。
-      this._emitState(SESSION_STATES.HOWTO, { practiceDone: true });
+      this.onPracticeComplete();
+      this._stopGame();
+      if (this.practiceToNormal) {
+        // No second warmup: the new normal round starts only after 3-2-1.
+        this.practiceToNormal = false;
+        this.matchId += 1;
+        this.roundId = null;
+        this.result = null;
+        this.mode = 'normal';
+        this.resumeGameStarted = false;
+        const wall = this.wallNow();
+        this._beginCountdown('normal', wall, false);
+        if (!this.environmentReady()) this.pause('environment', { wall });
+      } else {
+        this._emitState(SESSION_STATES.PRACTICE_COMPLETE, { practiceDone: true });
+      }
       return true;
     }
     this._emitState(SESSION_STATES.RESULT, { result: data });

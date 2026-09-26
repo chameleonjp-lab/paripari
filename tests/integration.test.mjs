@@ -23,7 +23,8 @@ test('D01: 日本語・合成絵文字の20文字境界、空白・制御文字�
   assert.equal(storage.normalizePlayerName('🇯🇵'.repeat(21)), '🇯🇵'.repeat(20));
 });
 
-test('D02/D03: 旧得点を混ぜず、旧キーと名前を残す', (t) => {
+test('D02/D03: 旧得点を混ぜず、旧キーと名前を残す', async (t) => {
+  const storage = await import('../src/js/storage.js?integration=legacy');
   const values = savedValues(t, { 'paripari.best': '999999', 'paripari.player-name': '以前の名前' });
   assert.equal(storage.getBest(), 0);
   assert.equal(storage.getPlayerName(), '以前の名前');
@@ -32,18 +33,22 @@ test('D02/D03: 旧得点を混ぜず、旧キーと名前を残す', (t) => {
   assert.equal(values.get('paripari.best'), '999999');
   for (const bad of ['broken', '-1', 'null', 'true', '"900"', JSON.stringify({ version: storage.RULE_VERSION, score: '900' })]) {
     values.set(bestKey, bad);
-    assert.equal(storage.getBest(), 0, bad);
+    const fresh = await import(`../src/js/storage.js?corrupt=${encodeURIComponent(bad)}`);
+    assert.equal(fresh.getBest(), 0, bad);
+    assert.equal(storage.getBest(), 350, 'same launch retains its known best');
   }
 });
 
-test('D04: 後から低い点を保存しても同じ版の自己ベストが下がらない', (t) => {
+test('D04: 後から低い点を保存しても同じ版の自己ベストが下がらない', async (t) => {
+  const storage = await import('../src/js/storage.js?integration=max');
   savedValues(t);
   storage.setBest(1000);
   storage.setBest(100);
   assert.equal(storage.getBest(), 1000);
 });
 
-test('D03/R2: 時計の旧ルールであるR1の自己ベストを混ぜず保持する', (t) => {
+test('D03/R2: 時計の旧ルールであるR1の自己ベストを混ぜず保持する', async (t) => {
+  const storage = await import('../src/js/storage.js?integration=r1');
   const oldVersion = 'r1-5dir-20260922';
   const oldKey = `paripari.best.${oldVersion}`;
   const oldValue = JSON.stringify({ version: oldVersion, score: 18000 });
@@ -55,7 +60,8 @@ test('D03/R2: 時計の旧ルールであるR1の自己ベストを混ぜず保�
   assert.equal(values.get(oldKey), oldValue);
 });
 
-test('D02: 保存の読み書きが例外でも名前・設定・得点処理が止まらない', (t) => {
+test('D02: 保存の読み書きが例外でも名前・設定・得点処理が止まらない', async (t) => {
+  const storage = await import('../src/js/storage.js?integration=blocked');
   savedValues(t);
   t.mock.method(localStorage, 'getItem', () => { throw new Error('storage blocked'); });
   t.mock.method(localStorage, 'setItem', () => { throw new Error('storage blocked'); });
@@ -98,4 +104,17 @@ test('H02: 共有がないとコピー、コピー不可なら呼び出し元の
   assert.equal(await shareOrCopy({ text: 'ホームの文', textElement: field }), 'selected');
   assert.equal(field.value, 'ホームの文');
   assert.deepEqual(selected, ['focus', 'select']);
+});
+
+test('H02/U07: コピー処理を待つ間に画面が変わっても非表示の欄へフォーカスしない', async (t) => {
+  let rejectCopy;
+  navigatorFor(t, { clipboard: { writeText: () => new Promise((_, reject) => { rejectCopy = reject; }) } });
+  let visible = true;
+  const field = { getClientRects: () => visible ? [{}] : [],
+    focus: () => assert.fail('hidden share field must not take focus'),
+    select: () => assert.fail('hidden share field must not be selected') };
+  const pending = shareOrCopy({ text: '前の画面', textElement: field });
+  visible = false;
+  rejectCopy(new Error('denied'));
+  assert.equal(await pending, 'unavailable');
 });

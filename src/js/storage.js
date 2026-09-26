@@ -1,25 +1,43 @@
-// localStorage ラッパ（ベストスコア・設定・表示名） 要件 §3.2 §4.6
-// ルールが変わった版の点数は旧版と混ぜない。旧キーは削除せず残す。
-export const RULE_VERSION = 'r2-time-20260922';
+// localStorage wrapper (best score, settings, player name, tutorial completion).
+// Keep old score keys intact; rule-versioned keys prevent scores from mixing.
+export const RULE_VERSION = 'r3-practice-20260927';
 const KEY_BEST = `paripari.best.${RULE_VERSION}`;
 const KEY_SETTINGS = 'paripari.settings';
 const KEY_PLAYER_NAME = 'paripari.player-name';
+const KEY_TUTORIAL_COMPLETED = 'paripari.tutorial.v1';
 
-const DEFAULT_SETTINGS = {
+const DEFAULT_SETTINGS = Object.freeze({
   vibrate: true,
   reducedMotion: false,
-};
+});
+
+// Caches belong to this application launch, including failed writes.
+let cachedBest = 0;
+let cachedPlayerName = null;
+let cachedSettings = null;
+let cachedTutorialCompleted = null;
+let nameWriteFailed = false;
+let settingsWriteFailed = false;
 
 function safeGet(key) {
-  try { return localStorage.getItem(key); } catch { return null; }
+  try {
+    return { ok: true, value: globalThis.localStorage.getItem(key) };
+  } catch {
+    return { ok: false, value: null };
+  }
 }
-function safeSet(key, val) {
-  try { localStorage.setItem(key, val); } catch { /* ignore */ }
+
+function safeSet(key, value) {
+  try {
+    globalThis.localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function normalizePlayerName(value) {
-  // 制御文字を除き、前後の空白を取り、書記素単位で上限を適用する。
-  // Intl.Segmenter がない環境ではコードポイント単位にフォールバックする。
+  // Remove control characters, trim whitespace, and cap by grapheme where available.
   const cleaned = String(value ?? '')
     .replace(/[\u0000-\u001f\u007f-\u009f]/g, '')
     .trim();
@@ -29,64 +47,127 @@ export function normalizePlayerName(value) {
       return Array.from(segmenter.segment(cleaned), ({ segment }) => segment).slice(0, 20).join('');
     }
   } catch {
-    // 古いブラウザや不正なIntl実装では下のフォールバックを使う。
+    // Fall back for older browsers or an incomplete Intl implementation.
   }
   return Array.from(cleaned).slice(0, 20).join('');
 }
 
 function parseBest(raw) {
-  if (!raw) return 0;
+  if (raw === null) return null;
   try {
     const parsed = JSON.parse(raw);
-    if (typeof parsed === 'number') return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
-    if (parsed && parsed.version === RULE_VERSION && typeof parsed.score === 'number') {
-      return Number.isFinite(parsed.score) ? Math.max(0, Math.floor(parsed.score)) : 0;
+    if (typeof parsed === 'number' && Number.isFinite(parsed)) {
+      return Math.max(0, Math.floor(parsed));
+    }
+    if (parsed && parsed.version === RULE_VERSION &&
+        typeof parsed.score === 'number' && Number.isFinite(parsed.score)) {
+      return Math.max(0, Math.floor(parsed.score));
     }
   } catch {
-    // 不正な保存値は無視し、起動を継続する。
+    // Corrupt values do not interrupt the game; the in-memory maximum survives.
   }
-  return 0;
+  return null;
 }
 
 export function getBest() {
-  return parseBest(safeGet(KEY_BEST));
+  const read = safeGet(KEY_BEST);
+  if (!read.ok) return cachedBest;
+  const persisted = parseBest(read.value);
+  if (persisted !== null) cachedBest = Math.max(cachedBest, persisted);
+  return cachedBest;
 }
+
 export function setBest(n) {
   const score = Number(n);
   if (!Number.isFinite(score)) return getBest();
-  const best = Math.max(getBest(), Math.floor(score), 0);
+
+  // Read immediately before writing so a stale tab cannot replace a persisted
+  // higher score. The cache also protects a high score if storage is unavailable.
+  const read = safeGet(KEY_BEST);
+  const persisted = read.ok ? parseBest(read.value) : null;
+  const best = Math.max(cachedBest, persisted ?? 0, Math.floor(score), 0);
+  cachedBest = best;
   safeSet(KEY_BEST, JSON.stringify({ version: RULE_VERSION, score: best }));
   return best;
 }
 
 export function getPlayerName() {
-  return normalizePlayerName(safeGet(KEY_PLAYER_NAME));
+  if (nameWriteFailed) return cachedPlayerName ?? '';
+  const read = safeGet(KEY_PLAYER_NAME);
+  if (!read.ok || read.value === null) return cachedPlayerName ?? '';
+  cachedPlayerName = normalizePlayerName(read.value);
+  return cachedPlayerName;
 }
 
 export function setPlayerName(value) {
   const name = normalizePlayerName(value);
-  safeSet(KEY_PLAYER_NAME, name);
+  cachedPlayerName = name;
+  nameWriteFailed = !safeSet(KEY_PLAYER_NAME, name);
   return name;
 }
 
-export function getSettings() {
+function copySettings(settings) {
+  return { vibrate: settings.vibrate, reducedMotion: settings.reducedMotion };
+}
+
+function normalizeSettings(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return {
+    vibrate: typeof source.vibrate === 'boolean' ? source.vibrate : DEFAULT_SETTINGS.vibrate,
+    reducedMotion: typeof source.reducedMotion === 'boolean'
+      ? source.reducedMotion : DEFAULT_SETTINGS.reducedMotion,
+  };
+}
+
+function preferredDefaults() {
+  let reducedMotion = DEFAULT_SETTINGS.reducedMotion;
   try {
-    const raw = safeGet(KEY_SETTINGS);
-    if (!raw) {
-      const prefersReduced = window.matchMedia &&
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      return { ...DEFAULT_SETTINGS, reducedMotion: !!prefersReduced };
-    }
-    const parsed = JSON.parse(raw);
-    return {
-      vibrate: typeof parsed?.vibrate === 'boolean' ? parsed.vibrate : DEFAULT_SETTINGS.vibrate,
-      reducedMotion: typeof parsed?.reducedMotion === 'boolean'
-        ? parsed.reducedMotion : DEFAULT_SETTINGS.reducedMotion,
-    };
+    reducedMotion = !!globalThis.window?.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   } catch {
-    return { ...DEFAULT_SETTINGS };
+    // Use the static default when matchMedia is unavailable or throws.
+  }
+  return { ...DEFAULT_SETTINGS, reducedMotion };
+}
+
+export function getSettings() {
+  if (settingsWriteFailed) return copySettings(cachedSettings);
+  const read = safeGet(KEY_SETTINGS);
+  if (!read.ok) return copySettings(cachedSettings ?? preferredDefaults());
+  if (read.value === null) {
+    if (cachedSettings) return copySettings(cachedSettings);
+    return preferredDefaults();
+  }
+
+  try {
+    cachedSettings = normalizeSettings(JSON.parse(read.value));
+    return copySettings(cachedSettings);
+  } catch {
+    return copySettings(cachedSettings ?? DEFAULT_SETTINGS);
   }
 }
-export function setSettings(s) {
-  safeSet(KEY_SETTINGS, JSON.stringify(s));
+
+export function setSettings(settings) {
+  cachedSettings = normalizeSettings(settings);
+  settingsWriteFailed = !safeSet(KEY_SETTINGS, JSON.stringify(cachedSettings));
+}
+
+export function getTutorialCompleted() {
+  if (cachedTutorialCompleted === true) return true;
+  const read = safeGet(KEY_TUTORIAL_COMPLETED);
+  if (!read.ok || read.value === null) return cachedTutorialCompleted ?? false;
+  if (read.value === 'true') {
+    cachedTutorialCompleted = true;
+    return true;
+  }
+  if (read.value === 'false') {
+    cachedTutorialCompleted = false;
+    return false;
+  }
+  return false;
+}
+
+export function setTutorialCompleted() {
+  cachedTutorialCompleted = true;
+  safeSet(KEY_TUTORIAL_COMPLETED, 'true');
+  return true;
 }

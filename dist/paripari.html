@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0a0a12">
   <title>パリパリ - PariPari</title>
@@ -18,6 +18,7 @@
   --cyan: #5bdcff;
   --line: rgba(255,255,255,0.18);
   --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -43,8 +44,10 @@ html, body {
   width: 100%;
   max-width: 540px;
   margin-inline: auto;
+  --controls-height: max(34%, 180px);
   height: 100%;
   height: 100dvh;
+  height: min(100dvh, var(--visible-height, 100dvh));
   overflow: hidden;
 }
 
@@ -59,13 +62,18 @@ html, body {
   -webkit-user-select: none;
 }
 
-#controls, #hud, #judge-pop, #banner, #rotate-hint {
+#controls, #hud, #judge-pop, #banner, #rotate-hint, #practice-guide {
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
 }
 
 .hidden { display: none !important; }
+
+:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
+}
 
 /* ---------- HUD ---------- */
 .hud {
@@ -79,6 +87,7 @@ html, body {
   pointer-events: none;
 }
 .hud .icon-btn { pointer-events: auto; }
+.hud-right { display: flex; gap: .4rem; }
 .hud-center { text-align: center; flex: 1; }
 .hearts { font-size: 22px; letter-spacing: 2px; filter: drop-shadow(0 0 6px rgba(255,59,84,.6)); }
 .score {
@@ -97,13 +106,45 @@ html, body {
 }
 .combo.bump { transform: scale(1.35); }
 .icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 44px;
   background: rgba(255,255,255,.08);
   border: 1px solid var(--line);
   color: var(--ink);
-  width: 40px; height: 40px;
+  width: 44px; height: 44px;
   border-radius: 12px;
   font-size: 16px;
+  font-family: inherit;
+  touch-action: manipulation;
 }
+
+/* 練習案内は攻撃領域とボタンの間の専用スペースに置く。 */
+.practice-guide {
+  position: absolute;
+  top: auto;
+  bottom: calc(var(--controls-height) - 60px);
+  left: 50%;
+  z-index: 19;
+  width: min(calc(100% - 1.25rem), 30rem);
+  height: 60px;
+  padding: .15rem .5rem;
+  transform: translateX(-50%);
+  border: 1px solid rgba(91,220,255,.52);
+  border-radius: .8rem;
+  background: rgba(5,8,18,.9);
+  box-shadow: 0 5px 18px rgba(0,0,0,.28);
+  text-align: center;
+  line-height: 1.2;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: .1rem;
+}
+.practice-step { color: var(--gold); font-size: 14px; font-weight: 800; }
+.practice-instruction { margin: 0; font-size: 16px; font-weight: 700; }
 
 /* ---------- 判定ポップ ---------- */
 .judge-pop {
@@ -135,16 +176,17 @@ html, body {
 .controls {
   position: absolute;
   left: 0; right: 0; bottom: 0;
-  height: 34%;
-  min-height: 180px;
+  height: var(--controls-height);
+  min-height: 0;
   display: flex;
   gap: 6px;
   z-index: 15;
-  padding: 6px 6px calc(6px + var(--safe-b));
+  padding: 64px 6px calc(6px + var(--safe-b));
 }
 .ctl {
   flex: 1;
-  min-width: 0;
+  min-width: 44px;
+  min-height: 44px;
   background:
     radial-gradient(120% 80% at 50% 120%, rgba(91,220,255,.10), rgba(255,255,255,0) 60%),
     linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02));
@@ -173,6 +215,16 @@ html, body {
   box-shadow: inset 0 0 24px rgba(91,220,255,.35), 0 0 22px rgba(91,220,255,.25);
 }
 .ctl.pressed .ctl-arrow { transform: scale(1.2); }
+.ctl.tutorial-target {
+  z-index: 1;
+  border-color: var(--gold);
+  color: #fff;
+  background:
+    radial-gradient(120% 90% at 50% 120%, rgba(255,211,91,.42), rgba(255,211,91,.12) 60%),
+    linear-gradient(180deg, rgba(255,211,91,.22), rgba(255,211,91,.06));
+  box-shadow: inset 0 0 20px rgba(255,211,91,.24), 0 0 18px rgba(255,211,91,.38);
+}
+.ctl.tutorial-target .ctl-arrow { filter: drop-shadow(0 0 10px var(--gold)); }
 
 /* タップ波紋 */
 .ripple {
@@ -226,22 +278,30 @@ html, body {
   inset: 0;
   z-index: 30;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   background: radial-gradient(circle at 50% 30%, rgba(20,22,44,.86), rgba(5,5,11,.96));
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
-  padding: 24px;
+  padding: max(.75rem, env(safe-area-inset-top)) max(.75rem, env(safe-area-inset-left)) max(.75rem, env(safe-area-inset-bottom)) max(.75rem, env(safe-area-inset-right));
   text-align: center;
   overflow-y: auto;
-  touch-action: pan-y;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y pinch-zoom;
   user-select: text;
   -webkit-user-select: text;
 }
-.title-wrap, .panel { width: 100%; max-width: 340px; margin: auto; }
+.title-wrap, .panel {
+  width: 100%;
+  min-width: 0;
+  max-width: 340px;
+  margin: auto;
+  overflow-wrap: anywhere;
+}
 .logo {
-  font-size: clamp(48px, 18vw, 76px);
-  margin: 0 0 8px;
+  font-size: clamp(3rem, 18vw, 4.75rem);
+  margin: 0 0 .5rem;
   font-weight: 900;
   letter-spacing: 4px;
   background: linear-gradient(180deg, #fff, var(--gold));
@@ -250,27 +310,28 @@ html, body {
   -webkit-text-fill-color: transparent;
   text-shadow: 0 0 40px rgba(255,211,91,.25);
 }
-.tagline { color: rgba(233,238,247,.8); margin: 0 0 18px; font-size: 15px; }
+.tagline { color: rgba(233,238,247,.8); margin: 0 0 1rem; font-size: .95rem; }
 .tagline b, .ready-hint b { color: var(--gold); }
-.best { color: var(--cyan); font-weight: 800; margin-bottom: 22px; letter-spacing: 2px; }
+.best { color: var(--cyan); font-weight: 800; margin-bottom: 1rem; letter-spacing: .08em; }
 .name-label {
   display: block;
-  margin: 0 0 6px;
+  margin: 0 0 .35rem;
   color: rgba(233,238,247,.78);
-  font-size: 13px;
+  font-size: .85rem;
   text-align: left;
 }
 .name-input {
   display: block;
   width: 100%;
-  min-height: 48px;
-  padding: 11px 13px;
+  min-width: 0;
+  min-height: 3rem;
+  padding: .7rem .8rem;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: rgba(0,0,0,.25);
   color: var(--ink);
   font: inherit;
-  font-size: 16px;
+  font-size: 1rem;
   touch-action: auto;
   user-select: text;
   -webkit-user-select: text;
@@ -279,47 +340,57 @@ html, body {
 .name-input:focus, .share-preview:focus { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .platform-status {
   min-height: 1.25em;
-  margin: 7px 0;
+  margin: .4rem 0;
   color: rgba(233,238,247,.7);
-  font-size: 13px;
+  font-size: .82rem;
   line-height: 1.45;
 }
 .platform-status.error { color: #ff8f9e; }
 .share-preview {
   display: block;
   width: 100%;
-  min-height: 50px;
-  margin: 7px 0;
-  padding: 8px 10px;
+  min-width: 0;
+  min-height: 3.1rem;
+  margin: .4rem 0;
+  padding: .5rem .625rem;
   border: 1px solid rgba(255,255,255,.12);
   border-radius: 10px;
   background: rgba(0,0,0,.22);
   color: rgba(233,238,247,.72);
-  font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  font: .82rem/1.4 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
   resize: vertical;
   touch-action: auto;
   user-select: text;
   -webkit-user-select: text;
 }
 .platform-link {
-  display: inline-block;
-  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  max-width: 100%;
+  margin-top: .4rem;
+  padding: .35rem .25rem;
   color: var(--cyan);
-  font-size: 13px;
+  font-size: .82rem;
   text-decoration: underline;
   text-underline-offset: 3px;
+  overflow-wrap: anywhere;
 }
 
 .btn {
   display: block;
   width: 100%;
-  margin: 10px 0;
-  padding: 15px;
+  min-height: 44px;
+  margin: .55rem 0;
+  padding: .75rem;
   border-radius: 14px;
   border: 1px solid var(--line);
   background: rgba(255,255,255,.06);
   color: var(--ink);
-  font-size: 17px;
+  font-family: inherit;
+  font-size: 1.06rem;
+  line-height: 1.3;
   font-weight: 700;
   touch-action: manipulation;
   user-select: none;
@@ -333,57 +404,81 @@ html, body {
   box-shadow: 0 8px 24px rgba(43,124,255,.35);
 }
 
-.panel h2 { font-size: 24px; margin-top: 0; }
-.howto-list { text-align: left; line-height: 1.8; padding-left: 20px; }
+.panel h2 { font-size: 1.5rem; margin: 0 0 .75rem; }
+.howto-list { text-align: left; line-height: 1.65; padding-left: 1.25rem; margin: .5rem 0 1rem; }
+.howto-list li { margin: 0 0 .55rem; }
 .howto-list b { color: var(--gold); }
-.howto-judge { display: flex; flex-wrap: wrap; gap: 6px 10px; justify-content: center; font-size: 13px; align-items: center; }
-.tag { padding: 2px 8px; border-radius: 8px; font-weight: 800; font-size: 12px; }
+.howto-keys { overflow-wrap: anywhere; }
+kbd {
+  display: inline-block;
+  min-width: 1.5em;
+  padding: .05em .25em;
+  border: 1px solid var(--line);
+  border-radius: .25em;
+  background: rgba(255,255,255,.08);
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+}
+.howto-judge { display: flex; flex-wrap: wrap; gap: .35rem .625rem; justify-content: center; font-size: .82rem; align-items: center; line-height: 1.45; }
+.tag { padding: .12rem .5rem; border-radius: .5rem; font-weight: 800; font-size: .78rem; }
 .tag.perfect { background: var(--gold); color: #2a1d00; }
 .tag.good { background: var(--cyan); color: #04121e; }
 .tag.miss { background: var(--crimson); color: #2a0008; }
 
 .toggle {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 14px 4px; border-bottom: 1px solid var(--line); font-size: 16px;
+  gap: .75rem; min-height: 44px; padding: .8rem .25rem; border-bottom: 1px solid var(--line); font-size: 1rem;
 }
-.toggle input { width: 26px; height: 26px; accent-color: var(--cyan); }
+.toggle span { min-width: 0; flex: 1; text-align: left; overflow-wrap: anywhere; }
+.toggle input { flex: 0 0 26px; width: 26px; height: 26px; accent-color: var(--cyan); }
 
 /* カウントダウン */
 .countdown {
-  font-size: 30vw;
+  width: 100%;
+  max-width: 100%;
+  font-size: clamp(2.75rem, 25vmin, 9rem);
+  line-height: 1;
   font-weight: 900;
   color: #fff;
   text-shadow: 0 0 40px var(--cyan);
   animation: cd 1s ease-in-out;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
-.ready-hint { position: absolute; bottom: 42%; font-size: 18px; }
-@keyframes cd { 0% { transform: scale(1.8); opacity: 0; } 30% { opacity: 1; } 100% { transform: scale(.7); opacity: 0; } }
+#screen-ready { flex-direction: column; align-items: center; justify-content: center; gap: 1rem; }
+.ready-hint { position: static; margin: 0; font-size: 1.125rem; text-align: center; }
+@keyframes cd { 0% { transform: scale(1.12); opacity: 0; } 30% { opacity: 1; } 100% { transform: scale(.9); opacity: 0; } }
 
 /* リザルト */
 .result-rank {
-  font-size: 90px; font-weight: 900; line-height: 1;
+  font-size: clamp(3.5rem, 18vw, 5.625rem); font-weight: 900; line-height: 1;
   background: linear-gradient(180deg, #fff, var(--gold));
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
   text-shadow: 0 0 40px rgba(255,211,91,.4);
 }
-.result-score-label { letter-spacing: 4px; color: rgba(255,255,255,.6); font-size: 13px; margin-top: 6px; }
-.result-score { font-size: 52px; font-weight: 900; margin-bottom: 6px; }
-.best-badge { color: var(--gold); font-weight: 800; margin-bottom: 12px; animation: pulse 1s infinite; }
+.result-score-label { letter-spacing: .12em; color: rgba(255,255,255,.6); font-size: .82rem; margin-top: .35rem; }
+.result-score { font-size: clamp(2rem, 12vw, 3.25rem); font-weight: 900; line-height: 1.1; margin-bottom: .35rem; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.best-badge { color: var(--gold); font-weight: 800; margin-bottom: .5rem; animation: pulse 1s infinite; }
 @keyframes pulse { 50% { opacity: .5; } }
-.result-stats { display: flex; justify-content: space-around; margin: 14px 0 22px; }
-.result-stats span { display: block; font-size: 24px; font-weight: 800; color: var(--cyan); }
-.result-stats small { color: rgba(255,255,255,.6); font-size: 11px; }
+.result-actions { margin: .25rem 0 .75rem; }
+.result-actions .btn { margin: .45rem 0; }
+.result-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem .3rem; margin: .75rem 0 1rem; }
+.result-stats > div { min-width: 0; padding: .25rem .15rem; }
+.result-stats span { display: block; font-size: 1.5rem; font-weight: 800; line-height: 1.2; color: var(--cyan); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.result-stats small { display: block; color: rgba(255,255,255,.68); font-size: .75rem; line-height: 1.35; overflow-wrap: anywhere; }
+.practice-complete-panel p { line-height: 1.6; }
 
 .rotate-hint {
   position: absolute; inset: 0; z-index: 100;
   display: flex; align-items: center; justify-content: center;
-  background: var(--bg0); font-size: 20px; text-align: center; padding: 24px;
+  background: var(--bg0); font-size: 1.25rem; text-align: center; padding: 1.5rem;
 }
 
 /* 320px 幅（SE1）調整 */
 @media (max-width: 340px) {
-  .controls { min-height: 200px; }
-  .ctl { font-size: 34px; }
+  #app { --controls-height: max(34%, 200px); }
+  .ctl { font-size: 2.125rem; }
 }
 
 </style>
@@ -403,9 +498,16 @@ html, body {
         <div id="combo" class="combo"></div>
       </div>
       <div class="hud-right">
+        <button id="btn-practice-home" class="icon-btn hidden" aria-label="練習を終えてホームへ" title="練習を終えてホームへ">⌂</button>
         <button id="btn-pause" class="icon-btn" aria-label="ポーズ">⏸</button>
       </div>
     </header>
+
+    <!-- 練習中の方向案内。HUDとは独立させ、ポーズ中は内容を保ったまま隠す。 -->
+    <aside id="practice-guide" class="practice-guide hidden" aria-label="練習ガイド" aria-live="polite" aria-atomic="true">
+      <div id="practice-step" class="practice-step"></div>
+      <p id="practice-instruction" class="practice-instruction"></p>
+    </aside>
 
     <!-- 判定ポップ -->
     <div id="judge-pop" class="judge-pop"></div>
@@ -428,9 +530,9 @@ html, body {
     <!-- タイトル -->
     <section id="screen-title" class="screen">
       <div class="title-wrap">
-        <h1 class="logo">パリパリ</h1>
+        <h1 class="logo" tabindex="-1">パリパリ</h1>
         <p class="tagline">来た方向と<b>反対</b>を、ちょうどで弾け。</p>
-        <div class="best">BEST <span id="title-best">0</span></div>
+        <div class="best">自己ベスト <span id="title-best">0</span></div>
         <label class="name-label" for="player-name">表示名（1〜20文字）</label>
         <input id="player-name" class="name-input" type="text"
           autocomplete="nickname" autocapitalize="none" spellcheck="false"
@@ -449,18 +551,21 @@ html, body {
     <!-- 遊び方 -->
     <section id="screen-howto" class="screen hidden">
       <div class="panel">
-        <h2>遊び方</h2>
+        <h2 tabindex="-1">遊び方</h2>
         <ol class="howto-list">
-          <li>攻撃は上半分の<b>5方向</b>（左・右・上・左斜め上・右斜め上）から来ます。</li>
-          <li>線に届く<b>ちょうど</b>その瞬間に、来た方向と<b>反対</b>を1回タップ！</li>
-          <li>下部の5ボタンが受け流す向き：<br>左→<b>右</b> / 右→<b>左</b> / 上→<b>下</b> / 左斜め上→<b>右下</b> / 右斜め上→<b>左下</b></li>
-          <li>早すぎ・遅すぎ・逆方向は失敗。3回ミスで終了。</li>
-          <li>開始時はノーダメージの<b>ウォームアップ</b>で慣らせます。</li>
+          <li>攻撃は左・右・上・左上・右上の<b>5方向</b>から来ます。線に届く瞬間に、来た方向と反対のボタンを押します。</li>
+          <li>対応は、左→<b>右</b>／右→<b>左</b>／上→<b>下</b>／左上→<b>右下</b>／右上→<b>左下</b>です。</li>
+          <li>初回は5方向を1回ずつ成功させる案内付き練習から始まります。練習中はライフが減らず、失敗した方向を成功するまで繰り返します。遊び方から何度でも練習できます。</li>
+          <li>1回の攻撃は1〜3回押すことがあります。失敗しても、ライフが減るのは1回の攻撃につき最大1つです。</li>
+          <li>本番のライフは3つ。なくなると終了です。</li>
+          <li>誤差60ミリ秒以内は<b>ぴったり</b>、140ミリ秒以内は<b>成功</b>。それより早い・遅い入力や逆方向は失敗です。</li>
+          <li>ぴったり成功を10回連続するとライフが1つ回復します（最大3つ）。</li>
+          <li class="howto-keys">PCキー：左 <kbd>←</kbd>/<kbd>A</kbd>、右 <kbd>→</kbd>/<kbd>D</kbd>、下 <kbd>↓</kbd>/<kbd>S</kbd>、左下 <kbd>Q</kbd>/<kbd>Z</kbd>、右下 <kbd>E</kbd>/<kbd>C</kbd></li>
         </ol>
         <p class="howto-judge">
-          <span class="tag perfect">PERFECT</span> ど真ん中
-          <span class="tag good">GOOD</span> セーフ
-          <span class="tag miss">MISS</span> 失敗
+          <span class="tag perfect">ぴったり</span> 誤差60ミリ秒以内
+          <span class="tag good">成功</span> 誤差140ミリ秒以内
+          <span class="tag miss">失敗</span> 早い・遅い・逆方向
         </p>
         <button id="btn-howto-try" class="btn btn-primary">練習してみる</button>
         <button id="btn-howto-back" class="btn">もどる</button>
@@ -470,7 +575,7 @@ html, body {
     <!-- 設定 -->
     <section id="screen-settings" class="screen hidden">
       <div class="panel">
-        <h2>設定</h2>
+        <h2 tabindex="-1">設定</h2>
         <label class="toggle"><span>振動（対応端末のみ）</span><input type="checkbox" id="set-vibrate"></label>
         <label class="toggle"><span>モーション低減</span><input type="checkbox" id="set-motion"></label>
         <button id="btn-settings-back" class="btn btn-primary">もどる</button>
@@ -479,14 +584,14 @@ html, body {
 
     <!-- カウントダウン -->
     <section id="screen-ready" class="screen hidden">
-      <div id="countdown" class="countdown">3</div>
+      <div id="countdown" class="countdown" role="heading" aria-level="1" tabindex="-1">3</div>
       <p class="ready-hint">来た方向と<b>反対</b>を押す！</p>
     </section>
 
     <!-- ポーズ -->
     <section id="screen-pause" class="screen hidden">
       <div class="panel">
-        <h2>ポーズ</h2>
+        <h2 tabindex="-1">ポーズ</h2>
         <button id="btn-resume" class="btn btn-primary">再開</button>
         <button id="btn-pause-retry" class="btn">リトライ</button>
         <button id="btn-pause-home" class="btn">ホーム</button>
@@ -497,21 +602,34 @@ html, body {
     <section id="screen-result" class="screen hidden">
       <div class="panel result-panel">
         <div id="result-rank" class="result-rank">A</div>
-        <div class="result-score-label">SCORE</div>
+        <div class="result-score-label">スコア</div>
         <div id="result-score" class="result-score">0</div>
         <div id="result-best-badge" class="best-badge hidden">★ ベスト更新！</div>
+        <div class="result-actions">
+          <button id="btn-retry" class="btn btn-primary">もう一回</button>
+          <button id="btn-result-home" class="btn">ホーム</button>
+        </div>
         <div class="result-stats">
           <div><span id="result-combo">0</span><small>最大コンボ</small></div>
-          <div><span id="result-perfect">0%</span><small>PERFECT率</small></div>
-          <div><span id="result-tier">1</span><small>到達ティア</small></div>
+          <div><span id="result-perfect">0%</span><small>成功のうち、ぴったりの割合</small></div>
+          <div><span id="result-tier">1</span><small>到達段階</small></div>
+          <div><span id="result-best">0</span><small>自己ベスト</small></div>
         </div>
-        <button id="btn-retry" class="btn btn-primary">もう一回</button>
-        <button id="btn-result-home" class="btn">ホーム</button>
         <p id="result-player" class="platform-status"></p>
         <textarea id="result-share-text" class="share-preview" readonly aria-label="結果のシェア文"></textarea>
         <button id="btn-result-share" class="btn">結果をシェア</button>
         <p id="result-share-status" class="platform-status" role="status" aria-live="polite"></p>
         <a class="platform-link" href="https://chameleonjp-lab.github.io/chameleonjp_lab/" target="_blank" rel="noopener noreferrer">カメレオンJPの実験場へ</a>
+      </div>
+    </section>
+
+    <!-- 任意練習の終了後は、ユーザーが選ぶまでこの画面に留まる。 -->
+    <section id="screen-practice-complete" class="screen hidden">
+      <div class="panel practice-complete-panel">
+        <h2 tabindex="-1">練習おつかれさま！</h2>
+        <p>5方向の練習が終わりました。次に進む操作を選んでください。</p>
+        <button id="btn-practice-again" class="btn btn-primary">もう一度練習</button>
+        <button id="btn-practice-done-home" class="btn">ホームへ</button>
       </div>
     </section>
 
@@ -1439,22 +1557,116 @@ html, body {
     setBestLabel: () => setBestLabel,
     setCountdown: () => setCountdown,
     setPlayUIVisible: () => setPlayUIVisible,
+    setPracticeGuide: () => setPracticeGuide,
+    setPracticeVisible: () => setPracticeVisible,
     showBanner: () => showBanner,
     showResult: () => showResult,
     showScreen: () => showScreen,
     updateHUD: () => updateHUD
   });
   var $ = (id) => document.getElementById(id);
-  var SCREENS = ["title", "howto", "settings", "ready", "pause", "result"];
+  var SCREENS = ["title", "howto", "settings", "ready", "pause", "result", "practice-complete"];
+  var DIRECTION_NAMES = {
+    L: "左",
+    R: "右",
+    U: "上",
+    UL: "左上",
+    UR: "右上",
+    DL: "左下",
+    D: "下",
+    DR: "右下"
+  };
+  var _playUIVisible = false;
+  var _practiceVisible = false;
+  var _practiceGuide = null;
+  function focusScreen(screen2) {
+    const heading = screen2.querySelector('h1, h2, h3, [role="heading"]');
+    const firstAction = screen2.querySelector(
+      "button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])"
+    );
+    const target = heading || firstAction;
+    if (target && typeof target.focus === "function") {
+      try {
+        target.focus({ preventScroll: true });
+      } catch (_) {
+        target.focus();
+      }
+    }
+  }
   function showScreen(name) {
-    SCREENS.forEach((s) => $("screen-" + s).classList.toggle("hidden", s !== name));
+    const target = $("screen-" + name);
+    if (!target) return;
+    const active = document.activeElement;
+    SCREENS.forEach((screenName) => {
+      const screen2 = $("screen-" + screenName);
+      if (!screen2) return;
+      const willHide = screen2 !== target;
+      if (willHide && active && screen2.contains(active) && typeof active.blur === "function") {
+        active.blur();
+      }
+      screen2.classList.toggle("hidden", willHide);
+    });
+    target.scrollTop = 0;
+    focusScreen(target);
   }
   function hideAllScreens() {
-    SCREENS.forEach((s) => $("screen-" + s).classList.add("hidden"));
+    const active = document.activeElement;
+    const focusedScreen = SCREENS.map((name) => $("screen-" + name)).find((screen2) => screen2 && active && screen2.contains(active));
+    if (focusedScreen && typeof active.blur === "function") active.blur();
+    SCREENS.forEach((name) => {
+      const screen2 = $("screen-" + name);
+      if (screen2) screen2.classList.add("hidden");
+    });
+  }
+  function syncPracticeGuide() {
+    const guide = $("practice-guide");
+    const shouldShow = _playUIVisible && _practiceVisible && !!_practiceGuide;
+    if (guide) guide.classList.toggle("hidden", !shouldShow);
+    const buttons = Array.from(document.querySelectorAll("#controls [data-dir]"));
+    buttons.forEach((button) => {
+      button.classList.remove("tutorial-target");
+      button.removeAttribute("aria-describedby");
+    });
+    if (!shouldShow) return;
+    const target = buttons.find((button) => button.dataset.dir === _practiceGuide.needDir);
+    if (target) {
+      target.classList.add("tutorial-target");
+      target.setAttribute("aria-describedby", "practice-guide");
+    }
   }
   function setPlayUIVisible(visible) {
-    $("hud").classList.toggle("hidden", !visible);
-    $("controls").classList.toggle("hidden", !visible);
+    _playUIVisible = !!visible;
+    $("hud").classList.toggle("hidden", !_playUIVisible);
+    $("controls").classList.toggle("hidden", !_playUIVisible);
+    if (!_playUIVisible) {
+      const judge = $("judge-pop");
+      judge.className = "judge-pop";
+      judge.textContent = "";
+    }
+    syncPracticeGuide();
+  }
+  function setPracticeVisible(visible) {
+    _practiceVisible = !!visible;
+    const homeButton = $("btn-practice-home");
+    if (homeButton) homeButton.classList.toggle("hidden", !_practiceVisible);
+    syncPracticeGuide();
+  }
+  function setPracticeGuide({ step, total, dir, needDir } = {}) {
+    const safeTotal = Number.isFinite(Number(total)) && Number(total) > 0 ? Math.floor(Number(total)) : 5;
+    const safeStep = Number.isFinite(Number(step)) ? Math.min(safeTotal, Math.max(1, Math.floor(Number(step)))) : 1;
+    _practiceGuide = {
+      step: safeStep,
+      total: safeTotal,
+      dir: String(dir || ""),
+      needDir: String(needDir || "")
+    };
+    const stepEl = $("practice-step");
+    const instructionEl = $("practice-instruction");
+    const incoming = DIRECTION_NAMES[_practiceGuide.dir] || "？";
+    const required = DIRECTION_NAMES[_practiceGuide.needDir] || "？";
+    if (stepEl) stepEl.textContent = `練習 ${safeStep} / ${safeTotal}　成功すると次へ`;
+    if (instructionEl) instructionEl.textContent = `${incoming}からの攻撃 → ${required}を押す`;
+    syncPracticeGuide();
   }
   var _bannerTimer = null;
   function showBanner(main, sub, duration = 1500) {
@@ -1482,7 +1694,7 @@ html, body {
     $("hearts").innerHTML = hearts;
     $("score").textContent = score.toLocaleString();
     const comboEl = $("combo");
-    comboEl.textContent = combo >= 2 ? `${combo} COMBO` : "";
+    comboEl.textContent = combo >= 2 ? `${combo} コンボ` : "";
   }
   function bumpCombo() {
     const el = $("combo");
@@ -1490,16 +1702,25 @@ html, body {
     void el.offsetWidth;
     el.classList.add("bump");
   }
-  function popJudge(result, delta) {
+  function popJudge(result, delta, reason) {
     const el = $("judge-pop");
     el.className = "judge-pop";
     void el.offsetWidth;
-    let text = result;
-    if (result === "PERFECT") text = "PERFECT!";
-    else if (result === "GOOD") text = delta < 0 ? "GOOD (早)" : delta > 0 ? "GOOD (遅)" : "GOOD";
-    else text = "MISS";
+    let text;
+    if (result === "PERFECT") text = "ぴったり！";
+    else if (result === "GOOD") text = "成功！";
+    else {
+      const fallbackReason = delta < 0 ? "early" : delta > 0 ? "late" : "";
+      const missMessage = {
+        direction: "逆方向！",
+        early: "早すぎ！",
+        late: "遅すぎ！",
+        timeout: "時間切れ！"
+      };
+      text = missMessage[reason || fallbackReason] || "失敗！";
+    }
     el.textContent = text;
-    el.classList.add("show", result.toLowerCase());
+    el.classList.add("show", String(result || "MISS").toLowerCase());
   }
   function setCountdown(n) {
     const el = $("countdown");
@@ -1515,6 +1736,7 @@ html, body {
     $("result-combo").textContent = maxCombo;
     $("result-perfect").textContent = `${perfectRate}%`;
     $("result-tier").textContent = tier;
+    $("result-best").textContent = best.toLocaleString();
     showScreen("result");
   }
   function setBestLabel(best) {
@@ -1526,25 +1748,34 @@ html, body {
   }
 
   // src/js/storage.js
-  var RULE_VERSION = "r2-time-20260922";
+  var RULE_VERSION = "r3-practice-20260927";
   var KEY_BEST = `paripari.best.${RULE_VERSION}`;
   var KEY_SETTINGS = "paripari.settings";
   var KEY_PLAYER_NAME = "paripari.player-name";
-  var DEFAULT_SETTINGS = {
+  var KEY_TUTORIAL_COMPLETED = "paripari.tutorial.v1";
+  var DEFAULT_SETTINGS = Object.freeze({
     vibrate: true,
     reducedMotion: false
-  };
+  });
+  var cachedBest = 0;
+  var cachedPlayerName = null;
+  var cachedSettings = null;
+  var cachedTutorialCompleted = null;
+  var nameWriteFailed = false;
+  var settingsWriteFailed = false;
   function safeGet(key) {
     try {
-      return localStorage.getItem(key);
+      return { ok: true, value: globalThis.localStorage.getItem(key) };
     } catch {
-      return null;
+      return { ok: false, value: null };
     }
   }
-  function safeSet(key, val) {
+  function safeSet(key, value) {
     try {
-      localStorage.setItem(key, val);
+      globalThis.localStorage.setItem(key, value);
+      return true;
     } catch {
+      return false;
     }
   }
   function normalizePlayerName(value) {
@@ -1559,57 +1790,109 @@ html, body {
     return Array.from(cleaned).slice(0, 20).join("");
   }
   function parseBest(raw) {
-    if (!raw) return 0;
+    if (raw === null) return null;
     try {
       const parsed = JSON.parse(raw);
-      if (typeof parsed === "number") return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
-      if (parsed && parsed.version === RULE_VERSION && typeof parsed.score === "number") {
-        return Number.isFinite(parsed.score) ? Math.max(0, Math.floor(parsed.score)) : 0;
+      if (typeof parsed === "number" && Number.isFinite(parsed)) {
+        return Math.max(0, Math.floor(parsed));
+      }
+      if (parsed && parsed.version === RULE_VERSION && typeof parsed.score === "number" && Number.isFinite(parsed.score)) {
+        return Math.max(0, Math.floor(parsed.score));
       }
     } catch {
     }
-    return 0;
+    return null;
   }
   function getBest() {
-    return parseBest(safeGet(KEY_BEST));
+    const read = safeGet(KEY_BEST);
+    if (!read.ok) return cachedBest;
+    const persisted = parseBest(read.value);
+    if (persisted !== null) cachedBest = Math.max(cachedBest, persisted);
+    return cachedBest;
   }
   function setBest(n) {
     const score = Number(n);
     if (!Number.isFinite(score)) return getBest();
-    const best = Math.max(getBest(), Math.floor(score), 0);
+    const read = safeGet(KEY_BEST);
+    const persisted = read.ok ? parseBest(read.value) : null;
+    const best = Math.max(cachedBest, persisted ?? 0, Math.floor(score), 0);
+    cachedBest = best;
     safeSet(KEY_BEST, JSON.stringify({ version: RULE_VERSION, score: best }));
     return best;
   }
   function getPlayerName() {
-    return normalizePlayerName(safeGet(KEY_PLAYER_NAME));
+    if (nameWriteFailed) return cachedPlayerName ?? "";
+    const read = safeGet(KEY_PLAYER_NAME);
+    if (!read.ok || read.value === null) return cachedPlayerName ?? "";
+    cachedPlayerName = normalizePlayerName(read.value);
+    return cachedPlayerName;
   }
   function setPlayerName(value) {
     const name = normalizePlayerName(value);
-    safeSet(KEY_PLAYER_NAME, name);
+    cachedPlayerName = name;
+    nameWriteFailed = !safeSet(KEY_PLAYER_NAME, name);
     return name;
   }
-  function getSettings() {
+  function copySettings(settings2) {
+    return { vibrate: settings2.vibrate, reducedMotion: settings2.reducedMotion };
+  }
+  function normalizeSettings(value) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    return {
+      vibrate: typeof source.vibrate === "boolean" ? source.vibrate : DEFAULT_SETTINGS.vibrate,
+      reducedMotion: typeof source.reducedMotion === "boolean" ? source.reducedMotion : DEFAULT_SETTINGS.reducedMotion
+    };
+  }
+  function preferredDefaults() {
+    let reducedMotion = DEFAULT_SETTINGS.reducedMotion;
     try {
-      const raw = safeGet(KEY_SETTINGS);
-      if (!raw) {
-        const prefersReduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        return { ...DEFAULT_SETTINGS, reducedMotion: !!prefersReduced };
-      }
-      const parsed = JSON.parse(raw);
-      return {
-        vibrate: typeof parsed?.vibrate === "boolean" ? parsed.vibrate : DEFAULT_SETTINGS.vibrate,
-        reducedMotion: typeof parsed?.reducedMotion === "boolean" ? parsed.reducedMotion : DEFAULT_SETTINGS.reducedMotion
-      };
+      reducedMotion = !!globalThis.window?.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     } catch {
-      return { ...DEFAULT_SETTINGS };
+    }
+    return { ...DEFAULT_SETTINGS, reducedMotion };
+  }
+  function getSettings() {
+    if (settingsWriteFailed) return copySettings(cachedSettings);
+    const read = safeGet(KEY_SETTINGS);
+    if (!read.ok) return copySettings(cachedSettings ?? preferredDefaults());
+    if (read.value === null) {
+      if (cachedSettings) return copySettings(cachedSettings);
+      return preferredDefaults();
+    }
+    try {
+      cachedSettings = normalizeSettings(JSON.parse(read.value));
+      return copySettings(cachedSettings);
+    } catch {
+      return copySettings(cachedSettings ?? DEFAULT_SETTINGS);
     }
   }
-  function setSettings(s) {
-    safeSet(KEY_SETTINGS, JSON.stringify(s));
+  function setSettings(settings2) {
+    cachedSettings = normalizeSettings(settings2);
+    settingsWriteFailed = !safeSet(KEY_SETTINGS, JSON.stringify(cachedSettings));
+  }
+  function getTutorialCompleted() {
+    if (cachedTutorialCompleted === true) return true;
+    const read = safeGet(KEY_TUTORIAL_COMPLETED);
+    if (!read.ok || read.value === null) return cachedTutorialCompleted ?? false;
+    if (read.value === "true") {
+      cachedTutorialCompleted = true;
+      return true;
+    }
+    if (read.value === "false") {
+      cachedTutorialCompleted = false;
+      return false;
+    }
+    return false;
+  }
+  function setTutorialCompleted() {
+    cachedTutorialCompleted = true;
+    safeSet(KEY_TUTORIAL_COMPLETED, "true");
+    return true;
   }
 
   // src/js/game.js
-  var PRACTICE_GOAL = 5;
+  var PRACTICE_DIRECTIONS = Object.freeze(["L", "R", "U", "UL", "UR"]);
+  var PRACTICE_GOAL = PRACTICE_DIRECTIONS.length;
   var INPUT_ORDER = Object.freeze(
     (CONFIG.INPUT_DIRECTIONS || ["L", "DL", "D", "DR", "R"]).slice()
   );
@@ -1696,10 +1979,10 @@ html, body {
       this.r.reducedMotion = !!this.settings.reducedMotion;
       this._callRenderer("clearTransients");
       this._callParticles("clear");
-      this.warmupRemaining = this.mode === "normal" ? CONFIG.WARMUP.count : PRACTICE_GOAL;
+      this.warmupRemaining = this.mode === "practice" ? PRACTICE_GOAL : 0;
       this.nextSpawnAt = 500;
-      if (this.mode === "normal") {
-        this._ui("showBanner", "WARM UP", "来た方向の【反対】を押す");
+      if (this.mode === "practice") {
+        this._ui("setPracticeGuide", { step: 1, total: PRACTICE_GOAL, dir: "L", needDir: "R" });
       }
       this._ui("updateHUD", this);
       return this.roundId;
@@ -1814,7 +2097,7 @@ html, body {
           const timeoutWatermark = horizon - INPUT_DELAY_MS;
           if (finite(timeoutAt) && timeoutAt < timeoutWatermark) {
             this._processingTime = timeoutAt;
-            this._resolveSegment(this.attack, seg, "MISS", CONFIG.GOOD_WINDOW, timeoutAt);
+            this._resolveSegment(this.attack, seg, "MISS", CONFIG.GOOD_WINDOW, timeoutAt, "timeout");
             cursor = Math.max(cursor, timeoutAt);
             continue;
           }
@@ -1864,7 +2147,8 @@ html, body {
       }
       const delta = input.time - seg.impactAt;
       const result = judgeTiming(delta, input.dir === a.needDir);
-      this._resolveSegment(a, seg, result, delta, input.time);
+      const reason = input.dir !== a.needDir ? "direction" : delta < 0 ? "early" : "late";
+      this._resolveSegment(a, seg, result, delta, input.time, reason);
     }
     _tier() {
       return this.mode === "practice" ? CONFIG.TIERS[0] : tierForSuccess(this.successCount);
@@ -1878,6 +2162,7 @@ html, body {
         baseVisibleMs: CONFIG.WARMUP.visibleMs,
         speedJitter: 0,
         taps: 1,
+        dirs: [PRACTICE_DIRECTIONS[PRACTICE_GOAL - this.warmupRemaining]],
         random: this.random
       } : {
         baseVisibleMs: tier.visibleMs,
@@ -1888,6 +2173,14 @@ html, body {
       this.attack = createAttack(spawnAt, opts);
       this.attack.warmup = warm;
       this.attack.scheduledSpawnAt = spawnAt;
+      if (this.mode === "practice") {
+        this._ui("setPracticeGuide", {
+          step: PRACTICE_GOAL - this.warmupRemaining + 1,
+          total: PRACTICE_GOAL,
+          dir: this.attack.dir,
+          needDir: this.attack.needDir
+        });
+      }
       this._checkTierUp();
       return this.attack;
     }
@@ -1899,20 +2192,20 @@ html, body {
         if (tier.maxTaps > this._maxTaps && tier.maxTaps >= 2) {
           this._ui("showBanner", `${tier.maxTaps}連 受け流し！`, "同じ向きに連続タップ", 1500);
         } else {
-          this._ui("showBanner", "SPEED UP", null, 900);
+          this._ui("showBanner", "難しさアップ", null, 900);
         }
       }
       this._tierIndex = idx;
       this._maxTaps = tier.maxTaps;
     }
-    _resolveSegment(a, seg, result, delta, resolvedAt = this._processingTime) {
+    _resolveSegment(a, seg, result, delta, resolvedAt = this._processingTime, reason = "timeout") {
       if (!this.isPlaying() || !a || a.resolved || !seg || seg.resolved) return false;
       seg.resolved = true;
       seg.result = result;
       seg.resolvedAt = resolvedAt;
       a.resolvedAt = resolvedAt;
       a.result = result;
-      const warmup = !!a.warmup;
+      const warmup = this.mode === "practice";
       const reduced = !!this.settings.reducedMotion;
       const { cx, cy } = this._center();
       if (!warmup) this.totalAttempts++;
@@ -1936,11 +2229,11 @@ html, body {
           life: 0.45,
           gravity: 700
         });
-        this._ui("popJudge", "MISS", delta);
+        this._ui("popJudge", "MISS", delta, reason);
       } else {
-        this.combo++;
-        this.maxCombo = Math.max(this.maxCombo, this.combo);
         if (!warmup) {
+          this.combo++;
+          this.maxCombo = Math.max(this.maxCombo, this.combo);
           this.successCount++;
           const gain = calcGain(result, this.combo, delta);
           this.score += gain;
@@ -1949,8 +2242,10 @@ html, body {
         this._callRenderer("triggerDeflect", a.needDir, result);
         this._callRenderer("triggerShockwave", result);
         if (result === "PERFECT") {
-          if (!warmup) this.perfectCount++;
-          this.perfectStreak++;
+          if (!warmup) {
+            this.perfectCount++;
+            this.perfectStreak++;
+          }
           this._callHaptics(HAPTICS.perfect);
           this._callRenderer("triggerFlash", "#fff7df", 0.5);
           this.hitstopMs = 0;
@@ -2009,16 +2304,8 @@ html, body {
       if (!a || a.resolved) return;
       a.resolved = true;
       a.lastImpactAt = a.segments[a.segments.length - 1]?.impactAt ?? a.spawnAt;
-      if (a.warmup) {
-        this.warmupRemaining--;
-        if (this.warmupRemaining <= 0 && this.mode === "normal") {
-          this.combo = 0;
-          this.perfectStreak = 0;
-          const t0 = tierForSuccess(0);
-          this._tierIndex = CONFIG.TIERS.indexOf(t0);
-          this._maxTaps = t0.maxTaps;
-          this._ui("showBanner", "START!", null, 800);
-        }
+      if (this.mode === "practice" && a.segments.every((seg) => seg.result !== "MISS")) {
+        this.warmupRemaining = Math.max(0, this.warmupRemaining - 1);
       }
       const intervalMs = this.inWarmup() ? CONFIG.WARMUP.intervalMs : this._tier().intervalMs;
       const interval = nextInterval(intervalMs, this.random);
@@ -2395,6 +2682,7 @@ html, body {
     COUNTDOWN: "COUNTDOWN",
     PLAYING: "PLAYING",
     PRACTICE: "PRACTICE",
+    PRACTICE_COMPLETE: "PRACTICE_COMPLETE",
     PAUSED: "PAUSED",
     RESUME_COUNTDOWN: "RESUME_COUNTDOWN",
     RESULT: "RESULT"
@@ -2430,6 +2718,7 @@ html, body {
       onStart = noop,
       onPause = noop,
       onResult = noop,
+      onPracticeComplete = noop,
       onInvalidate = noop,
       countdownStepMs = COUNTDOWN_STEP_MS,
       stallThresholdMs = STALL_THRESHOLD_MS2
@@ -2446,6 +2735,8 @@ html, body {
       this.onStart = onStart;
       this.onPause = onPause;
       this.onResult = onResult;
+      this.onPracticeComplete = onPracticeComplete;
+      this.practiceToNormal = false;
       this.onInvalidate = onInvalidate;
       this.countdownStepMs = countdownStepMs;
       this.stallThresholdMs = stallThresholdMs;
@@ -2585,16 +2876,17 @@ html, body {
       return true;
     }
     /** Begin a normal match at a 3-2-1 countdown. */
-    start(mode = "normal", wall = this.wallNow()) {
+    start(mode = "normal", wall = this.wallNow(), { tutorial = false } = {}) {
       if (!finiteWall(wall)) return false;
       if (mode !== "normal" && mode !== "practice") mode = "normal";
-      const allowed = mode === "practice" ? this.state === SESSION_STATES.HOWTO : [SESSION_STATES.HOME, SESSION_STATES.RESULT, SESSION_STATES.PAUSED].includes(this.state);
+      const allowed = mode === "practice" ? tutorial ? this.state === SESSION_STATES.HOME : [SESSION_STATES.HOWTO, SESSION_STATES.PRACTICE_COMPLETE].includes(this.state) : [SESSION_STATES.HOME, SESSION_STATES.RESULT, SESSION_STATES.PAUSED].includes(this.state) && !(this.state === SESSION_STATES.PAUSED && this.mode === "practice");
       if (!allowed || !this.environmentReady()) return false;
       this._invalidate("start");
       this._stopGame();
       this.matchId += 1;
       this.roundId = null;
       this.mode = mode;
+      this.practiceToNormal = mode === "practice" && tutorial;
       this.result = null;
       this.pauseReason = null;
       this.resumeState = null;
@@ -2620,6 +2912,7 @@ html, body {
       this._pauseClock(wall);
       this._stopGame();
       this.mode = null;
+      this.practiceToNormal = false;
       this.roundId = null;
       this.result = null;
       this.pauseReason = null;
@@ -2733,6 +3026,7 @@ html, body {
     finish(data, roundId = this.roundId) {
       if (!(this.state === SESSION_STATES.PLAYING || this.state === SESSION_STATES.PRACTICE)) return false;
       if (roundId != null && this.roundId != null && roundId !== this.roundId) return false;
+      if (!!data?.practiceDone !== (this.state === SESSION_STATES.PRACTICE)) return false;
       this._generation += 1;
       this._countdown = null;
       this._pauseClock(this.wallNow());
@@ -2740,7 +3034,21 @@ html, body {
       this._clearPressed();
       this.result = data;
       if (data && data.practiceDone) {
-        this._emitState(SESSION_STATES.HOWTO, { practiceDone: true });
+        this.onPracticeComplete();
+        this._stopGame();
+        if (this.practiceToNormal) {
+          this.practiceToNormal = false;
+          this.matchId += 1;
+          this.roundId = null;
+          this.result = null;
+          this.mode = "normal";
+          this.resumeGameStarted = false;
+          const wall = this.wallNow();
+          this._beginCountdown("normal", wall, false);
+          if (!this.environmentReady()) this.pause("environment", { wall });
+        } else {
+          this._emitState(SESSION_STATES.PRACTICE_COMPLETE, { practiceDone: true });
+        }
         return true;
       }
       this._emitState(SESSION_STATES.RESULT, { result: data });
@@ -2795,6 +3103,7 @@ html, body {
       throw new Error("clipboard unavailable");
     } catch {
       if (textElement && typeof textElement.focus === "function") {
+        if (textElement.isConnected === false || typeof textElement.getClientRects === "function" && textElement.getClientRects().length === 0) return "unavailable";
         textElement.value = shareText;
         textElement.focus({ preventScroll: true });
         textElement.select();
@@ -2852,7 +3161,7 @@ html, body {
           hideBanner();
           setPlayUIVisible(false);
           setBestLabel(getBest());
-          playerName = getPlayerName() || playerName;
+          playerName = getPlayerName();
           $2("player-name").value = playerName;
           $2("name-error").textContent = "";
           renderHomeShare();
@@ -2878,10 +3187,17 @@ html, body {
         case SESSION_STATES.PLAYING:
         case SESSION_STATES.PRACTICE:
           hideAllScreens();
+          setPracticeVisible(state === SESSION_STATES.PRACTICE);
           setPlayUIVisible(true);
+          break;
+        case SESSION_STATES.PRACTICE_COMPLETE:
+          hideBanner();
+          setPlayUIVisible(false);
+          showScreen("practice-complete");
           break;
         case SESSION_STATES.PAUSED:
           setPlayUIVisible(false);
+          $2("btn-pause-retry").classList.toggle("hidden", context.mode === "practice");
           showScreen("pause");
           break;
         case SESSION_STATES.RESULT:
@@ -2900,7 +3216,8 @@ html, body {
     onResult: (data) => {
       setBestLabel(data.best);
       renderResultShare(data);
-    }
+    },
+    onPracticeComplete: () => setTutorialCompleted()
   });
   lockGestures({
     targets: [canvas, $2("controls")],
@@ -2918,7 +3235,7 @@ html, body {
     const url = officialGameUrl();
     return [
       `${playerName || "プレイヤー"}さんのパリパリ結果：${data.score.toLocaleString()}点、ランク${data.rank}！`,
-      `最大コンボ${data.maxCombo}・PERFECT率${data.perfectRate}%・到達ティア${data.tier}`,
+      `最大連続成功${data.maxCombo}・成功のうち、ぴったりの割合${data.perfectRate}%・到達した難しさ${data.tier}`,
       url || "（正式な公開URLは準備中です）",
       "#パリパリ #ミニゲーム"
     ].join("\n");
@@ -2952,7 +3269,9 @@ html, body {
   }
   function beginNormalGame() {
     if (!readPlayerName()) return;
-    session.start("normal", performance.now());
+    $2("player-name").blur();
+    if (getTutorialCompleted()) session.start("normal", performance.now());
+    else session.start("practice", performance.now(), { tutorial: true });
   }
   function beginRetryGame() {
     if (!playerName) {
@@ -2969,6 +3288,9 @@ html, body {
   $2("btn-howto").addEventListener("click", () => session.navigate(SESSION_STATES.HOWTO));
   $2("btn-howto-back").addEventListener("click", () => session.navigate(SESSION_STATES.HOME));
   $2("btn-howto-try").addEventListener("click", beginPractice);
+  $2("btn-practice-again").addEventListener("click", beginPractice);
+  $2("btn-practice-done-home").addEventListener("click", gotoTitle);
+  $2("btn-practice-home").addEventListener("click", gotoTitle);
   var nameComposing = false;
   $2("player-name").addEventListener("input", () => {
     $2("name-error").textContent = "";
@@ -3032,6 +3354,10 @@ html, body {
     if (session) session.handlePageHide(performance.now());
   });
   function handleResize() {
+    const viewport = window.visualViewport;
+    if (viewport && viewport.scale === 1) {
+      document.documentElement.style.setProperty("--visible-height", `${viewport.height}px`);
+    }
     renderer.resize();
     checkOrientation();
   }

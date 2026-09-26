@@ -11,7 +11,8 @@ import * as defaultUi from './ui.js';
 import { getBest, setBest } from './storage.js';
 import { createRandom } from './random.js';
 
-const PRACTICE_GOAL = 5;
+export const PRACTICE_DIRECTIONS = Object.freeze(['L', 'R', 'U', 'UL', 'UR']);
+const PRACTICE_GOAL = PRACTICE_DIRECTIONS.length;
 const INPUT_ORDER = Object.freeze(
   (CONFIG.INPUT_DIRECTIONS || ['L', 'DL', 'D', 'DR', 'R']).slice(),
 );
@@ -106,11 +107,11 @@ export class Game {
     this.r.reducedMotion = !!this.settings.reducedMotion;
     this._callRenderer('clearTransients');
     this._callParticles('clear');
-    this.warmupRemaining = this.mode === 'normal' ? CONFIG.WARMUP.count : PRACTICE_GOAL;
+    this.warmupRemaining = this.mode === 'practice' ? PRACTICE_GOAL : 0;
     // 出現予定時刻はここから固定され、攻撃の早期解決で前倒ししない。
     this.nextSpawnAt = 500;
-    if (this.mode === 'normal') {
-      this._ui('showBanner', 'WARM UP', '来た方向の【反対】を押す');
+    if (this.mode === 'practice') {
+      this._ui('setPracticeGuide', { step: 1, total: PRACTICE_GOAL, dir: 'L', needDir: 'R' });
     }
     this._ui('updateHUD', this);
     return this.roundId;
@@ -257,7 +258,7 @@ export class Game {
         // gives an input at +140 its guaranteed chance to win.
         if (finite(timeoutAt) && timeoutAt < timeoutWatermark) {
           this._processingTime = timeoutAt;
-          this._resolveSegment(this.attack, seg, 'MISS', CONFIG.GOOD_WINDOW, timeoutAt);
+          this._resolveSegment(this.attack, seg, 'MISS', CONFIG.GOOD_WINDOW, timeoutAt, 'timeout');
           cursor = Math.max(cursor, timeoutAt);
           continue;
         }
@@ -338,7 +339,8 @@ export class Game {
     // Store the logical event time so state snapshots and the resolved trail are
     // independent of which frame delivered the queued action. The current frame
     // remains the render horizon in getRenderState().
-    this._resolveSegment(a, seg, result, delta, input.time);
+    const reason = input.dir !== a.needDir ? 'direction' : delta < 0 ? 'early' : 'late';
+    this._resolveSegment(a, seg, result, delta, input.time, reason);
   }
 
   _tier() {
@@ -355,6 +357,7 @@ export class Game {
         baseVisibleMs: CONFIG.WARMUP.visibleMs,
         speedJitter: 0,
         taps: 1,
+        dirs: [PRACTICE_DIRECTIONS[PRACTICE_GOAL - this.warmupRemaining]],
         random: this.random,
       }
       : {
@@ -366,6 +369,14 @@ export class Game {
     this.attack = createAttack(spawnAt, opts);
     this.attack.warmup = warm;
     this.attack.scheduledSpawnAt = spawnAt;
+    if (this.mode === 'practice') {
+      this._ui('setPracticeGuide', {
+        step: PRACTICE_GOAL - this.warmupRemaining + 1,
+        total: PRACTICE_GOAL,
+        dir: this.attack.dir,
+        needDir: this.attack.needDir,
+      });
+    }
     this._checkTierUp();
     return this.attack;
   }
@@ -378,14 +389,14 @@ export class Game {
       if (tier.maxTaps > this._maxTaps && tier.maxTaps >= 2) {
         this._ui('showBanner', `${tier.maxTaps}連 受け流し！`, '同じ向きに連続タップ', 1500);
       } else {
-        this._ui('showBanner', 'SPEED UP', null, 900);
+        this._ui('showBanner', '難しさアップ', null, 900);
       }
     }
     this._tierIndex = idx;
     this._maxTaps = tier.maxTaps;
   }
 
-  _resolveSegment(a, seg, result, delta, resolvedAt = this._processingTime) {
+  _resolveSegment(a, seg, result, delta, resolvedAt = this._processingTime, reason = 'timeout') {
     if (!this.isPlaying() || !a || a.resolved || !seg || seg.resolved) return false;
     seg.resolved = true;
     seg.result = result;
@@ -393,7 +404,7 @@ export class Game {
     a.resolvedAt = resolvedAt;
     a.result = result;
 
-    const warmup = !!a.warmup;
+    const warmup = this.mode === 'practice';
     const reduced = !!this.settings.reducedMotion;
     const { cx, cy } = this._center();
 
@@ -422,11 +433,11 @@ export class Game {
         life: 0.45,
         gravity: 700,
       });
-      this._ui('popJudge', 'MISS', delta);
+      this._ui('popJudge', 'MISS', delta, reason);
     } else {
-      this.combo++;
-      this.maxCombo = Math.max(this.maxCombo, this.combo);
       if (!warmup) {
+        this.combo++;
+        this.maxCombo = Math.max(this.maxCombo, this.combo);
         this.successCount++;
         const gain = calcGain(result, this.combo, delta);
         this.score += gain;
@@ -436,8 +447,10 @@ export class Game {
       this._callRenderer('triggerShockwave', result);
 
       if (result === 'PERFECT') {
-        if (!warmup) this.perfectCount++;
-        this.perfectStreak++;
+        if (!warmup) {
+          this.perfectCount++;
+          this.perfectStreak++;
+        }
         this._callHaptics(HAPTICS.perfect);
         this._callRenderer('triggerFlash', '#fff7df', 0.5);
         // Hitstop/slowmo never changes gameTime. Keep these legacy fields at zero
@@ -504,16 +517,8 @@ export class Game {
     a.resolved = true;
     a.lastImpactAt = a.segments[a.segments.length - 1]?.impactAt ?? a.spawnAt;
 
-    if (a.warmup) {
-      this.warmupRemaining--;
-      if (this.warmupRemaining <= 0 && this.mode === 'normal') {
-        this.combo = 0;
-        this.perfectStreak = 0;
-        const t0 = tierForSuccess(0);
-        this._tierIndex = CONFIG.TIERS.indexOf(t0);
-        this._maxTaps = t0.maxTaps;
-        this._ui('showBanner', 'START!', null, 800);
-      }
+    if (this.mode === 'practice' && a.segments.every((seg) => seg.result !== 'MISS')) {
+      this.warmupRemaining = Math.max(0, this.warmupRemaining - 1);
     }
 
     const intervalMs = this.inWarmup()

@@ -298,7 +298,7 @@ function addStorageAndShareBlock(context) {
   });
 }
 
-async function newContext(browser, { mobile = false, short = false, blocked = false, clocked = false } = {}) {
+async function newContext(browser, { mobile = false, short = false, blocked = false, clocked = false, learned = true } = {}) {
   const context = await browser.newContext({
     viewport: mobile
       ? { width: 375, height: short ? 500 : 667 }
@@ -316,6 +316,11 @@ async function newContext(browser, { mobile = false, short = false, blocked = fa
     await context.addInitScript(() => { globalThis.__browserClockMode = 'controlled'; });
   }
   await installFrameDiagnostics(context);
+  if (learned && !blocked) {
+    // R2 regressions exercise an already-trained player. First use is covered
+    // separately through all five real practice attacks, including storage loss.
+    await context.addInitScript(() => localStorage.setItem('paripari.tutorial.v1', 'true'));
+  }
   if (blocked) addStorageAndShareBlock(context);
   return context;
 }
@@ -1537,6 +1542,100 @@ async function runFileFlow(browser, browserName) {
   }
 }
 
+async function playPracticeStep(page, index, success, label) {
+  const spawnDelay = await page.evaluate(() => {
+    const game = globalThis.__testGame;
+    if (game.attack && !game.attack.resolved) return 0;
+    return Math.max(0, game.nextSpawnAt - globalThis.__testClock.now(performance.now())) + 32;
+  });
+  if (spawnDelay) await page.clock.runFor(spawnDelay);
+  const info = await page.evaluate(() => ({
+    dir: globalThis.__testGame.attack?.dir,
+    needDir: globalThis.__testGame.attack?.needDir,
+    remaining: globalThis.__testGame.warmupRemaining,
+    guide: document.querySelector('#practice-guide')?.textContent,
+    highlighted: document.querySelector('[data-dir].tutorial-target')?.dataset.dir,
+  }));
+  assert(info.dir === ['L', 'R', 'U', 'UL', 'UR'][index], `${label}: practice direction ${index}: ${JSON.stringify(info)}`);
+  assert(info.remaining === 5 - index && info.highlighted === info.needDir && info.guide?.includes(`${index + 1}`),
+    `${label}: guide/progress must match actual attack ${JSON.stringify(info)}`);
+  if (success) {
+    await advanceToFixtureSegment(page, 0, { clocked: true });
+    await page.keyboard.press({ R: 'ArrowRight', L: 'ArrowLeft', D: 'ArrowDown', DR: 'e', DL: 'q' }[info.needDir]);
+    await page.clock.runFor(80);
+  } else await advancePastFixtureTimeout(page);
+  const after = await page.evaluate(() => {
+    const g = globalThis.__testGame;
+    return { remaining: g.warmupRemaining, hp: g.hp,
+      stats: [g.score, g.combo, g.maxCombo, g.successCount, g.perfectCount, g.perfectStreak, g.totalAttempts] };
+  });
+  assert(after.remaining === 5 - index - (success ? 1 : 0), `${label}: success-only progress ${JSON.stringify(after)}`);
+  assert(after.hp === 3 && after.stats.every((value) => value === 0), `${label}: practice polluted normal stats ${JSON.stringify(after)}`);
+}
+
+async function runFirstUseFlow(browser, browserName, origin, variant, blocked) {
+  const context = await newContext(browser, { clocked: true, learned: false, blocked });
+  const page = await context.newPage();
+  const observation = observe(page, origin);
+  const label = `${browserName}-${variant}-first-use-${blocked ? 'memory' : 'saved'}`;
+  try {
+    await page.goto(`${origin}${variant === 'split' ? '/' : '/dist.html'}`, { waitUntil: 'domcontentloaded' });
+    await waitForReady(page, label);
+    await pauseClockAtHome(page, label);
+    await page.locator('#player-name').fill('練習から本番');
+    await page.locator('#btn-play').click();
+    assert(await page.evaluate(() => globalThis.__testSession.state === 'PRACTICE'), `${label}: first use must practice`);
+    await playPracticeStep(page, 0, false, label);
+    // Abort must not persist completion or leak a pending practice result.
+    await page.locator('#btn-practice-home').click();
+    await page.locator('#btn-play').click();
+    const practiceBounds = await page.locator('#controls [data-dir]').evaluateAll((buttons) =>
+      buttons.map((button) => {
+        const { x, y, width, height } = button.getBoundingClientRect();
+        return { x, y, width, height };
+      }));
+    for (let i = 0; i < 5; i++) await playPracticeStep(page, i, true, label);
+    assert(await page.evaluate(() => globalThis.__testSession.state === 'COUNTDOWN'), `${label}: first use needs normal countdown`);
+    await waitForPlaying(page, { hook: true, clocked: true, label });
+    const normalBounds = await page.locator('#controls [data-dir]').evaluateAll((buttons) =>
+      buttons.map((button) => {
+        const { x, y, width, height } = button.getBoundingClientRect();
+        return { x, y, width, height };
+      }));
+    assert(JSON.stringify(practiceBounds) === JSON.stringify(normalBounds), `${label}: controls moved between practice and normal`);
+    assert(await page.evaluate(() => globalThis.__testGame.mode === 'normal' && globalThis.__testGame.warmupRemaining === 0),
+      `${label}: no second warmup`);
+    // Let the actual next three attacks expire: no forced score/HP/result state.
+    for (let i = 0; i < 3; i++) {
+      const delay = await page.evaluate(() => Math.max(0, globalThis.__testGame.nextSpawnAt
+        - globalThis.__testClock.now(performance.now())) + 32);
+      await page.clock.runFor(delay);
+      await advancePastFixtureTimeout(page);
+    }
+    assert(await page.locator('#screen-result').isVisible(), `${label}: normal death did not reach results`);
+    for (const [id, value] of [['result-score', '0'], ['result-combo', '0'], ['result-perfect', '0%']]) {
+      assert(await page.locator(`#${id}`).textContent() === value, `${label}: ${id} inherited practice data`);
+    }
+    assert((await page.locator('#result-player').textContent()).includes('練習から本番'), `${label}: result name changed`);
+    await page.locator('#btn-retry').click();
+    assert(await page.evaluate(() => globalThis.__testSession.state === 'COUNTDOWN'), `${label}: retry repeated tutorial`);
+    await waitForPlaying(page, { hook: true, clocked: true, label });
+    await page.locator('#btn-pause').click();
+    await page.locator('#btn-pause-home').click();
+    assert(await page.locator('#player-name').inputValue() === '練習から本番', `${label}: name not retained`);
+    if (!blocked) {
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await waitForReady(page, label);
+    }
+    await page.locator('#btn-play').click();
+    assert(await page.evaluate(() => globalThis.__testSession.state === 'COUNTDOWN'), `${label}: completed state not retained`);
+    assertHealthy(observation, label);
+  } finally {
+    await closeObservedPage(page);
+    await context.close();
+  }
+}
+
 async function runPracticeBlankNameRegression(browser, browserName, origin) {
   const context = await newContext(browser, { clocked: true });
   // 旧保存名が残る状態から、ホーム上の表示名を空に戻す経路を再現する。
@@ -1566,26 +1665,20 @@ async function runPracticeBlankNameRegression(browser, browserName, origin) {
       await practice.click();
       await waitForPlaying(page, { hook: true, label, clocked: true });
 
-      // 練習の5攻撃を実際のGame.updateで失敗確定させ、GameがpracticeDoneを
-      // 通知する自然な経路を通す。攻撃予定は現在のGameClockから相対設定し、
-      // 本番時計やGame.updateの引数をテストから直接変更しない。
+      // Five misses must leave the first direction pending. Then complete the
+      // actual generated directions through the real keyboard/clock wiring.
       for (let i = 0; i < 5; i++) {
-        const beforeWarmup = await page.evaluate(() => globalThis.__testGame?.warmupRemaining);
-        await prepareAttack(page, { mode: 'practice', taps: 1, hp: 3, impactOffset: 80 });
-        await advancePastFixtureTimeout(page);
-        await page.waitForFunction((previous) => {
-          const game = globalThis.__testGame;
-          return Number(game?.warmupRemaining) === Number(previous) - 1;
-        }, beforeWarmup, { timeout: DEFAULT_TIMEOUT });
+        await playPracticeStep(page, 0, false, label);
       }
-      await firstVisible(page, ['#screen-howto', 'h2:has-text("遊び方")'],
+      for (let i = 0; i < 5; i++) await playPracticeStep(page, i, true, label);
+      await firstVisible(page, ['#screen-practice-complete'],
         `${label}の練習完了後画面`);
       const readyVisible = await page.locator('#screen-ready').isVisible().catch(() => false);
       assert(!readyVisible, `${label}: 任意練習完了後に本番カウントダウンが始まりました`);
       const state = await page.evaluate(() => String(globalThis.__testGame?.state || '').toUpperCase());
       assert(state !== 'PLAYING' && state !== 'RUNNING', `${label}: 任意練習完了後にゲームが続行しています`);
 
-      const back = await firstVisible(page, ['#btn-howto-back', 'button:has-text("もどる")'], `${label}の戻る`);
+      const back = await firstVisible(page, ['#btn-practice-done-home'], `${label}の戻る`);
       await back.click();
       const blankInput = await firstVisible(page, ['#player-name', 'input[name="name"]'], `${label}の空名欄`);
       await blankInput.fill('仮');
@@ -1613,6 +1706,108 @@ async function runPracticeBlankNameRegression(browser, browserName, origin) {
       await closeObservedPage(page);
     }
   } finally {
+    await context.close();
+  }
+}
+
+async function runMenuLayoutRegression(browser, browserName, origin, variant) {
+  const context = await newContext(browser, { clocked: true });
+  const page = await context.newPage();
+  const observation = observe(page, origin);
+  const label = `${browserName}-${variant}-menu-layout`;
+  try {
+    await page.goto(`${origin}${variant === 'split' ? '/' : '/dist.html'}`, { waitUntil: 'domcontentloaded' });
+    await waitForReady(page, label);
+    await pauseClockAtHome(page, label);
+    const sizes = [[320, 568, 100], [375, 500, 100], [375, 667, 100], [402, 874, 100],
+      [1280, 720, 100], [1920, 1080, 100], [375, 500, 150], [375, 500, 200]];
+    for (const [width, height, scale] of sizes) {
+      await page.setViewportSize({ width, height });
+      await page.evaluate((value) => { document.documentElement.style.fontSize = `${value}%`; }, scale);
+      // Layout-only fixtures reveal each existing menu without fabricating a
+      // gameplay outcome. The separate first-use flow verifies real transitions.
+      for (const screen of ['title', 'howto', 'settings', 'pause', 'practice-complete', 'result']) {
+        const metrics = await page.evaluate((name) => {
+          for (const el of document.querySelectorAll('.screen')) el.classList.toggle('hidden', el.id !== `screen-${name}`);
+          const active = document.getElementById(`screen-${name}`);
+          active.scrollTop = 0;
+          document.querySelector('#result-player').textContent = 'あ'.repeat(20) + 'さんの結果';
+          document.querySelector('#result-score').textContent = '999,999,999';
+          const controls = [...active.querySelectorAll('button, input, textarea, a')]
+            .filter((el) => el.getClientRects().length);
+          const small = controls.filter((el) => {
+            const rect = (el.closest('.toggle') || el).getBoundingClientRect();
+            return rect.width < 44 || rect.height < 44;
+          }).map((el) => el.id || el.tagName);
+          const rect = active.getBoundingClientRect();
+          const panel = active.querySelector('.panel,.title-wrap').getBoundingClientRect();
+          return { overflow: active.scrollWidth > active.clientWidth + 1,
+            pageOverflow: document.documentElement.scrollWidth > innerWidth + 1,
+            topReachable: panel.top >= rect.top - 1, small,
+            actions: controls.map((el) => el.id).filter(Boolean) };
+        }, screen);
+        assert(!metrics.overflow && !metrics.pageOverflow && metrics.topReachable && !metrics.small.length,
+          `${label} ${width}x${height} ${scale}% ${screen}: ${JSON.stringify(metrics)}`);
+        for (const id of metrics.actions) {
+          const action = page.locator(`#${id}`);
+          await action.scrollIntoViewIfNeeded();
+          const reachable = await action.evaluate((el) => {
+            const rect = el.getBoundingClientRect();
+            const screen = el.closest('.screen').getBoundingClientRect();
+            const x = rect.left + rect.width / 2;
+            const y = rect.top + rect.height / 2;
+            const top = document.elementFromPoint(x, y);
+            return x >= screen.left && x <= screen.right && y >= screen.top && y <= screen.bottom
+              && !!top && (top === el || el.contains(top));
+          });
+          assert(reachable, `${label} ${width}x${height} ${scale}% ${screen} #${id}: unreachable`);
+        }
+      }
+    }
+    await saveScreenshot(page, label, '200-percent-result');
+    // Simulate the reduced visual viewport reported while a software keyboard
+    // is open. This verifies our resize adapter, not a physical iOS keyboard.
+    await page.evaluate(() => {
+      document.documentElement.style.fontSize = '200%';
+      globalThis.__testSession.home(performance.now());
+      Object.defineProperty(window.visualViewport, 'height', { configurable: true, value: 280 });
+      window.dispatchEvent(new Event('resize'));
+    });
+    await page.locator('#player-name').fill('キーボード表示中');
+    await page.locator('#btn-play').scrollIntoViewIfNeeded();
+    assert(await page.locator('#btn-play').evaluate((el) => {
+      const rect = el.getBoundingClientRect();
+      return rect.top >= 0 && rect.bottom <= 281;
+    }), `${label}: keyboard viewport must keep start reachable`);
+    // Gameplay geometry uses the actual renderer baseline and button boxes.
+    await page.evaluate(() => {
+      delete window.visualViewport.height;
+      document.documentElement.style.fontSize = '100%';
+      window.dispatchEvent(new Event('resize'));
+      globalThis.__testSession.navigate('HOWTO', performance.now());
+    });
+    await page.locator('#btn-howto-try').click();
+    for (const [width, height] of sizes.slice(0, 6)) {
+      await page.setViewportSize({ width, height });
+      await page.clock.runFor(32);
+      const geometry = await page.evaluate(() => {
+        const guide = document.querySelector('#practice-guide').getBoundingClientRect();
+        const buttons = [...document.querySelectorAll('#controls [data-dir]')].map((el) => el.getBoundingClientRect());
+        const app = document.querySelector('#app').getBoundingClientRect();
+        return { guideTop: guide.top, guideBottom: guide.bottom,
+          playerBottom: app.top + app.height * .54 + 27,
+          buttonTop: Math.min(...buttons.map((r) => r.top)),
+          targets: buttons.every((r) => r.width >= 44 && r.height >= 44 && r.bottom <= app.bottom + 1) };
+      });
+      assert(geometry.guideTop >= geometry.playerBottom && geometry.guideBottom <= geometry.buttonTop && geometry.targets,
+        `${label} ${width}x${height}: practice guide/player/buttons overlap ${JSON.stringify(geometry)}`);
+    }
+    await page.setViewportSize({ width: 375, height: 500 });
+    await page.clock.runFor(32);
+    await saveScreenshot(page, label, 'short-practice');
+    assertHealthy(observation, label);
+  } finally {
+    await closeObservedPage(page);
     await context.close();
   }
 }
@@ -1662,6 +1857,12 @@ async function main() {
         await runCase(`${browserName}: タッチ併用PCとiPhone横向き案内`,
           () => runOrientationTouchRegression(browser, browserName, normalOrigin));
         for (const variant of ['split', 'dist']) {
+          for (const blocked of [false, true]) {
+            await runCase(`${browserName}: ${variant}の初回5方向→本番→結果→再挑戦・${blocked ? '保存不可' : '保存再読込'}`,
+              () => runFirstUseFlow(browser, browserName, hookOrigin, variant, blocked));
+          }
+          await runCase(`${browserName}: ${variant}の6画面サイズ・文字150/200%・操作到達`,
+            () => runMenuLayoutRegression(browser, browserName, hookOrigin, variant));
           await runCase(`${browserName}: ${variant}の名前→成功/誤方向/timeout→結果→retry`,
             () => runHookFlow(browser, browserName, hookOrigin, variant));
           await runCase(`${browserName}: ${variant}のR2初期countdown/pagehide/縦横復帰`,
