@@ -35,8 +35,8 @@ R4までに実装したゲームを、公開候補として長時間動かした
 - `npm run build` / `npm run build:check`：成功。分割ソースと配布HTMLの一致を確認
 - `node --check tests/browser.mjs tests/release-r5.test.mjs`：成功
 - PR #10マージ後のmain Quality #18：成功（Chromium、WebKit、verifyを含む）
-- R5のブラウザ100回再挑戦：Draft PRのGitHub Actionsで分割版・単一HTML版、Chromium/WebKitを確認する
-- 独立レビュー：提出前にSol Highの読み取り専用レビューを実施し、結果を追記する
+- R5のブラウザ100回再挑戦：Quality #20（Chromium、WebKit、verify）が全件成功。分割版・単一HTML版を両ブラウザで確認
+- 独立レビュー：Sol Highの読み取り専用レビューを実施し、修正後の再確認で承認。残る必須修正なし
 
 ローカル環境でPlaywright本体を導入できない場合、ローカルブラウザを合格扱いにせず、GitHub Actionsの結果と分けて記録します。
 
