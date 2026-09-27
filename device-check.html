@@ -221,6 +221,16 @@
       font-weight: 700;
     }
 
+    .pending {
+      margin-top: 1rem;
+      border-left: 0.25rem solid var(--focus);
+      padding: 0.75rem 0.85rem;
+      background: #272a22;
+      color: var(--muted);
+    }
+
+    .pending strong { color: var(--focus); }
+
     .report-label { margin-top: 1rem; }
     .footer-note { margin-top: 1.25rem; }
 
@@ -275,14 +285,26 @@
         <label class="field" for="commit">対象コミット
           <input id="commit" type="text" autocomplete="off" placeholder="公開後に確認したSHA">
         </label>
+        <label class="field" for="viewport">実寸法
+          <input id="viewport" type="text" autocomplete="off" placeholder="例：402×874 CSS px">
+        </label>
+        <label class="field" for="game-form">確認したゲーム形式
+          <select id="game-form">
+            <option value="未選択">未選択</option>
+            <option value="分割版">分割版</option>
+            <option value="単一HTML版">単一HTML版</option>
+            <option value="両方">両方</option>
+          </select>
+        </label>
         <label class="field" for="overall">総合判定
           <select id="overall">
             <option value="未実施">未実施</option>
-            <option value="合格">合格</option>
+            <option value="合格" disabled>合格（全項目と公開前点検が必要）</option>
             <option value="要修正">要修正</option>
           </select>
         </label>
       </div>
+      <p class="hint">「合格」は、X01/X02の全項目、X03の確認項目、端末情報、対象コミット、公開前点検をすべて記録した後に選べます。</p>
     </section>
 
     <section class="card" aria-labelledby="x01-heading">
@@ -307,7 +329,7 @@
     <section class="card" aria-labelledby="x02-heading">
       <div class="section-heading">
         <h2 id="x02-heading">3. X02 端末・アクセシビリティ</h2>
-        <span class="summary" id="summary-x02">0/7</span>
+        <span class="summary" id="summary-x02">0/9</span>
       </div>
       <p class="hint">無理に合格にせず、できなかった操作はメモ欄に再現条件を書きます。</p>
       <fieldset>
@@ -315,8 +337,10 @@
         <div class="check-list">
           <label class="check-item"><input id="x02-portrait" type="checkbox" data-group="x02"><span>縦向きで、文字や操作ボタンが欠けずに確認できた</span></label>
           <label class="check-item"><input id="x02-landscape" type="checkbox" data-group="x02"><span>横向きで、文字や操作ボタンが欠けずに確認できた</span></label>
+          <label class="check-item"><input id="x02-rotate" type="checkbox" data-group="x02"><span>縦向き・横向きの回転後に、表示と操作が戻った</span></label>
           <label class="check-item"><input id="x02-keyboard" type="checkbox" data-group="x02"><span>名前入力時のキーボード表示・確定・非表示を確認できた</span></label>
           <label class="check-item"><input id="x02-resume" type="checkbox" data-group="x02"><span>Safariを離れて戻った後、状態が壊れずに再開・再操作できた</span></label>
+          <label class="check-item"><input id="x02-no-hit" type="checkbox" data-group="x02"><span>画面を離れて戻っただけで被弾せず、状態が壊れなかった</span></label>
           <label class="check-item"><input id="x02-text" type="checkbox" data-group="x02"><span>文字拡大（150%・200%相当）で内容を読み取れた</span></label>
           <label class="check-item"><input id="x02-voiceover" type="checkbox" data-group="x02"><span>VoiceOverで主要な見出し・入力・ボタンの役割を確認できた</span></label>
           <label class="check-item"><input id="x02-share" type="checkbox" data-group="x02"><span>共有操作を実行し、キャンセルまたは共有完了後に戻れた</span></label>
@@ -327,7 +351,7 @@
     <section class="card" aria-labelledby="x03-heading">
       <div class="section-heading">
         <h2 id="x03-heading">4. X03 配布前点検</h2>
-        <span class="summary" id="summary-x03">0/5</span>
+        <span class="summary" id="summary-x03">0/4</span>
       </div>
       <p class="hint">公開設定は変えず、今見えている配布物だけを確認します。</p>
       <fieldset>
@@ -337,9 +361,37 @@
           <label class="check-item"><input id="x03-source" type="checkbox" data-group="x03"><span>分割版ゲームへのリンクが開いた</span></label>
           <label class="check-item"><input id="x03-single" type="checkbox" data-group="x03"><span>単一HTML版ゲームへのリンクが開いた</span></label>
           <label class="check-item"><input id="x03-license" type="checkbox" data-group="x03"><span>LICENSEのリンクを開けた</span></label>
-          <label class="check-item"><input id="x03-hold" type="checkbox" data-group="x03"><span>正式URL・公開元は未確定のまま、推測していない</span></label>
         </div>
       </fieldset>
+      <div class="pending" aria-labelledby="pending-heading">
+        <strong id="pending-heading">公開前の保留項目（X03の合格条件）</strong>
+        <p>公開予定パス、公開元、正式URL、プレビュー画像、コミットと配布物の一致は、公開指示後に確認します。未確定のまま「合格」にはできません。</p>
+        <div class="field-grid">
+          <label class="field" for="planned-path">公開予定パス
+            <input id="planned-path" type="text" autocomplete="off" placeholder="公開指示後に確認">
+          </label>
+          <label class="field" for="public-source">公開元
+            <input id="public-source" type="text" autocomplete="off" placeholder="例：GitHub Pages（確定後）">
+          </label>
+          <label class="field" for="official-url">正式URL
+            <input id="official-url" type="url" inputmode="url" autocomplete="off" placeholder="公開指示後に確認">
+          </label>
+          <label class="field" for="preview-status">プレビュー画像
+            <select id="preview-status">
+              <option value="未作成">未作成</option>
+              <option value="作成済み">作成済み</option>
+              <option value="実機画面を確認済み">実機画面を確認済み</option>
+            </select>
+          </label>
+          <label class="field" for="distribution-match">コミットと配布物
+            <select id="distribution-match">
+              <option value="未確認">未確認</option>
+              <option value="一致">一致</option>
+              <option value="不一致">不一致</option>
+            </select>
+          </label>
+        </div>
+      </div>
       <p class="hint"><a href="./LICENSE">LICENSEを開く</a>（公開元や正式URLの確定とは別の確認です）</p>
     </section>
 
@@ -362,6 +414,6 @@
 
     <p class="small footer-note">保存先はこのブラウザの端末内だけです。記録を共有するときは、内容を確認してからコピーしてください。</p>
   </main>
-  <script src="./src/js/device-check.js" defer></script>
+  <script type="module" src="./src/js/device-check.js"></script>
 </body>
 </html>
