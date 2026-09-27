@@ -11,7 +11,10 @@ assert.notEqual(end, -1, '結果共有関数の終端が見つかる');
 const functionSource = source.slice(start, end + 2);
 const bodyStart = functionSource.indexOf('{') + 1;
 const body = functionSource.slice(bodyStart, functionSource.lastIndexOf('}'));
-const makeShareText = new Function('playerName', `return function shareTextForResult(data) {\${body}};`) ;
+const makeShareText = new Function(
+  'playerName',
+  'return function shareTextForResult(data) {' + body + '};',
+);
 
 test('結果共有文を指定された改行形式で作る', () => {
   const shareTextForResult = makeShareText('カメレオンJP');
