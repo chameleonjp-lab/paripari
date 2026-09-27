@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import {
   buildReport,
   isPassReady,
+  reportIsCurrent,
   recordFingerprint,
   recordKey,
 } from '../src/js/device-check.js';
@@ -89,7 +90,7 @@ function readyRecord() {
       device: 'iPhone 17 Pro',
       ios: 'iOS 26',
       safari: 'Safari 26',
-      commit: 'abc123',
+      commit: 'abcdef1234567',
       viewport: '402×874 CSS px',
       'game-form': '両方',
       'planned-path': '/paripari/',
@@ -105,10 +106,19 @@ function readyRecord() {
 test('D07: 合格は必要チェック・端末情報・公開前点検が揃った記録だけで成立する', () => {
   const record = readyRecord();
   assert.equal(isPassReady(record, requiredChecks), true);
+  record.fields['game-form'] = '分割版';
+  assert.equal(isPassReady(record, requiredChecks), false);
+  record.fields['game-form'] = '両方';
   record.checks['x02-no-hit'] = false;
   assert.equal(isPassReady(record, requiredChecks), false);
   record.checks['x02-no-hit'] = true;
   record.fields['official-url'] = '';
+  assert.equal(isPassReady(record, requiredChecks), false);
+  record.fields['official-url'] = 'https://example.test/paripari/';
+  assert.equal(isPassReady(record, requiredChecks), true);
+  record.fields['official-url'] = 'not-a-url';
+  assert.equal(isPassReady(record, requiredChecks), false);
+  record.fields['official-url'] = 'https://example.test/other/';
   assert.equal(isPassReady(record, requiredChecks), false);
   record.fields['official-url'] = 'https://example.test/paripari/';
   record.fields['distribution-match'] = '不一致';
@@ -120,8 +130,12 @@ test('D08: 対象コミットごとに記録キーを分け、編集すると記
   assert.equal(recordKey(''), '__unspecified__');
   const first = readyRecord();
   const firstFingerprint = recordFingerprint(first);
+  first.report = '古い記録文';
+  first.reportFingerprint = firstFingerprint;
+  assert.equal(reportIsCurrent(first), true);
   first.checks['x01-result'] = false;
   assert.notEqual(recordFingerprint(first), firstFingerprint);
+  assert.equal(reportIsCurrent(first), false);
   assert.notEqual(recordKey('abc123'), recordKey('def456'));
 });
 

@@ -10,21 +10,49 @@ export function recordFingerprint(record) {
   });
 }
 
+export function reportIsCurrent(record) {
+  return Boolean(record?.report
+    && record?.reportFingerprint
+    && record.reportFingerprint === recordFingerprint(record));
+}
+
+function normalizedPath(path) {
+  const value = String(path || '').trim();
+  if (!value.startsWith('/') || /\s/.test(value)) return '';
+  return value.replace(/\/+$/, '') || '/';
+}
+
+function validCommit(commit) {
+  return /^[0-9a-f]{7,40}$/i.test(String(commit || '').trim());
+}
+
+function validOfficialUrl(officialUrl, plannedPath) {
+  try {
+    const url = new URL(String(officialUrl || '').trim());
+    return (url.protocol === 'https:' || url.protocol === 'http:')
+      && Boolean(url.hostname)
+      && normalizedPath(url.pathname) === normalizedPath(plannedPath);
+  } catch (error) {
+    return false;
+  }
+}
+
 export function isPassReady(record, requiredCheckIds) {
   const fields = record?.fields || {};
   const checks = record?.checks || {};
   const hasAllChecks = requiredCheckIds.every((id) => checks[id] === true);
-  const hasDeviceRecord = ['device', 'ios', 'safari', 'commit', 'viewport']
+  const hasDeviceRecord = ['device', 'ios', 'safari', 'viewport']
     .every((id) => String(fields[id] || '').trim());
-  const hasGameForm = fields['game-form'] && fields['game-form'] !== '未選択';
+  const hasCommit = validCommit(fields.commit);
+  const hasBothGameForms = fields['game-form'] === '両方';
   const hasPublicationRecord = [
     'planned-path',
     'public-source',
-    'official-url',
   ].every((id) => String(fields[id] || '').trim())
+    && validOfficialUrl(fields['official-url'], fields['planned-path'])
     && fields['preview-status'] === '実機画面を確認済み'
     && fields['distribution-match'] === '一致';
-  return hasAllChecks && hasDeviceRecord && hasGameForm && hasPublicationRecord;
+  return hasAllChecks && hasDeviceRecord && hasCommit && hasBothGameForms && hasPublicationRecord;
 }
 
 export function buildReport(record, groups) {
@@ -98,6 +126,7 @@ function init() {
       fields: Object.fromEntries(fieldIds.map((id) => [id, fields[id].value])),
       checks: Object.fromEntries(checkboxes.map((checkbox) => [checkbox.id, checkbox.checked])),
       report: report.value,
+      reportFingerprint: report.dataset.fingerprint || '',
     };
   }
 
@@ -112,7 +141,8 @@ function init() {
       }
     }
     report.value = typeof record.report === 'string' ? record.report : '';
-    report.dataset.fingerprint = report.value ? recordFingerprint(record) : '';
+    report.dataset.fingerprint = typeof record.reportFingerprint === 'string'
+      ? record.reportFingerprint : '';
   }
 
   function resetVerificationState(commitValue = '') {
@@ -191,7 +221,7 @@ function init() {
   }
 
   function markReportStale() {
-    if (report.value && report.dataset.fingerprint !== recordFingerprint(readRecord())) {
+    if (report.value && !reportIsCurrent(readRecord())) {
       setStatus('記録内容が変わりました。「記録文を作る」で記録を更新してください。');
     }
   }
@@ -221,7 +251,7 @@ function init() {
   async function copyReport() {
     ensureActiveRecord();
     const current = readRecord();
-    if (!report.value || report.dataset.fingerprint !== recordFingerprint(current)) makeReport();
+    if (!reportIsCurrent(current)) makeReport();
     const text = report.value;
     report.focus();
     report.select();
