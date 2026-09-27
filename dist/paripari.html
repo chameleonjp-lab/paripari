@@ -6,6 +6,18 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0a0a12">
   <title>パリパリ - PariPari</title>
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="パリパリ｜来た方向と反対を、タイミングよく選べ！">
+  <meta property="og:description" content="攻撃が来た瞬間に、反対方向を選ぶタイミングゲーム。">
+  <meta property="og:url" content="https://chameleonjp-lab.github.io/paripari/">
+  <meta property="og:image" content="https://chameleonjp-lab.github.io/paripari/og-image.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="パリパリ｜来た方向と反対を、タイミングよく選べ！">
+  <meta name="twitter:description" content="攻撃が来た瞬間に、反対方向を選ぶタイミングゲーム。">
+  <meta name="twitter:image" content="https://chameleonjp-lab.github.io/paripari/og-image.png">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9A%94%EF%B8%8F%3C/text%3E%3C/svg%3E">
   <style>
 /* パリパリ スタイル — 和ネオン墨 / iPhone SE 最適化 (要件 §4) */
@@ -574,18 +586,19 @@ kbd {
         <h2 tabindex="-1">遊び方</h2>
         <ol class="howto-list">
           <li>攻撃は左・右・上・左上・右上の<b>5方向</b>から来ます。線に届く瞬間に、来た方向と反対のボタンを押します。</li>
+          <li id="howto-mobile" class="howto-platform">スマホでは、画面下の<b>5つの方向ボタン</b>を使います。攻撃が来た瞬間に、来た方向と反対のボタンをタップします。</li>
+          <li id="howto-pc" class="howto-platform hidden" aria-hidden="true">PCでは、画面のボタンまたはキーボードを使います。攻撃が来た瞬間に、来た方向と反対のキーを押します。左 <kbd>←</kbd>/<kbd>A</kbd>、右 <kbd>→</kbd>/<kbd>D</kbd>、下 <kbd>↓</kbd>/<kbd>S</kbd>、左下 <kbd>Q</kbd>/<kbd>Z</kbd>、右下 <kbd>E</kbd>/<kbd>C</kbd> です。</li>
           <li>対応は、左→<b>右</b>／右→<b>左</b>／上→<b>下</b>／左上→<b>右下</b>／右上→<b>左下</b>です。</li>
           <li>初回は5方向を1回ずつ成功させる案内付き練習から始まります。練習中はライフが減らず、失敗した方向を成功するまで繰り返します。遊び方から何度でも練習できます。</li>
           <li>1回の攻撃は1〜3回押すことがあります。失敗しても、ライフが減るのは1回の攻撃につき最大1つです。</li>
           <li>本番のライフは3つ。なくなると終了です。</li>
-          <li>誤差60ミリ秒以内は<b>ぴったり</b>、140ミリ秒以内は<b>成功</b>。それより早い・遅い入力や逆方向は失敗です。</li>
+          <li>誤差60ミリ秒以内は<b>ぴったり</b>、140ミリ秒以内は<b>成功</b>。それより早い・遅い入力、逆方向、方向が違う入力は失敗です。</li>
           <li>ぴったり成功を10回連続するとライフが1つ回復します（最大3つ）。</li>
-          <li class="howto-keys">PCキー：左 <kbd>←</kbd>/<kbd>A</kbd>、右 <kbd>→</kbd>/<kbd>D</kbd>、下 <kbd>↓</kbd>/<kbd>S</kbd>、左下 <kbd>Q</kbd>/<kbd>Z</kbd>、右下 <kbd>E</kbd>/<kbd>C</kbd></li>
         </ol>
         <p class="howto-judge">
           <span class="tag perfect">ぴったり</span> 誤差60ミリ秒以内
           <span class="tag good">成功</span> 誤差140ミリ秒以内
-          <span class="tag miss">失敗</span> 早い・遅い・逆方向
+          <span class="tag miss">失敗</span> 早い・遅い・逆方向・方向が違う
         </p>
         <button id="btn-howto-try" class="btn btn-primary">練習してみる</button>
         <button id="btn-howto-back" class="btn">もどる</button>
@@ -597,6 +610,7 @@ kbd {
       <div class="panel">
         <h2 tabindex="-1">設定</h2>
         <label class="toggle"><span>振動（対応端末のみ）</span><input type="checkbox" id="set-vibrate"></label>
+        <label class="toggle"><span>効果音</span><input type="checkbox" id="set-sound"></label>
         <label class="toggle"><span>モーション低減</span><input type="checkbox" id="set-motion"></label>
         <button id="btn-settings-back" class="btn btn-primary">もどる</button>
       </div>
@@ -621,7 +635,7 @@ kbd {
     <!-- リザルト -->
     <section id="screen-result" class="screen hidden">
       <div class="panel result-panel">
-        <div id="result-rank" class="result-rank">A</div>
+        <div id="result-rank" class="result-rank">E</div>
         <div class="result-score-label">スコア</div>
         <div id="result-score" class="result-score">0</div>
         <div id="result-best-badge" class="best-badge hidden">★ ベスト更新！</div>
@@ -686,12 +700,18 @@ kbd {
     SLOWMO_MS: 140,
     SHAKE_MISS: 14,
     DPR_CAP: 3,
-    // --- ランクしきい値（総スコア）---
+    // --- ランクしきい値（総スコア、10段階）---
     RANKS: [
-      { rank: "S", min: 18e3 },
-      { rank: "A", min: 1e4 },
-      { rank: "B", min: 5e3 },
-      { rank: "C", min: 0 }
+      { rank: "S", min: 32e3 },
+      { rank: "A+", min: 26e3 },
+      { rank: "A", min: 21e3 },
+      { rank: "B+", min: 16500 },
+      { rank: "B", min: 12500 },
+      { rank: "C+", min: 9e3 },
+      { rank: "C", min: 6e3 },
+      { rank: "D+", min: 3500 },
+      { rank: "D", min: 1500 },
+      { rank: "E", min: 0 }
     ],
     // 攻撃は上半分から来る5方向（下部はボタン専用エリア）
     DIRECTIONS: ["L", "R", "U", "UL", "UR"],
@@ -1569,6 +1589,95 @@ kbd {
     miss: [40]
   };
 
+  // src/js/sound.js
+  var enabled2 = true;
+  var audioContext = null;
+  function contextConstructor() {
+    return globalThis.AudioContext || globalThis.webkitAudioContext || null;
+  }
+  function getContext() {
+    const Constructor = contextConstructor();
+    if (!Constructor) return null;
+    if (audioContext) return audioContext;
+    try {
+      audioContext = new Constructor();
+      return audioContext;
+    } catch {
+      return null;
+    }
+  }
+  function resumeContext(context) {
+    if (context && context.state === "suspended" && typeof context.resume === "function") {
+      context.resume().catch(() => {
+      });
+    }
+  }
+  function tone(frequency, duration, {
+    type = "sine",
+    volume = 0.045,
+    delay = 0,
+    endFrequency = frequency
+  } = {}) {
+    if (!enabled2) return;
+    const context = getContext();
+    if (!context || typeof context.createOscillator !== "function") return;
+    resumeContext(context);
+    try {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const start = context.currentTime + Math.max(0, delay);
+      const end = start + Math.max(0.025, duration);
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(frequency, start);
+      oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, endFrequency), end);
+      gain.gain.setValueAtTime(1e-4, start);
+      gain.gain.exponentialRampToValueAtTime(Math.max(1e-4, volume), start + 8e-3);
+      gain.gain.exponentialRampToValueAtTime(1e-4, end);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(start);
+      oscillator.stop(end + 0.02);
+    } catch {
+    }
+  }
+  function setSoundEnabled(value) {
+    enabled2 = !!value;
+  }
+  function unlockSound() {
+    resumeContext(getContext());
+  }
+  function playSfx(name, value = 0) {
+    if (!enabled2) return;
+    switch (name) {
+      case "attack":
+        tone(430, 0.055, { volume: 0.018, type: "triangle", endFrequency: 560 });
+        break;
+      case "countdown":
+        tone(value === 1 ? 560 : 470, 0.09, { volume: 0.035, type: "sine" });
+        break;
+      case "start":
+        tone(660, 0.1, { volume: 0.04, type: "triangle" });
+        tone(990, 0.16, { volume: 0.045, type: "triangle", delay: 0.08 });
+        break;
+      case "perfect":
+        tone(880, 0.1, { volume: 0.045, type: "triangle" });
+        tone(1320, 0.16, { volume: 0.04, type: "triangle", delay: 0.06 });
+        break;
+      case "good":
+        tone(650, 0.11, { volume: 0.035, type: "sine", endFrequency: 760 });
+        break;
+      case "miss":
+        tone(180, 0.2, { volume: 0.05, type: "sawtooth", endFrequency: 90 });
+        break;
+      case "gameover":
+        tone(260, 0.18, { volume: 0.045, type: "triangle", endFrequency: 180 });
+        tone(150, 0.28, { volume: 0.04, type: "triangle", delay: 0.14, endFrequency: 90 });
+        break;
+      default:
+        break;
+    }
+  }
+
   // src/js/ui.js
   var ui_exports = {};
   __export(ui_exports, {
@@ -1579,6 +1688,7 @@ kbd {
     reflectSettings: () => reflectSettings,
     setBestLabel: () => setBestLabel,
     setCountdown: () => setCountdown,
+    setHowtoPlatform: () => setHowtoPlatform,
     setPlayUIVisible: () => setPlayUIVisible,
     setPracticeGuide: () => setPracticeGuide,
     setPracticeVisible: () => setPracticeVisible,
@@ -1678,6 +1788,19 @@ kbd {
     renderAttackProgress();
     syncPracticeGuide();
   }
+  function setHowtoPlatform(isHandheld) {
+    const mobile = $("howto-mobile");
+    const pc = $("howto-pc");
+    const showMobile = !!isHandheld;
+    if (mobile) {
+      mobile.classList.toggle("hidden", !showMobile);
+      mobile.setAttribute("aria-hidden", String(!showMobile));
+    }
+    if (pc) {
+      pc.classList.toggle("hidden", showMobile);
+      pc.setAttribute("aria-hidden", String(showMobile));
+    }
+  }
   function renderAttackProgress() {
     const el = $("attack-progress");
     if (!el) return;
@@ -1759,7 +1882,9 @@ kbd {
     else {
       const fallbackReason = delta < 0 ? "early" : delta > 0 ? "late" : "";
       const missMessage = {
-        direction: "逆方向！",
+        reverse: "逆方向！",
+        direction: "方向が違う！",
+        "wrong-direction": "方向が違う！",
         early: "早すぎ！",
         late: "遅すぎ！",
         timeout: "時間切れ！"
@@ -1791,6 +1916,7 @@ kbd {
   }
   function reflectSettings(s) {
     $("set-vibrate").checked = s.vibrate;
+    $("set-sound").checked = s.sound;
     $("set-motion").checked = s.reducedMotion;
   }
 
@@ -1802,6 +1928,7 @@ kbd {
   var KEY_TUTORIAL_COMPLETED = "paripari.tutorial.v1";
   var DEFAULT_SETTINGS = Object.freeze({
     vibrate: true,
+    sound: true,
     reducedMotion: false
   });
   var cachedBest = 0;
@@ -1881,12 +2008,13 @@ kbd {
     return name;
   }
   function copySettings(settings2) {
-    return { vibrate: settings2.vibrate, reducedMotion: settings2.reducedMotion };
+    return { vibrate: settings2.vibrate, sound: settings2.sound, reducedMotion: settings2.reducedMotion };
   }
   function normalizeSettings(value) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     return {
       vibrate: typeof source.vibrate === "boolean" ? source.vibrate : DEFAULT_SETTINGS.vibrate,
+      sound: typeof source.sound === "boolean" ? source.sound : DEFAULT_SETTINGS.sound,
       reducedMotion: typeof source.reducedMotion === "boolean" ? source.reducedMotion : DEFAULT_SETTINGS.reducedMotion
     };
   }
@@ -1971,7 +2099,7 @@ kbd {
     } = {}) {
       this.r = renderer2 || makeEmptyRenderer();
       this.particles = particles2 || null;
-      this.settings = { reducedMotion: false, vibrate: true, ...settings2 };
+      this.settings = { reducedMotion: false, vibrate: true, sound: true, ...settings2 };
       this.onGameOver = typeof onGameOver === "function" ? onGameOver : () => {
       };
       this.ui = ui || ui_exports;
@@ -2195,7 +2323,7 @@ kbd {
       }
       const delta = input.time - seg.impactAt;
       const result = judgeTiming(delta, input.dir === a.needDir);
-      const reason = input.dir !== a.needDir ? "direction" : delta < 0 ? "early" : "late";
+      const reason = input.dir !== a.needDir ? input.dir === a.dir ? "reverse" : "wrong-direction" : delta < 0 ? "early" : "late";
       this._resolveSegment(a, seg, result, delta, input.time, reason);
     }
     _tier() {
@@ -2221,6 +2349,7 @@ kbd {
       this.attack = createAttack(spawnAt, opts);
       this.attack.warmup = warm;
       this.attack.scheduledSpawnAt = spawnAt;
+      this._playSfx("attack");
       if (this.mode === "practice") {
         this._ui("setPracticeGuide", {
           step: PRACTICE_GOAL - this.warmupRemaining + 1,
@@ -2269,6 +2398,7 @@ kbd {
           a.hpLost = true;
         }
         this._callHaptics(HAPTICS.miss);
+        this._playSfx("miss");
         this._callRenderer("triggerFlash", "#5a0a14", 0.45);
         this._callRenderer("triggerVignette", "150,20,40", warmup ? 0.4 : 0.7);
         this._callRenderer("triggerShake", CONFIG.SHAKE_MISS);
@@ -2299,6 +2429,7 @@ kbd {
             this.perfectStreak++;
           }
           this._callHaptics(HAPTICS.perfect);
+          this._playSfx("perfect");
           this._callRenderer("triggerFlash", "#fff7df", 0.5);
           this.hitstopMs = 0;
           this.slowmoMs = 0;
@@ -2326,6 +2457,7 @@ kbd {
         } else {
           this.perfectStreak = 0;
           this._callHaptics(HAPTICS.good);
+          this._playSfx("good");
           this._callRenderer("triggerFlash", "#bfefff", 0.3);
           this.hitstopMs = 0;
           this.slowmoMs = 0;
@@ -2389,6 +2521,7 @@ kbd {
       this._gameOverNotified = true;
       this._roundActive = false;
       this.state = "OVER";
+      this._playSfx("gameover");
       this.attack = null;
       this.clearInputs();
       const best = getBest();
@@ -2431,6 +2564,10 @@ kbd {
     }
     _callHaptics(pattern) {
       if (this.settings.vibrate !== false) vibrate(pattern);
+    }
+    _playSfx(name, ...args) {
+      if (this.settings.sound === false) return;
+      playSfx(name, ...args);
     }
     _ui(method, ...args) {
       if (typeof this.ui?.[method] === "function") this.ui[method](...args);
@@ -3130,7 +3267,7 @@ kbd {
   };
 
   // src/js/platform.js
-  var OFFICIAL_GAME_URL = "";
+  var OFFICIAL_GAME_URL = "https://chameleonjp-lab.github.io/paripari/";
   function officialGameUrl() {
     return OFFICIAL_GAME_URL || null;
   }
@@ -3180,6 +3317,7 @@ kbd {
   var clock = new GameClock();
   var settings = getSettings();
   setHapticsEnabled(settings.vibrate);
+  setSoundEnabled(settings.sound);
   renderer.reducedMotion = !!settings.reducedMotion;
   var playerName = getPlayerName();
   var session = null;
@@ -3227,6 +3365,7 @@ kbd {
         case SESSION_STATES.HOWTO:
           hideBanner();
           setPlayUIVisible(false);
+          setHowtoPlatform(isHandheldDevice());
           showScreen("howto");
           break;
         case SESSION_STATES.SETTINGS:
@@ -3267,6 +3406,7 @@ kbd {
       }
     },
     onCountdown: (n) => {
+      playSfx(n > 0 ? "countdown" : "start", n);
       if (n > 0) setCountdown(n);
       else setCountdown(0);
     },
@@ -3281,20 +3421,17 @@ kbd {
     isEnabled: () => !!session && session.canHandleAction()
   });
   function shareTextForHome() {
-    const url = officialGameUrl();
     return [
-      "パリパリ：来た方向と反対を、ちょうどの瞬間に弾け。",
-      url || "（正式な公開URLは準備中です）",
-      "#パリパリ #ミニゲーム"
+      "パリパリ：来た方向と反対を、タイミングよく選べ！",
+      "https://chameleonjp-lab.github.io/paripari/"
     ].join("\n");
   }
   function shareTextForResult(data) {
-    const url = officialGameUrl();
     return [
       `${playerName || "プレイヤー"}さんのパリパリ結果：${data.score.toLocaleString()}点、ランク${data.rank}！`,
       `最大連続成功${data.maxCombo}・成功のうち、ぴったりの割合${data.perfectRate}%・到達した難しさ${data.tier}`,
-      url || "（正式な公開URLは準備中です）",
-      "#パリパリ #ミニゲーム"
+      "パリパリ：来た方向と反対を、タイミングよく選べ！",
+      "https://chameleonjp-lab.github.io/paripari/"
     ].join("\n");
   }
   function renderHomeShare() {
@@ -3395,6 +3532,10 @@ kbd {
     });
   }
   bindToggle("set-vibrate", "vibrate", (v) => setHapticsEnabled(v));
+  bindToggle("set-sound", "sound", (v) => {
+    setSoundEnabled(v);
+    if (v) unlockSound();
+  });
   bindToggle("set-motion", "reducedMotion", (v) => {
     renderer.reducedMotion = v;
   });
@@ -3416,6 +3557,7 @@ kbd {
       document.documentElement.style.setProperty("--visible-height", `${viewport.height}px`);
     }
     renderer.resize();
+    setHowtoPlatform(isHandheldDevice());
     checkOrientation();
   }
   function isHandheldDevice() {

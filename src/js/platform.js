@@ -1,6 +1,5 @@
 // 端末内のシェア補助。スコア送信・ランキング・外部APIは持ち込まない。
-// 正式な公開URLは公開工程で確認するまで設定しない。
-export const OFFICIAL_GAME_URL = '';
+export const OFFICIAL_GAME_URL = 'https://chameleonjp-lab.github.io/paripari/';
 
 export function officialGameUrl() {
   return OFFICIAL_GAME_URL || null;
@@ -12,7 +11,7 @@ function setStatus(statusElement, message) {
 
 /**
  * Web Share → クリップボード → 画面上の選択、の順で共有を試みる。
- * 共有キャンセルはエラー表示にせず、URL未確定時はurlフィールドを送らない。
+ * 共有キャンセルはエラー表示にせず、本文にURLがない場合だけurlフィールドを補う。
  */
 export async function shareOrCopy({ text, title, statusElement, textElement, url = officialGameUrl() }) {
   setStatus(statusElement, '');

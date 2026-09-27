@@ -304,6 +304,19 @@ test('G04/G05/G08: split misses lose one HP, recovery has a 9/10/11 boundary, an
   assert.equal(mixed.successCount, SUCCESS_BOUNDARIES[6] + 1, 'the successful split segment still counts');
   assert.equal(mixedAttack.segments[1].result, 'GOOD', 'a split can contain a GOOD result');
 
+  const reverseReasons = [];
+  const reverse = new Game({
+    settings: { vibrate: false, sound: false },
+    random: () => 0,
+    ui: { popJudge: (...args) => reverseReasons.push(args) },
+  });
+  reverse.start('normal');
+  reverse.update(reverse.nextSpawnAt);
+  const reverseAttack = reverse.attack;
+  assert.equal(reverseAttack.dir, 'L', 'the fixed seed creates a left attack');
+  resolveSegment(reverse, reverseAttack, 0, reverseAttack.dir);
+  assert.ok(reverseReasons.some(([result, , reason]) => result === 'MISS' && reason === 'reverse'));
+
   const missReasons = [];
   const allMiss = new Game({
     settings: { vibrate: false },
@@ -319,7 +332,7 @@ test('G04/G05/G08: split misses lose one HP, recovery has a 9/10/11 boundary, an
   assert.equal(allMiss.hp, 2, 'multiple misses in one split attack cost at most one HP');
   assert.equal(allMiss.successCount, SUCCESS_BOUNDARIES[6]);
   assert.equal(allMiss.state, 'PLAYING');
-  assert.ok(missReasons.some(([result, , reason]) => result === 'MISS' && reason === 'direction'));
+  assert.ok(missReasons.some(([result, , reason]) => result === 'MISS' && reason === 'wrong-direction'));
 
   const threeMiss = new Game({ settings: { vibrate: false }, random: () => 0.999999, ui: {} });
   threeMiss.start('normal');
@@ -349,7 +362,7 @@ test('G04/G05/G08: split misses lose one HP, recovery has a 9/10/11 boundary, an
   assert.deepEqual(threeMixedAttack.segments.map((segment) => segment.result), ['PERFECT', 'GOOD', 'MISS']);
   assert.equal(threeMixed.hp, 2);
   assert.equal(threeMixed.successCount, SUCCESS_BOUNDARIES[12] + 2);
-  assert.ok(threeMixedReasons.some(([result, , reason]) => result === 'MISS' && reason === 'direction'));
+  assert.ok(threeMixedReasons.some(([result, , reason]) => result === 'MISS' && reason === 'wrong-direction'));
 
   const recovery = new Game({ settings: { vibrate: false }, random: () => 0, ui: {} });
   recovery.start('normal');

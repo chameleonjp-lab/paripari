@@ -8,6 +8,7 @@ const KEY_TUTORIAL_COMPLETED = 'paripari.tutorial.v1';
 
 const DEFAULT_SETTINGS = Object.freeze({
   vibrate: true,
+  sound: true,
   reducedMotion: false,
 });
 
@@ -107,13 +108,14 @@ export function setPlayerName(value) {
 }
 
 function copySettings(settings) {
-  return { vibrate: settings.vibrate, reducedMotion: settings.reducedMotion };
+  return { vibrate: settings.vibrate, sound: settings.sound, reducedMotion: settings.reducedMotion };
 }
 
 function normalizeSettings(value) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   return {
     vibrate: typeof source.vibrate === 'boolean' ? source.vibrate : DEFAULT_SETTINGS.vibrate,
+    sound: typeof source.sound === 'boolean' ? source.sound : DEFAULT_SETTINGS.sound,
     reducedMotion: typeof source.reducedMotion === 'boolean'
       ? source.reducedMotion : DEFAULT_SETTINGS.reducedMotion,
   };

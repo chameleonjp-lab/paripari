@@ -78,18 +78,18 @@ function navigatorFor(t, value) {
   t.after(() => descriptor ? Object.defineProperty(globalThis, 'navigator', descriptor) : delete globalThis.navigator);
 }
 
-test('H01/H03: URL未確定時に開発URLを共有せず、キャンセルでコピーしない', async (t) => {
+test('H01/H03: 公開URLを共有し、キャンセルでコピーしない', async (t) => {
   let shared;
   navigatorFor(t, {
     share: async (data) => { shared = data; throw Object.assign(new Error('cancel'), { name: 'AbortError' }); },
     clipboard: { writeText: async () => assert.fail('キャンセル後のコピーは禁止') },
   });
   const status = { textContent: '' };
-  assert.equal(officialGameUrl(), null);
+  assert.equal(officialGameUrl(), 'https://chameleonjp-lab.github.io/paripari/');
   const outcome = await shareOrCopy({ text: 'パリパリ', title: 'パリパリ', statusElement: status });
   assert.equal(outcome, 'cancelled');
   assert.equal(shared.text, 'パリパリ');
-  assert.equal('url' in shared, false);
+  assert.equal(shared.url, 'https://chameleonjp-lab.github.io/paripari/');
   assert.equal(status.textContent, '');
 });
 

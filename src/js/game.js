@@ -7,6 +7,7 @@ import { judgeTiming } from './judge.js';
 import { calcGain } from './scoring.js';
 import { createAttack, nextInterval, pickTaps, currentSegment } from './enemy.js';
 import { vibrate, HAPTICS } from './haptics.js';
+import { playSfx } from './sound.js';
 import * as defaultUi from './ui.js';
 import { getBest, setBest } from './storage.js';
 import { createRandom } from './random.js';
@@ -46,7 +47,7 @@ export class Game {
   } = {}) {
     this.r = renderer || makeEmptyRenderer();
     this.particles = particles || null;
-    this.settings = { reducedMotion: false, vibrate: true, ...settings };
+    this.settings = { reducedMotion: false, vibrate: true, sound: true, ...settings };
     this.onGameOver = typeof onGameOver === 'function' ? onGameOver : () => {};
     this.ui = ui || defaultUi;
     this.random = typeof random === 'function' ? random : createRandom();
@@ -340,7 +341,9 @@ export class Game {
     // Store the logical event time so state snapshots and the resolved trail are
     // independent of which frame delivered the queued action. The current frame
     // remains the render horizon in getRenderState().
-    const reason = input.dir !== a.needDir ? 'direction' : delta < 0 ? 'early' : 'late';
+    const reason = input.dir !== a.needDir
+      ? input.dir === a.dir ? 'reverse' : 'wrong-direction'
+      : delta < 0 ? 'early' : 'late';
     this._resolveSegment(a, seg, result, delta, input.time, reason);
   }
 
@@ -370,6 +373,7 @@ export class Game {
     this.attack = createAttack(spawnAt, opts);
     this.attack.warmup = warm;
     this.attack.scheduledSpawnAt = spawnAt;
+    this._playSfx('attack');
     if (this.mode === 'practice') {
       this._ui('setPracticeGuide', {
         step: PRACTICE_GOAL - this.warmupRemaining + 1,
@@ -426,6 +430,7 @@ export class Game {
         a.hpLost = true;
       }
       this._callHaptics(HAPTICS.miss);
+      this._playSfx('miss');
       this._callRenderer('triggerFlash', '#5a0a14', 0.45);
       this._callRenderer('triggerVignette', '150,20,40', warmup ? 0.4 : 0.7);
       this._callRenderer('triggerShake', CONFIG.SHAKE_MISS);
@@ -457,6 +462,7 @@ export class Game {
           this.perfectStreak++;
         }
         this._callHaptics(HAPTICS.perfect);
+        this._playSfx('perfect');
         this._callRenderer('triggerFlash', '#fff7df', 0.5);
         // Hitstop/slowmo never changes gameTime. Keep these legacy fields at zero
         // so old render loops cannot accidentally slow the simulation.
@@ -486,6 +492,7 @@ export class Game {
       } else {
         this.perfectStreak = 0;
         this._callHaptics(HAPTICS.good);
+        this._playSfx('good');
         this._callRenderer('triggerFlash', '#bfefff', 0.3);
         this.hitstopMs = 0;
         this.slowmoMs = 0;
@@ -564,6 +571,7 @@ export class Game {
     this._gameOverNotified = true;
     this._roundActive = false;
     this.state = 'OVER';
+    this._playSfx('gameover');
     this.attack = null;
     this.clearInputs();
     const best = getBest();
@@ -614,6 +622,11 @@ export class Game {
 
   _callHaptics(pattern) {
     if (this.settings.vibrate !== false) vibrate(pattern);
+  }
+
+  _playSfx(name, ...args) {
+    if (this.settings.sound === false) return;
+    playSfx(name, ...args);
   }
 
   _ui(method, ...args) {

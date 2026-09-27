@@ -1,6 +1,6 @@
 // 判定/スコアの境界値テスト（要件 §9.1 §9.2）
 // 実行: npm test  もしくは  node tests/test.mjs
-import { CONFIG } from '../src/js/config.js';
+import { CONFIG, rankForScore } from '../src/js/config.js';
 import { judgeTiming } from '../src/js/judge.js';
 import { comboMultiplier, timingBonus, calcGain } from '../src/js/scoring.js';
 
@@ -45,6 +45,18 @@ eq(calcGain('GOOD', 0, GW), CONFIG.BASE_GOOD,
   'GOOD combo0 Δ=GW → 基礎100+ボーナス0=100');
 eq(calcGain('PERFECT', 5, 0), Math.round(CONFIG.BASE_PERFECT * 1.5) + CONFIG.TIMING_BONUS_MAX,
   'PERFECT combo5 → 倍率1.5適用');
+
+// --- rankForScore（10段階） ---
+eq(CONFIG.RANKS.length, 10, 'ランクは10段階');
+for (let i = 0; i < CONFIG.RANKS.length; i++) {
+  const current = CONFIG.RANKS[i];
+  eq(rankForScore(current.min), current.rank, `${current.rank}の下限`);
+  if (i < CONFIG.RANKS.length - 1) {
+    eq(rankForScore(current.min - 1), CONFIG.RANKS[i + 1].rank, `${current.rank}直前は下位ランク`);
+  }
+}
+eq(rankForScore(0), 'E', '0点はE');
+eq(rankForScore(32000), 'S', 'Sは32000点から');
 
 // --- ティア生成（20段階・速度ランダム性→マルチタップ） ---
 const T = CONFIG.TIERS;

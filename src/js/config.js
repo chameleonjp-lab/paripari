@@ -26,12 +26,18 @@ export const CONFIG = {
   SHAKE_MISS: 14,
   DPR_CAP: 3,
 
-  // --- ランクしきい値（総スコア）---
+  // --- ランクしきい値（総スコア、10段階）---
   RANKS: [
-    { rank: 'S', min: 18000 },
-    { rank: 'A', min: 10000 },
-    { rank: 'B', min: 5000 },
-    { rank: 'C', min: 0 },
+    { rank: 'S', min: 32000 },
+    { rank: 'A+', min: 26000 },
+    { rank: 'A', min: 21000 },
+    { rank: 'B+', min: 16500 },
+    { rank: 'B', min: 12500 },
+    { rank: 'C+', min: 9000 },
+    { rank: 'C', min: 6000 },
+    { rank: 'D+', min: 3500 },
+    { rank: 'D', min: 1500 },
+    { rank: 'E', min: 0 },
   ],
 
   // 攻撃は上半分から来る5方向（下部はボタン専用エリア）
