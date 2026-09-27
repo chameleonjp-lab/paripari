@@ -17,7 +17,7 @@ R6では、公開設定を変更せずに、公開前に確認できるものを
 | 公開予定パス・公開元 | 未確認 | 現在の設定を変更せず、ユーザーの公開指示後に確認する |
 | プレビュー画像 | 未作成 | 実ゲームの最終画面を確認してから作成する |
 | iPhone 17 Pro Safari | 未実施 | 実機での確認が必要。模擬画面やWebKit検査を実機確認とは扱わない |
-| 実機確認ページ | PR #13で追加・改善中 | [`device-check.html`](../../../device-check.html)でX01/X02/X03を記録できる。対象コミットごとに分離し、未確認のまま合格にできない。公開URLは未確定 |
+| 実機確認ページ | PR #13 Draft、Quality #31成功、独立レビューPASS | [`device-check.html`](../../../device-check.html)でX01/X02/X03を記録できる。対象コミットごとに分離し、未確認のまま合格にできない。公開URLは未確定 |
 
 ## 自動検査の結果
 
@@ -26,7 +26,8 @@ R6では、公開設定を変更せずに、公開前に確認できるものを
 - `LICENSE`：MIT本文を確認。`package.json` のライセンス指定と一致
 - マージ後main Quality #22：Chromium、WebKit、verifyが全件成功
 - R6 PR #12の最終head Quality #25：Chromium、WebKit、verifyが全件成功。PR #12はmainへマージ済み
-- Sol High相当の独立レビュー：承認、必須修正なし
+- R6 PR #13の最終head Quality #31：checks、webkit、verifyが全件成功
+- Sol High相当の独立レビュー（PR #13最終head）：PASS、必須修正なし
 
 この自動検査は、iPhone Safariの実機操作、正式URL、公開元、プレビュー画像の確認を代替しません。
 

@@ -19,7 +19,7 @@ R2のPR #7と、そのマージ後に失敗したブラウザ検査を修正す�
 | R3 一巡する画面 | PR #9マージ済み、マージ後Quality成功 | R4へ引き継ぐ |
 | R4 難易度と説明 | PR #10マージ済み、Quality成功 | R5へ引き継ぐ |
 | R5 公開候補の検証 | [PR #11](https://github.com/chameleonjp-lab/paripari/pull/11)マージ済み、Quality #21でChromium/WebKit/verify成功、独立レビュー承認 | R6へ引き継ぐ |
-| R6 公開準備 | [PR #12](https://github.com/chameleonjp-lab/paripari/pull/12)マージ済み、Quality #25でChromium/WebKit/verify成功、独立レビュー承認。続く[PR #13](https://github.com/chameleonjp-lab/paripari/pull/13)はDraft、独立レビューの必須修正を反映中 | 実機確認ページでX01/X02/X03を記録する。正式URL・公開予定パス・プレビューの確定と実公開は別の指示後 |
+| R6 公開準備 | [PR #12](https://github.com/chameleonjp-lab/paripari/pull/12)マージ済み、Quality #25でChromium/WebKit/verify成功、独立レビュー承認。続く[PR #13](https://github.com/chameleonjp-lab/paripari/pull/13)はDraft、Quality #31全ジョブ成功、独立レビューPASS | 実機確認ページでX01/X02/X03を記録する。正式URL・公開予定パス・プレビューの確定と実公開は別の指示後 |
 
 ## 次の工程
 
@@ -29,6 +29,6 @@ R3は成功した方向だけ進む初回練習、本番集計の完全分離、
 
 ## 確認の区別
 
-単体検査、ブラウザ検査、独立レビュー、GitHub Actions、実機確認を分けて各実装記録とPRに残します。R6マージ後の単体・契約検査は100件、配布物一致、PR #12のChromium/WebKit/verify、独立レビューが完了しています。PR #13は独立レビューの必須修正を反映中で、修正後のブラウザCIと再レビューを確認します。ローカルのブラウザ本体は環境制限で導入できないため、ブラウザ合否はGitHub Actionsで確認します。受入検査53件を全て合格にしたわけではありません。iPhone 17 Pro Safari実機確認、正式URL、公開予定パス、プレビュー画像は未確認で、公開候補の承認は行っていません。
+単体検査、ブラウザ検査、独立レビュー、GitHub Actions、実機確認を分けて各実装記録とPRに残します。R6マージ後の単体・契約検査は100件、配布物一致、PR #12のChromium/WebKit/verify、PR #13のQuality #31、独立レビューが完了しています。ローカルのブラウザ本体は環境制限で導入できないため、ブラウザ合否はGitHub Actionsで確認しました。受入検査53件を全て合格にしたわけではありません。iPhone 17 Pro Safari実機確認、正式URL、公開予定パス、プレビュー画像は未確認で、公開候補の承認は行っていません。
 
 mainへの直接書き込み、マージ、自動マージ、保護設定・既定ブランチ・公開設定の変更はしません。正式公開URLは推測で設定せず、公開前に確認します。
