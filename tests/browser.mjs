@@ -44,6 +44,9 @@ let diagnosticPageId = 0;
 // Playwrightのinit scriptなので、配布HTML/通常ソースには含まれない。
 async function installFrameDiagnostics(context) {
   await context.addInitScript(() => {
+    // 受入検査は外部HTTP通信を禁止するため、共有ランキングをテスト中だけ止める。
+    // 製品コードにはこのフラグを設定する処理を含めず、通常のブラウザでは常に未設定。
+    globalThis.__paripariBrowserTest = true;
     const history = { maxGap: 0, gaps: [], screens: [], events: [] };
     globalThis.__browserFrameDiagnostics = history;
     const retain = (array, entry) => { array.push(entry); if (array.length > 60) array.shift(); };
@@ -1028,6 +1031,7 @@ async function runOrientationTouchRegression(browser, browserName, origin) {
     isMobile: false,
     hasTouch: true,
   });
+  await pcContext.addInitScript(() => { globalThis.__paripariBrowserTest = true; });
   try {
     const page = await pcContext.newPage();
     const observation = observe(page, origin);

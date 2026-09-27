@@ -3938,6 +3938,9 @@ kbd {
   var rankingPlay = null;
   var pendingRankingPromise = null;
   var rankingRefreshToken = 0;
+  function rankingEnabled() {
+    return globalThis.__paripariBrowserTest !== true;
+  }
   var game = new Game({
     renderer,
     particles,
@@ -4025,7 +4028,7 @@ kbd {
       }
     },
     onStart: (mode) => {
-      if (mode === "normal") beginRankingPlay();
+      if (mode === "normal" && rankingEnabled()) beginRankingPlay();
     },
     onCountdown: (n) => {
       playSfx(n > 0 ? "countdown" : "start", n);
@@ -4043,7 +4046,7 @@ kbd {
     targets: [canvas, $2("controls")],
     isEnabled: () => !!session && session.canHandleAction()
   });
-  void flushPendingRanking();
+  if (rankingEnabled()) void flushPendingRanking();
   var RANKING_UNAVAILABLE_CODES = /* @__PURE__ */ new Set([
     "game_not_found",
     "game_inactive",
@@ -4119,6 +4122,7 @@ kbd {
     return pendingRankingPromise;
   }
   async function refreshRanking({ setStatus: setStatus2 = true } = {}) {
+    if (!rankingEnabled()) return null;
     const token = ++rankingRefreshToken;
     try {
       const rows = await rankingClient.fetchTopRanking();
@@ -4134,6 +4138,7 @@ kbd {
     }
   }
   function beginRankingPlay() {
+    if (!rankingEnabled()) return;
     const displayName = playerName || getPlayerName();
     if (!displayName) return;
     const play = {
@@ -4175,6 +4180,7 @@ kbd {
     }
   }
   async function recordRankingResult(data) {
+    if (!rankingEnabled()) return;
     const play = rankingPlay;
     setRankingStatus("ランキングへ送信中…", "pending");
     if (!play || play.resultHandled) {

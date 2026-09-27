@@ -43,6 +43,10 @@ let rankingPlay = null;
 let pendingRankingPromise = null;
 let rankingRefreshToken = 0;
 
+function rankingEnabled() {
+  return globalThis.__paripariBrowserTest !== true;
+}
+
 const game = new Game({
   renderer, particles, settings,
   onGameOver: (data) => {
@@ -137,7 +141,7 @@ session = new SessionController({
     // Practice is deliberately excluded from the shared ranking. A normal
     // play is recorded when its countdown actually reaches START, including
     // the first normal game after the guided practice.
-    if (mode === 'normal') beginRankingPlay();
+    if (mode === 'normal' && rankingEnabled()) beginRankingPlay();
   },
   onCountdown: (n) => {
     playSfx(n > 0 ? 'countdown' : 'start', n);
@@ -157,7 +161,7 @@ lockGestures({
 });
 
 // 通信が一時的に失敗した前回結果は、次回起動時に再送する。
-void flushPendingRanking();
+if (rankingEnabled()) void flushPendingRanking();
 
 // ---------- 共有ランキング ----------
 const RANKING_UNAVAILABLE_CODES = new Set([
@@ -244,6 +248,7 @@ function flushPendingRanking() {
 }
 
 async function refreshRanking({ setStatus = true } = {}) {
+  if (!rankingEnabled()) return null;
   const token = ++rankingRefreshToken;
   try {
     const rows = await rankingClient.fetchTopRanking();
@@ -260,6 +265,7 @@ async function refreshRanking({ setStatus = true } = {}) {
 }
 
 function beginRankingPlay() {
+  if (!rankingEnabled()) return;
   const displayName = playerName || storage.getPlayerName();
   if (!displayName) return;
   const play = {
@@ -303,6 +309,7 @@ async function ensureRankingPlay(play) {
 }
 
 async function recordRankingResult(data) {
+  if (!rankingEnabled()) return;
   const play = rankingPlay;
   ui.setRankingStatus('ランキングへ送信中…', 'pending');
   if (!play || play.resultHandled) {
