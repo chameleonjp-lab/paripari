@@ -17,6 +17,10 @@ import {
 import * as ui from './ui.js';
 import * as storage from './storage.js';
 import { shareOrCopy } from './platform.js';
+import {
+  createRankingClient,
+  createRequestId,
+} from './ranking-client.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -34,6 +38,14 @@ let playerName = storage.getPlayerName();
 let session = null;
 let inputController = null;
 let keyCaptureDir = null;
+const rankingClient = createRankingClient();
+let rankingPlay = null;
+let pendingRankingPromise = null;
+let rankingRefreshToken = 0;
+
+function rankingEnabled() {
+  return globalThis.__paripariBrowserTest !== true;
+}
 
 const game = new Game({
   renderer, particles, settings,
@@ -125,6 +137,12 @@ session = new SessionController({
         break;
     }
   },
+  onStart: (mode) => {
+    // Practice is deliberately excluded from the shared ranking. A normal
+    // play is recorded when its countdown actually reaches START, including
+    // the first normal game after the guided practice.
+    if (mode === 'normal' && rankingEnabled()) beginRankingPlay();
+  },
   onCountdown: (n) => {
     playSfx(n > 0 ? 'countdown' : 'start', n);
     if (n > 0) ui.setCountdown(n);
@@ -133,6 +151,7 @@ session = new SessionController({
   onResult: (data) => {
     ui.setBestLabel(data.best);
     renderResultShare(data);
+    void recordRankingResult(data);
   },
   onPracticeComplete: () => storage.setTutorialCompleted(),
 });
@@ -140,6 +159,188 @@ lockGestures({
   targets: [canvas, $('controls')],
   isEnabled: () => !!session && session.canHandleAction(),
 });
+
+// 通信が一時的に失敗した前回結果は、次回起動時に再送する。
+if (rankingEnabled()) void flushPendingRanking();
+
+// ---------- 共有ランキング ----------
+const RANKING_UNAVAILABLE_CODES = new Set([
+  'game_not_found',
+  'game_inactive',
+  'game_not_available',
+  'submission_not_allowed',
+]);
+
+function rankingErrorMessage(error) {
+  const code = String(error?.code || '').toLowerCase();
+  if (RANKING_UNAVAILABLE_CODES.has(code)) return 'ランキングは公開準備中です。';
+  if (code === 'invalid_name' || code === 'invalid_uuid') return 'ランキングへの送信をスキップしました。';
+  if (error?.retryable === false) return 'ランキングに登録できませんでした。';
+  return '通信に失敗しました。次回起動時に再送します。';
+}
+
+function pendingRankingFrom({ startId, playId = null, submissionId, displayName, score, tier }) {
+  return {
+    version: 1,
+    stage: playId ? 'finish' : 'start',
+    startId,
+    playId,
+    submissionId,
+    displayName,
+    resultType: 'game_over',
+    reachedWave: Math.max(1, Number(tier) || 1),
+    score: Math.max(0, Number(score) || 0),
+  };
+}
+
+async function completePendingRanking(pending) {
+  let current = { ...pending };
+  if (!current.playId) {
+    const started = await rankingClient.startPlay({
+      startId: current.startId,
+      displayName: current.displayName,
+    });
+    current = { ...current, playId: started.playId, stage: 'finish' };
+    rankingClient.savePendingSubmission(current);
+  }
+
+  if (current.stage !== 'submit') {
+    await rankingClient.finishPlay({
+      playId: current.playId,
+      displayName: current.displayName,
+      resultType: current.resultType,
+      reachedWave: current.reachedWave,
+      score: current.score,
+    });
+    current = { ...current, stage: 'submit' };
+    rankingClient.savePendingSubmission(current);
+  }
+
+  const submitted = await rankingClient.submitScore({
+    playId: current.playId,
+    submissionId: current.submissionId,
+    displayName: current.displayName,
+    score: current.score,
+  });
+  rankingClient.clearPendingSubmission(current.submissionId);
+  return submitted;
+}
+
+function flushPendingRanking() {
+  if (pendingRankingPromise) return pendingRankingPromise;
+  pendingRankingPromise = (async () => {
+    const pending = rankingClient.loadPendingSubmission();
+    if (!pending || typeof pending !== 'object') return null;
+    try {
+      return await completePendingRanking(pending);
+    } catch (error) {
+      // Keep retryable and not-yet-published game records. A malformed local
+      // record is safe to discard because it cannot be accepted by the RPC.
+      if (['invalid_uuid', 'invalid_name'].includes(String(error?.code || ''))) {
+        rankingClient.clearPendingSubmission(pending.submissionId);
+      }
+      return null;
+    } finally {
+      pendingRankingPromise = null;
+    }
+  })();
+  return pendingRankingPromise;
+}
+
+async function refreshRanking({ setStatus = true } = {}) {
+  if (!rankingEnabled()) return null;
+  const token = ++rankingRefreshToken;
+  try {
+    const rows = await rankingClient.fetchTopRanking();
+    if (token !== rankingRefreshToken) return rows;
+    ui.renderRanking(rows);
+    if (setStatus) ui.setRankingStatus(rows.length ? '最新のTOP10を表示中' : 'まだランキングに記録がありません。');
+    return rows;
+  } catch (error) {
+    if (token === rankingRefreshToken && setStatus) {
+      ui.setRankingStatus(rankingErrorMessage(error), 'error');
+    }
+    return null;
+  }
+}
+
+function beginRankingPlay() {
+  if (!rankingEnabled()) return;
+  const displayName = playerName || storage.getPlayerName();
+  if (!displayName) return;
+  const play = {
+    startId: createRequestId(),
+    displayName,
+    playId: null,
+    startError: null,
+    resultHandled: false,
+  };
+  rankingPlay = play;
+  play.startPromise = rankingClient.startPlay({
+    startId: play.startId,
+    displayName: play.displayName,
+  }).then((started) => {
+    if (rankingPlay === play) play.playId = started.playId;
+    return started;
+  }).catch((error) => {
+    play.startError = error;
+    return null;
+  });
+}
+
+async function ensureRankingPlay(play) {
+  if (play.playId) return play.playId;
+  const firstAttempt = await play.startPromise;
+  if (firstAttempt?.playId) {
+    play.playId = firstAttempt.playId;
+    return play.playId;
+  }
+  try {
+    const retry = await rankingClient.startPlay({
+      startId: play.startId,
+      displayName: play.displayName,
+    });
+    play.playId = retry.playId;
+    return play.playId;
+  } catch (error) {
+    play.startError = error;
+    return null;
+  }
+}
+
+async function recordRankingResult(data) {
+  if (!rankingEnabled()) return;
+  const play = rankingPlay;
+  ui.setRankingStatus('ランキングへ送信中…', 'pending');
+  if (!play || play.resultHandled) {
+    await refreshRanking({ setStatus: false });
+    return;
+  }
+  play.resultHandled = true;
+
+  // Finish any older offline result before using the single pending slot for
+  // this result. Submission IDs make every retry idempotent on the server.
+  await flushPendingRanking();
+  const submissionId = createRequestId();
+  const playId = await ensureRankingPlay(play);
+  const pending = pendingRankingFrom({
+    startId: play.startId,
+    playId,
+    submissionId,
+    displayName: play.displayName,
+    score: data.score,
+    tier: data.tier,
+  });
+  rankingClient.savePendingSubmission(pending);
+
+  try {
+    await completePendingRanking(pending);
+    ui.setRankingStatus('ランキングに登録しました。', 'success');
+  } catch (error) {
+    ui.setRankingStatus(rankingErrorMessage(error), 'error');
+  }
+  await refreshRanking({ setStatus: false });
+}
 
 // ---------- 名前とシェア ----------
 function shareTextForHome() {
