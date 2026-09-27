@@ -143,6 +143,11 @@ function init() {
     report.value = typeof record.report === 'string' ? record.report : '';
     report.dataset.fingerprint = typeof record.reportFingerprint === 'string'
       ? record.reportFingerprint : '';
+    if (report.value && !reportIsCurrent(record)) {
+      report.value = '';
+      report.dataset.fingerprint = '';
+      setStatus('前回の記録文は内容変更後のため消去しました。「記録文を作る」で更新してください。');
+    }
   }
 
   function resetVerificationState(commitValue = '') {
