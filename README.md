@@ -4,6 +4,7 @@
 >
 > 2系統の試作を統合する [実装計画書 v2.0](docs/plans/current/IMPLEMENTATION_PLAN.md)、[受入検査](docs/plans/current/ACCEPTANCE_TESTS.md)、[進捗](docs/plans/current/PROGRESS.md) を追加しました。
 > R1〜R5はPR #6〜#11でマージ済みです。現在は **R6（公開準備）** として、公開設定を変えずに公開前の確認項目を整理しています。検査結果と残作業は[進捗](docs/plans/current/PROGRESS.md)と[R6公開準備記録](docs/plans/current/R6_RELEASE_READINESS.md)を参照してください。完成版の公開とランキング連携は行っていません。
+> 実機確認用ページ： [device-check.html](device-check.html)（公開URL確定前は、ページの公開先を推測しないでください）。
 > 以下の説明と旧 `docs/requirements.md` / `docs/implementation-plan.md` は試作時点の内容です。完成版との相違は新しい計画を優先し、旧説明の「検査済み」等を今回の検査結果として扱わないでください。
 
 ## 現在の開発・検査手順

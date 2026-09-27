@@ -1,7 +1,7 @@
 # R6：公開準備
 
 作成日：2026-09-27（日本時間）  
-基準：R5マージ後のmain `09a450dfa31f3303fb50d58c6aebb872eda3faa8`
+基準：R6マージ後のmain `28476c28a4e319f0aaac8b178faf4e6afa487d14`
 
 ## 目的
 
@@ -17,17 +17,25 @@ R6では、公開設定を変更せずに、公開前に確認できるものを
 | 公開予定パス・公開元 | 未確認 | 現在の設定を変更せず、ユーザーの公開指示後に確認する |
 | プレビュー画像 | 未作成 | 実ゲームの最終画面を確認してから作成する |
 | iPhone 17 Pro Safari | 未実施 | 実機での確認が必要。模擬画面やWebKit検査を実機確認とは扱わない |
+| 実機確認ページ | PR #13 Draft、Quality #31成功、独立レビューPASS | [`device-check.html`](../../../device-check.html)でX01/X02/X03を記録できる。対象コミットごとに分離し、未確認のまま合格にできない。公開URLは未確定 |
 
 ## 自動検査の結果
 
-- `npm test`：91件成功（スクリプト33件、Nodeテスト58件）
+- `npm test`：100件成功（スクリプト33件、Nodeテスト67件。実機確認ページの契約・構文・操作ロジック検査9件を含む）
 - `npm run build:check`：成功。分割ソースと配布HTMLの一致を確認
 - `LICENSE`：MIT本文を確認。`package.json` のライセンス指定と一致
 - マージ後main Quality #22：Chromium、WebKit、verifyが全件成功
-- R6 Draft PR #12の最終head Quality #24：Chromium、WebKit、verifyが全件成功
-- Sol High相当の独立レビュー：承認、必須修正なし
+- R6 PR #12の最終head Quality #25：Chromium、WebKit、verifyが全件成功。PR #12はmainへマージ済み
+- R6 PR #13の最終head Quality #31：checks、webkit、verifyが全件成功
+- Sol High相当の独立レビュー（PR #13最終head）：PASS、必須修正なし
 
 この自動検査は、iPhone Safariの実機操作、正式URL、公開元、プレビュー画像の確認を代替しません。
+
+## 実機確認ページの使い方
+
+`device-check.html` は、ゲームと同じ公開先に置いた場合にSafariから開ける、端末内記録用のページです。分割版と単一HTML版をそれぞれ開いて確認し、戻る操作でこのページへ戻ります。チェック結果と記録文は対象コミットごとに分け、このブラウザのlocalStorageにだけ保存し、外部へ送信しません。未確認項目が残る間は総合判定を「合格」にできません。
+
+このDraft PRが未マージの間は、実機確認ページの正式な公開URLはありません。ページが開けること自体を、正式公開や実機確認済みの根拠にはしません。
 
 ## 実機確認の記録欄
 

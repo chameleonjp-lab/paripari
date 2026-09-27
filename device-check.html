@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#10182b">
+  <title>パリパリ｜実機確認</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #10182b;
+      --panel: #19253d;
+      --panel-strong: #223252;
+      --text: #f4f7ff;
+      --muted: #b9c5dc;
+      --line: #405277;
+      --accent: #8bd8ff;
+      --accent-strong: #0f6f9d;
+      --danger: #ffb2b2;
+      --focus: #ffe082;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { background: var(--bg); }
+
+    body {
+      margin: 0;
+      min-width: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+      font-size: 1rem;
+      line-height: 1.65;
+    }
+
+    main {
+      width: 100%;
+      max-width: 48rem;
+      margin: 0 auto;
+      padding-top: max(1rem, env(safe-area-inset-top));
+      padding-right: max(1rem, env(safe-area-inset-right));
+      padding-bottom: max(2rem, env(safe-area-inset-bottom));
+      padding-left: max(1rem, env(safe-area-inset-left));
+    }
+
+    h1, h2, h3 { line-height: 1.3; }
+    h1 { margin: 0.25rem 0 0.5rem; font-size: clamp(1.75rem, 7vw, 2.5rem); }
+    h2 { margin: 0; font-size: 1.35rem; }
+    p { margin: 0.5rem 0; }
+
+    .eyebrow {
+      margin: 0;
+      color: var(--accent);
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+
+    .lead { color: var(--muted); margin-bottom: 1rem; }
+
+    .notice,
+    .card {
+      margin-top: 1rem;
+      border: 1px solid var(--line);
+      border-radius: 0.9rem;
+      background: var(--panel);
+      padding: 1rem;
+    }
+
+    .notice {
+      border-color: #806b33;
+      background: #2b2a20;
+    }
+
+    .notice strong { color: var(--focus); }
+    .hint, .small { color: var(--muted); font-size: 0.95rem; }
+
+    .launch-actions,
+    .toolbar {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    a.action,
+    button {
+      min-height: 3rem;
+      border: 1px solid var(--line);
+      border-radius: 0.7rem;
+      padding: 0.7rem 0.9rem;
+      color: var(--text);
+      background: var(--panel-strong);
+      font: inherit;
+      font-weight: 700;
+      line-height: 1.25;
+      text-align: center;
+      text-decoration: none;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    a.action.primary,
+    button.primary {
+      border-color: var(--accent);
+      background: var(--accent-strong);
+    }
+
+    button.danger { color: var(--danger); }
+
+    a.action:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .summary {
+      flex: 0 0 auto;
+      color: var(--accent);
+      font-size: 0.95rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.85rem;
+      margin-top: 1rem;
+    }
+
+    .field,
+    .full-field {
+      display: grid;
+      gap: 0.35rem;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .full-field { margin-top: 0.9rem; }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 0.55rem;
+      padding: 0.7rem;
+      color: var(--text);
+      background: #0d1425;
+      font: inherit;
+      font-size: 1rem;
+      line-height: 1.4;
+    }
+
+    textarea {
+      min-height: 8rem;
+      resize: vertical;
+    }
+
+    fieldset {
+      min-width: 0;
+      margin: 1rem 0 0;
+      border: 0;
+      padding: 0;
+    }
+
+    legend {
+      width: 100%;
+      margin-bottom: 0.35rem;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .check-list { display: grid; gap: 0.5rem; }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.7rem;
+      min-height: 3rem;
+      border: 1px solid transparent;
+      border-radius: 0.55rem;
+      padding: 0.65rem 0.7rem;
+      background: #142039;
+      cursor: pointer;
+    }
+
+    .check-item:has(input:checked) {
+      border-color: #4e9e83;
+      background: #17352f;
+    }
+
+    .check-item input {
+      flex: 0 0 auto;
+      width: 1.35rem;
+      height: 1.35rem;
+      margin: 0.15rem 0 0;
+      accent-color: #70d4a7;
+    }
+
+    .check-item span { flex: 1 1 auto; }
+
+    .status {
+      min-height: 1.7rem;
+      margin-top: 0.75rem;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .pending {
+      margin-top: 1rem;
+      border-left: 0.25rem solid var(--focus);
+      padding: 0.75rem 0.85rem;
+      background: #272a22;
+      color: var(--muted);
+    }
+
+    .pending strong { color: var(--focus); }
+
+    .report-label { margin-top: 1rem; }
+    .footer-note { margin-top: 1.25rem; }
+
+    @media (max-width: 30rem) {
+      .field-grid,
+      .launch-actions,
+      .toolbar { grid-template-columns: 1fr; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">R6 公開前確認</p>
+      <h1>パリパリ 実機確認</h1>
+      <p class="lead">iPhone 17 Pro の Safariで、ゲーム本体の操作と表示を確認するためのページです。</p>
+    </header>
+
+    <aside class="notice" aria-label="確認前の注意">
+      <strong>確認前の注意</strong>
+      <p>チェック結果はこのブラウザの端末内だけに保存します。外部送信、ランキング登録、公開設定の変更は行いません。正式URLが未確定の間は、公開先を推測して記録しないでください。</p>
+    </aside>
+
+    <nav class="launch-actions" aria-label="ゲームを開く">
+      <a class="action primary" href="./index.html">分割版ゲームを開く</a>
+      <a class="action" href="./dist/paripari.html">単一HTML版を開く</a>
+    </nav>
+    <p class="hint">ゲームを確認したら、Safariの戻る操作でこのページへ戻って記録します。</p>
+
+    <section class="card" aria-labelledby="record-heading">
+      <div class="section-heading">
+        <h2 id="record-heading">1. 確認記録</h2>
+        <span class="summary" id="overall-summary">未実施</span>
+      </div>
+      <div class="field-grid">
+        <label class="field" for="check-date">確認日
+          <input id="check-date" type="date" autocomplete="off">
+        </label>
+        <label class="field" for="device">端末
+          <input id="device" type="text" autocomplete="off" placeholder="例：iPhone 17 Pro">
+        </label>
+        <label class="field" for="ios">iOS
+          <input id="ios" type="text" autocomplete="off" placeholder="例：iOS 26.0">
+        </label>
+        <label class="field" for="safari">Safari
+          <input id="safari" type="text" autocomplete="off" placeholder="例：Safari 26">
+        </label>
+        <label class="field" for="commit">対象コミット
+          <input id="commit" type="text" autocomplete="off" placeholder="公開後に確認したSHA">
+        </label>
+        <label class="field" for="viewport">実寸法
+          <input id="viewport" type="text" autocomplete="off" placeholder="例：402×874 CSS px">
+        </label>
+        <label class="field" for="game-form">確認したゲーム形式
+          <select id="game-form">
+            <option value="未選択">未選択</option>
+            <option value="分割版">分割版</option>
+            <option value="単一HTML版">単一HTML版</option>
+            <option value="両方">両方</option>
+          </select>
+        </label>
+        <label class="field" for="overall">総合判定
+          <select id="overall">
+            <option value="未実施">未実施</option>
+            <option value="合格" disabled>合格（全項目と公開前点検が必要）</option>
+            <option value="要修正">要修正</option>
+          </select>
+        </label>
+      </div>
+      <p class="hint">「合格」は、X01/X02の全項目、X03の確認項目、両方のゲーム形式、端末情報、対象コミット、公開前点検をすべて記録した後に選べます。</p>
+    </section>
+
+    <section class="card" aria-labelledby="x01-heading">
+      <div class="section-heading">
+        <h2 id="x01-heading">2. X01 基本プレイ</h2>
+        <span class="summary" id="summary-x01">0/6</span>
+      </div>
+      <p class="hint">実際のiPhone Safariで、名前入力から結果画面まで確認します。</p>
+      <fieldset>
+        <legend>確認できた項目にチェック</legend>
+        <div class="check-list">
+          <label class="check-item"><input id="x01-name" type="checkbox" data-group="x01"><span>名前を入力し、プレイを開始できた</span></label>
+          <label class="check-item"><input id="x01-practice" type="checkbox" data-group="x01"><span>初回練習で5方向の案内を最後まで確認できた</span></label>
+          <label class="check-item"><input id="x01-normal" type="checkbox" data-group="x01"><span>練習後に本番プレイを開始し、方向ボタンを操作できた</span></label>
+          <label class="check-item"><input id="x01-taps" type="checkbox" data-group="x01"><span>1回・2回・3回の攻撃を確認できた</span></label>
+          <label class="check-item"><input id="x01-result" type="checkbox" data-group="x01"><span>本番終了後に結果画面を表示できた</span></label>
+          <label class="check-item"><input id="x01-retry" type="checkbox" data-group="x01"><span>結果画面から「もう一回」で再挑戦できた</span></label>
+        </div>
+      </fieldset>
+    </section>
+
+    <section class="card" aria-labelledby="x02-heading">
+      <div class="section-heading">
+        <h2 id="x02-heading">3. X02 端末・アクセシビリティ</h2>
+        <span class="summary" id="summary-x02">0/9</span>
+      </div>
+      <p class="hint">無理に合格にせず、できなかった操作はメモ欄に再現条件を書きます。</p>
+      <fieldset>
+        <legend>確認できた項目にチェック</legend>
+        <div class="check-list">
+          <label class="check-item"><input id="x02-portrait" type="checkbox" data-group="x02"><span>縦向きで、文字や操作ボタンが欠けずに確認できた</span></label>
+          <label class="check-item"><input id="x02-landscape" type="checkbox" data-group="x02"><span>横向きで、文字や操作ボタンが欠けずに確認できた</span></label>
+          <label class="check-item"><input id="x02-rotate" type="checkbox" data-group="x02"><span>縦向き・横向きの回転後に、表示と操作が戻った</span></label>
+          <label class="check-item"><input id="x02-keyboard" type="checkbox" data-group="x02"><span>名前入力時のキーボード表示・確定・非表示を確認できた</span></label>
+          <label class="check-item"><input id="x02-resume" type="checkbox" data-group="x02"><span>Safariを離れて戻った後、状態が壊れずに再開・再操作できた</span></label>
+          <label class="check-item"><input id="x02-no-hit" type="checkbox" data-group="x02"><span>画面を離れて戻っただけで被弾せず、状態が壊れなかった</span></label>
+          <label class="check-item"><input id="x02-text" type="checkbox" data-group="x02"><span>文字拡大（150%・200%相当）で内容を読み取れた</span></label>
+          <label class="check-item"><input id="x02-voiceover" type="checkbox" data-group="x02"><span>VoiceOverで主要な見出し・入力・ボタンの役割を確認できた</span></label>
+          <label class="check-item"><input id="x02-share" type="checkbox" data-group="x02"><span>共有操作を実行し、キャンセルまたは共有完了後に戻れた</span></label>
+        </div>
+      </fieldset>
+    </section>
+
+    <section class="card" aria-labelledby="x03-heading">
+      <div class="section-heading">
+        <h2 id="x03-heading">4. X03 配布前点検</h2>
+        <span class="summary" id="summary-x03">0/4</span>
+      </div>
+      <p class="hint">公開設定は変えず、今見えている配布物だけを確認します。</p>
+      <fieldset>
+        <legend>確認できた項目にチェック</legend>
+        <div class="check-list">
+          <label class="check-item"><input id="x03-page" type="checkbox" data-group="x03"><span>この実機確認ページを、ゲームと同じ場所から開けた</span></label>
+          <label class="check-item"><input id="x03-source" type="checkbox" data-group="x03"><span>分割版ゲームへのリンクが開いた</span></label>
+          <label class="check-item"><input id="x03-single" type="checkbox" data-group="x03"><span>単一HTML版ゲームへのリンクが開いた</span></label>
+          <label class="check-item"><input id="x03-license" type="checkbox" data-group="x03"><span>LICENSEのリンクを開けた</span></label>
+        </div>
+      </fieldset>
+      <div class="pending" aria-labelledby="pending-heading">
+        <strong id="pending-heading">公開前の保留項目（X03の合格条件）</strong>
+        <p>公開予定パス、公開元、正式URL、プレビュー画像、コミットと配布物の一致は、公開指示後に確認します。正式URLは公開予定パスと一致する http(s) URLを入力してください。未確定のまま「合格」にはできません。</p>
+        <div class="field-grid">
+          <label class="field" for="planned-path">公開予定パス
+            <input id="planned-path" type="text" autocomplete="off" placeholder="公開指示後に確認">
+          </label>
+          <label class="field" for="public-source">公開元
+            <input id="public-source" type="text" autocomplete="off" placeholder="例：GitHub Pages（確定後）">
+          </label>
+          <label class="field" for="official-url">正式URL
+            <input id="official-url" type="url" inputmode="url" autocomplete="off" placeholder="公開指示後に確認">
+          </label>
+          <label class="field" for="preview-status">プレビュー画像
+            <select id="preview-status">
+              <option value="未作成">未作成</option>
+              <option value="作成済み">作成済み</option>
+              <option value="実機画面を確認済み">実機画面を確認済み</option>
+            </select>
+          </label>
+          <label class="field" for="distribution-match">コミットと配布物
+            <select id="distribution-match">
+              <option value="未確認">未確認</option>
+              <option value="一致">一致</option>
+              <option value="不一致">不一致</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <p class="hint"><a href="./LICENSE">LICENSEを開く</a>（公開元や正式URLの確定とは別の確認です）</p>
+    </section>
+
+    <section class="card" aria-labelledby="notes-heading">
+      <h2 id="notes-heading">5. メモ・再現手順</h2>
+      <label class="full-field" for="notes">気づいたこと、不具合、再現条件
+        <textarea id="notes" rows="7" placeholder="例：横向きで結果画面の右端が少し欠けた。iOS / Safari / 対象画面を記録する。"></textarea>
+      </label>
+      <div class="toolbar" aria-label="記録操作">
+        <button class="primary" id="save" type="button">この端末に保存</button>
+        <button id="make-report" type="button">記録文を作る</button>
+        <button id="copy-report" type="button">記録文をコピー</button>
+        <button class="danger" id="reset" type="button">記録をリセット</button>
+      </div>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+      <label class="full-field report-label" for="report">作成した記録文
+        <textarea id="report" rows="15" readonly placeholder="「記録文を作る」を押すと、ここに記録が表示されます。"></textarea>
+      </label>
+    </section>
+
+    <p class="small footer-note">保存先はこのブラウザの端末内だけです。記録を共有するときは、内容を確認してからコピーしてください。</p>
+  </main>
+  <script type="module" src="./src/js/device-check.js"></script>
+</body>
+</html>
