@@ -169,6 +169,14 @@
           <div><span id="result-best">0</span><small>自己ベスト</small></div>
         </div>
         <p id="result-player" class="platform-status"></p>
+        <section id="result-ranking" class="ranking-panel" aria-labelledby="result-ranking-title">
+          <div class="ranking-heading">
+            <h3 id="result-ranking-title">カメレオンJPランキング</h3>
+            <span>TOP10</span>
+          </div>
+          <p id="ranking-status" class="platform-status" role="status" aria-live="polite">ランキングを読み込み中…</p>
+          <ol id="ranking-list" class="ranking-list" aria-live="polite"></ol>
+        </section>
         <textarea id="result-share-text" class="share-preview" readonly aria-label="結果のシェア文"></textarea>
         <button id="btn-result-share" class="btn">結果をシェア</button>
         <p id="result-share-status" class="platform-status" role="status" aria-live="polite"></p>

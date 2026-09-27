@@ -270,6 +270,47 @@ export function setCountdown(n) {
   el.style.animation = '';
 }
 
+export function setRankingStatus(message = '', tone = '') {
+  const status = $('ranking-status');
+  if (!status) return;
+  status.textContent = message;
+  status.classList.toggle('error', tone === 'error');
+  status.classList.toggle('ranking-success', tone === 'success');
+  status.classList.toggle('ranking-pending', tone === 'pending');
+}
+
+export function renderRanking(rows = []) {
+  const list = $('ranking-list');
+  if (!list) return;
+  list.replaceChildren();
+  if (!Array.isArray(rows) || rows.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'ranking-empty';
+    empty.textContent = 'まだランキングに記録がありません。';
+    list.append(empty);
+    return;
+  }
+  rows.forEach((row, index) => {
+    const item = document.createElement('li');
+    item.className = 'ranking-row';
+
+    const rank = document.createElement('span');
+    rank.className = 'ranking-rank';
+    rank.textContent = `${Math.max(1, Number(row?.rankNo) || index + 1)}`;
+
+    const name = document.createElement('span');
+    name.className = 'ranking-name';
+    name.textContent = String(row?.name || '名無し');
+
+    const score = document.createElement('span');
+    score.className = 'ranking-score';
+    score.textContent = `${Math.max(0, Number(row?.score) || 0).toLocaleString()}点`;
+
+    item.append(rank, name, score);
+    list.append(item);
+  });
+}
+
 export function showResult({ score, best, isBest, maxCombo, perfectRate, tier, rank }) {
   $('result-rank').textContent = rank;
   $('result-score').textContent = score.toLocaleString();
@@ -278,6 +319,8 @@ export function showResult({ score, best, isBest, maxCombo, perfectRate, tier, r
   $('result-perfect').textContent = `${perfectRate}%`;
   $('result-tier').textContent = tier;
   $('result-best').textContent = best.toLocaleString();
+  renderRanking([]);
+  setRankingStatus('ランキングを読み込み中…');
   showScreen('result');
 }
 

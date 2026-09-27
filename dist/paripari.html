@@ -535,6 +535,36 @@ kbd {
 .result-stats > div { min-width: 0; padding: .25rem .15rem; }
 .result-stats span { display: block; font-size: 1.5rem; font-weight: 800; line-height: 1.2; color: var(--cyan); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .result-stats small { display: block; color: rgba(255,255,255,.68); font-size: .75rem; line-height: 1.35; overflow-wrap: anywhere; }
+.ranking-panel {
+  margin: .75rem 0 1rem;
+  padding: .7rem .65rem .55rem;
+  border: 1px solid rgba(91,220,255,.3);
+  border-radius: 12px;
+  background: rgba(4,12,25,.34);
+  text-align: left;
+}
+.ranking-heading { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; }
+.ranking-heading h3 { margin: 0; font-size: 1rem; color: var(--cyan); }
+.ranking-heading > span { color: rgba(233,238,247,.56); font-size: .72rem; letter-spacing: .08em; }
+.ranking-panel .platform-status { margin: .25rem 0 .35rem; font-size: .76rem; }
+.ranking-success { color: var(--gold); }
+.ranking-pending { color: var(--cyan); }
+.ranking-list { display: grid; gap: .25rem; padding: 0; margin: 0; list-style: none; }
+.ranking-row {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .45rem;
+  min-height: 2rem;
+  padding: .25rem .35rem;
+  border-radius: 7px;
+  background: rgba(255,255,255,.045);
+  font-size: .83rem;
+}
+.ranking-rank { color: var(--gold); font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+.ranking-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ranking-score { color: var(--ink); font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ranking-empty { padding: .45rem .35rem; color: rgba(233,238,247,.58); font-size: .8rem; }
 .practice-complete-panel p { line-height: 1.6; }
 
 .rotate-hint {
@@ -699,6 +729,14 @@ kbd {
           <div><span id="result-best">0</span><small>自己ベスト</small></div>
         </div>
         <p id="result-player" class="platform-status"></p>
+        <section id="result-ranking" class="ranking-panel" aria-labelledby="result-ranking-title">
+          <div class="ranking-heading">
+            <h3 id="result-ranking-title">カメレオンJPランキング</h3>
+            <span>TOP10</span>
+          </div>
+          <p id="ranking-status" class="platform-status" role="status" aria-live="polite">ランキングを読み込み中…</p>
+          <ol id="ranking-list" class="ranking-list" aria-live="polite"></ol>
+        </section>
         <textarea id="result-share-text" class="share-preview" readonly aria-label="結果のシェア文"></textarea>
         <button id="btn-result-share" class="btn">結果をシェア</button>
         <p id="result-share-status" class="platform-status" role="status" aria-live="polite"></p>
@@ -1736,6 +1774,7 @@ kbd {
     popJudge: () => popJudge,
     reflectKeyboardBindings: () => reflectKeyboardBindings,
     reflectSettings: () => reflectSettings,
+    renderRanking: () => renderRanking,
     setBestLabel: () => setBestLabel,
     setCountdown: () => setCountdown,
     setHowtoPlatform: () => setHowtoPlatform,
@@ -1744,6 +1783,7 @@ kbd {
     setPlayUIVisible: () => setPlayUIVisible,
     setPracticeGuide: () => setPracticeGuide,
     setPracticeVisible: () => setPracticeVisible,
+    setRankingStatus: () => setRankingStatus,
     showBanner: () => showBanner,
     showResult: () => showResult,
     showScreen: () => showScreen,
@@ -2091,6 +2131,41 @@ kbd {
     void el.offsetWidth;
     el.style.animation = "";
   }
+  function setRankingStatus(message = "", tone2 = "") {
+    const status = $("ranking-status");
+    if (!status) return;
+    status.textContent = message;
+    status.classList.toggle("error", tone2 === "error");
+    status.classList.toggle("ranking-success", tone2 === "success");
+    status.classList.toggle("ranking-pending", tone2 === "pending");
+  }
+  function renderRanking(rows = []) {
+    const list = $("ranking-list");
+    if (!list) return;
+    list.replaceChildren();
+    if (!Array.isArray(rows) || rows.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "ranking-empty";
+      empty.textContent = "まだランキングに記録がありません。";
+      list.append(empty);
+      return;
+    }
+    rows.forEach((row, index) => {
+      const item = document.createElement("li");
+      item.className = "ranking-row";
+      const rank = document.createElement("span");
+      rank.className = "ranking-rank";
+      rank.textContent = `${Math.max(1, Number(row?.rankNo) || index + 1)}`;
+      const name = document.createElement("span");
+      name.className = "ranking-name";
+      name.textContent = String(row?.name || "名無し");
+      const score = document.createElement("span");
+      score.className = "ranking-score";
+      score.textContent = `${Math.max(0, Number(row?.score) || 0).toLocaleString()}点`;
+      item.append(rank, name, score);
+      list.append(item);
+    });
+  }
   function showResult({ score, best, isBest, maxCombo, perfectRate, tier, rank }) {
     $("result-rank").textContent = rank;
     $("result-score").textContent = score.toLocaleString();
@@ -2099,6 +2174,8 @@ kbd {
     $("result-perfect").textContent = `${perfectRate}%`;
     $("result-tier").textContent = tier;
     $("result-best").textContent = best.toLocaleString();
+    renderRanking([]);
+    setRankingStatus("ランキングを読み込み中…");
     showScreen("result");
   }
   function setBestLabel(best) {
@@ -3496,6 +3573,353 @@ kbd {
     }
   }
 
+  // src/js/ranking-config.js
+  var SUPABASE_URL = "https://mlpnjgezrnhdxsxolyzj.supabase.co";
+  var SUPABASE_PUBLISHABLE_KEY = "sb_publishable_drzcy0v97knU6FgjqSgBHw_0A9XPdFM";
+  var RANKING_CONFIG = Object.freeze({
+    gameSlug: "paripari",
+    clientVersion: "paripari-web-20260928-01",
+    rpcBaseUrl: `${SUPABASE_URL}/rest/v1/rpc`,
+    startRpc: "start_game_play_v1",
+    finishRpc: "finish_game_play_v1",
+    submitRpc: "submit_score_idempotent_v1",
+    rankingRpc: "get_best_score_ranking",
+    rankingLimit: 10,
+    timeoutMs: 8e3,
+    pendingSubmissionStorageKey: "paripari:ranking-pending:v1"
+  });
+
+  // src/js/ranking-client.js
+  var RANKING_STATES = Object.freeze({
+    idle: "idle",
+    starting: "starting",
+    submitting: "submitting",
+    submitted: "submitted",
+    retryableFailed: "retryable_failed",
+    permanentFailed: "permanent_failed"
+  });
+  var UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+  var RETRYABLE_REASONS = /* @__PURE__ */ new Set([
+    "play_rate_limited",
+    "service_unavailable",
+    "timeout",
+    "network_error",
+    "http_error"
+  ]);
+  var clone = (value) => {
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch {
+      return null;
+    }
+  };
+  var finiteInteger = (value, fallback = 0) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.trunc(number) : fallback;
+  };
+  var storageLike = (value) => value && typeof value.getItem === "function" && typeof value.setItem === "function" && typeof value.removeItem === "function" ? value : null;
+  var readGlobalStorage = () => {
+    try {
+      return storageLike(globalThis.localStorage);
+    } catch {
+      return null;
+    }
+  };
+  var reasonFrom = (payload, fallback = "ranking_request_failed") => {
+    if (payload && typeof payload === "object") {
+      for (const key of ["reason", "code", "message", "error"]) {
+        if (typeof payload[key] === "string" && payload[key].trim()) return payload[key].trim();
+      }
+    }
+    return fallback;
+  };
+  var isRetryableReason = (reason) => RETRYABLE_REASONS.has(String(reason ?? "").toLowerCase());
+  var RankingClientError = class extends Error {
+    constructor(message, {
+      code = "ranking_request_failed",
+      retryable = true,
+      status = 0,
+      payload = null
+    } = {}) {
+      super(message);
+      this.name = "RankingClientError";
+      this.code = code;
+      this.retryable = retryable;
+      this.status = status;
+      this.payload = payload;
+    }
+  };
+  var createRequestId = () => {
+    if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID();
+    if (typeof globalThis.crypto?.getRandomValues === "function") {
+      const bytes = new Uint8Array(16);
+      globalThis.crypto.getRandomValues(bytes);
+      bytes[6] = bytes[6] & 15 | 64;
+      bytes[8] = bytes[8] & 63 | 128;
+      const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    }
+    throw new RankingClientError("このブラウザでは安全な開始IDを作成できません。", {
+      code: "uuid_unavailable",
+      retryable: false
+    });
+  };
+  var requireUuid = (value, label) => {
+    if (typeof value !== "string" || !UUID_PATTERN.test(value)) {
+      throw new RankingClientError(`${label}が不正です。`, {
+        code: "invalid_uuid",
+        retryable: false
+      });
+    }
+    return value;
+  };
+  var requireName = (value) => {
+    if (typeof value !== "string") {
+      throw new RankingClientError("プレイヤー名が不正です。", {
+        code: "invalid_name",
+        retryable: false
+      });
+    }
+    const name = value.trim();
+    if (name.length < 1 || name.length > 20 || /[\u0000-\u001f\u007f-\u009f]/u.test(name)) {
+      throw new RankingClientError("プレイヤー名が不正です。", {
+        code: "invalid_name",
+        retryable: false
+      });
+    }
+    return name;
+  };
+  var acceptedPayload = (payload, label) => {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      throw new RankingClientError(`${label}の応答形式が不正です。`, {
+        code: "invalid_response",
+        retryable: true,
+        payload
+      });
+    }
+    if (payload.accepted !== true) {
+      const reason = reasonFrom(payload, `${label}_rejected`);
+      throw new RankingClientError(`${label}を記録できませんでした。`, {
+        code: reason,
+        retryable: isRetryableReason(reason),
+        payload
+      });
+    }
+    return payload;
+  };
+  var normalizeRankingRows = (payload, limit = 10) => {
+    const rows = Array.isArray(payload) ? payload : [];
+    return rows.slice(0, Math.max(0, Math.trunc(Number(limit) || 0))).map((row, index) => ({
+      rankNo: Math.max(1, finiteInteger(row?.rank_no, index + 1)),
+      name: typeof row?.display_name === "string" && row.display_name.trim() ? row.display_name.trim() : "名無し",
+      score: Math.max(0, finiteInteger(row?.best_score)),
+      firstScore: Math.max(0, finiteInteger(row?.first_score)),
+      playCount: Math.max(0, finiteInteger(row?.play_count)),
+      updatedAt: typeof row?.updated_at === "string" ? row.updated_at : ""
+    }));
+  };
+  var createPendingSubmissionStore = (storage = readGlobalStorage(), key = RANKING_CONFIG.pendingSubmissionStorageKey) => {
+    const backend = storageLike(storage);
+    let memory = null;
+    let preferMemory = false;
+    const read = () => {
+      if (!backend || preferMemory) return clone(memory);
+      try {
+        const raw = backend.getItem(key);
+        memory = raw ? JSON.parse(raw) : null;
+      } catch {
+        preferMemory = true;
+      }
+      return clone(memory);
+    };
+    const write = (value) => {
+      memory = value && typeof value === "object" ? clone(value) : null;
+      if (backend) {
+        try {
+          if (memory) backend.setItem(key, JSON.stringify(memory));
+          else backend.removeItem(key);
+          preferMemory = false;
+        } catch {
+          preferMemory = true;
+        }
+      }
+      return clone(memory);
+    };
+    return {
+      key,
+      load: read,
+      save: write,
+      clear: () => write(null)
+    };
+  };
+  var responsePayload = async (response) => {
+    if (!response || typeof response.json !== "function") return null;
+    try {
+      return await response.json();
+    } catch {
+      return null;
+    }
+  };
+  var createRankingClient = ({
+    config = RANKING_CONFIG,
+    fetchImpl = null,
+    storage = readGlobalStorage(),
+    publishableKey = SUPABASE_PUBLISHABLE_KEY
+  } = {}) => {
+    const fetchFunction = fetchImpl ?? ((...args) => {
+      if (typeof globalThis.fetch !== "function") {
+        throw new RankingClientError("通信機能を利用できません。", {
+          code: "fetch_unavailable",
+          retryable: false
+        });
+      }
+      return globalThis.fetch(...args);
+    });
+    const pendingStore = createPendingSubmissionStore(storage, config.pendingSubmissionStorageKey);
+    const requestRpc = async (rpcName, body) => {
+      const url = `${config.rpcBaseUrl}/${encodeURIComponent(rpcName)}`;
+      const controller = typeof AbortController === "function" ? new AbortController() : null;
+      const timeoutId = controller ? globalThis.setTimeout(() => controller.abort(), config.timeoutMs) : null;
+      let response;
+      try {
+        response = await fetchFunction(url, {
+          method: "POST",
+          headers: {
+            apikey: publishableKey,
+            Authorization: `Bearer ${publishableKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(body),
+          ...controller ? { signal: controller.signal } : {}
+        });
+      } catch (error) {
+        const aborted = error?.name === "AbortError";
+        throw new RankingClientError(
+          aborted ? "ランキング通信がタイムアウトしました。" : "ランキング通信に失敗しました。",
+          {
+            code: aborted ? "timeout" : "network_error",
+            retryable: true,
+            payload: error?.message ?? null
+          }
+        );
+      } finally {
+        if (timeoutId !== null) globalThis.clearTimeout(timeoutId);
+      }
+      const payload = await responsePayload(response);
+      if (!response?.ok) {
+        const reason = reasonFrom(payload, response?.status >= 500 ? "service_unavailable" : "http_error");
+        throw new RankingClientError("ランキング通信が拒否されました。", {
+          code: reason,
+          status: response?.status ?? 0,
+          retryable: response?.status === 408 || response?.status === 409 || response?.status === 429 || response?.status >= 500,
+          payload
+        });
+      }
+      return payload;
+    };
+    const startPlay = async ({ startId, displayName }) => {
+      const safeStartId = requireUuid(startId, "開始ID");
+      const safeName = requireName(displayName);
+      const payload = await requestRpc(config.startRpc, {
+        p_start_id: safeStartId,
+        p_display_name: safeName,
+        p_game_slug: config.gameSlug,
+        p_client_version: config.clientVersion
+      });
+      const accepted = acceptedPayload(payload, "プレイ開始");
+      const playId = requireUuid(accepted.play_id, "プレイID");
+      return {
+        accepted: true,
+        duplicate: accepted.duplicate === true,
+        startId: safeStartId,
+        playId,
+        displayName: typeof accepted.display_name === "string" ? accepted.display_name : safeName,
+        normalizedName: typeof accepted.normalized_name === "string" ? accepted.normalized_name : ""
+      };
+    };
+    const finishPlay = async ({ playId, displayName, resultType, reachedWave, score }) => {
+      const safePlayId = requireUuid(playId, "プレイID");
+      const safeName = requireName(displayName);
+      const safeResultType = String(resultType ?? "").trim().toLowerCase();
+      if (!["clear", "game_over", "retire"].includes(safeResultType)) {
+        throw new RankingClientError("結果種別が不正です。", {
+          retryable: false,
+          code: "invalid_result_type"
+        });
+      }
+      const payload = await requestRpc(config.finishRpc, {
+        p_play_id: safePlayId,
+        p_display_name: safeName,
+        p_game_slug: config.gameSlug,
+        p_result_type: safeResultType,
+        p_reached_wave: Math.max(1, finiteInteger(reachedWave, 1)),
+        p_score: Math.max(0, finiteInteger(score)),
+        p_client_version: config.clientVersion,
+        p_ranking_score: safeResultType === "game_over" || safeResultType === "clear" ? Math.max(0, finiteInteger(score)) : null
+      });
+      return acceptedPayload(payload, "プレイ結果");
+    };
+    const submitScore = async ({ playId, submissionId, displayName, score }) => {
+      const safePlayId = requireUuid(playId, "プレイID");
+      const safeSubmissionId = requireUuid(submissionId, "送信ID");
+      const safeName = requireName(displayName);
+      const payload = await requestRpc(config.submitRpc, {
+        p_play_id: safePlayId,
+        p_submission_id: safeSubmissionId,
+        p_display_name: safeName,
+        p_game_slug: config.gameSlug,
+        p_score: Math.max(0, finiteInteger(score)),
+        p_client_version: config.clientVersion
+      });
+      const row = Array.isArray(payload) ? payload[0] : payload;
+      if (!row || row.accepted !== true) {
+        const reason = reasonFrom(row, "score_submission_rejected");
+        throw new RankingClientError("スコアをランキングへ送信できませんでした。", {
+          code: reason,
+          retryable: isRetryableReason(reason),
+          payload
+        });
+      }
+      return {
+        accepted: true,
+        submissionId: requireUuid(row.result_submission_id ?? safeSubmissionId, "送信ID"),
+        playId: requireUuid(row.result_play_id ?? safePlayId, "プレイID"),
+        score: Math.max(0, finiteInteger(row.result_best_score ?? score)),
+        playCount: Math.max(0, finiteInteger(row.result_play_count)),
+        wasDuplicate: row.was_duplicate === true
+      };
+    };
+    const fetchTopRanking = async (limit = config.rankingLimit ?? 10) => {
+      const safeLimit = Math.min(100, Math.max(1, Math.trunc(Number(limit) || 10)));
+      const payload = await requestRpc(config.rankingRpc, {
+        p_game_slug: config.gameSlug,
+        p_limit: safeLimit
+      });
+      if (!Array.isArray(payload)) {
+        throw new RankingClientError("ランキングの応答形式が不正です。", {
+          code: "invalid_ranking_response",
+          retryable: true,
+          payload
+        });
+      }
+      return normalizeRankingRows(payload, safeLimit);
+    };
+    return {
+      config,
+      startPlay,
+      finishPlay,
+      submitScore,
+      fetchTopRanking,
+      loadPendingSubmission: () => pendingStore.load(),
+      savePendingSubmission: (value) => pendingStore.save(value),
+      clearPendingSubmission: (submissionId = null) => {
+        const current = pendingStore.load();
+        if (!submissionId || current?.submissionId === submissionId) pendingStore.clear();
+        return current;
+      }
+    };
+  };
+
   // src/js/main.js
   var $2 = (id) => document.getElementById(id);
   var canvas = $2("game-canvas");
@@ -3510,6 +3934,10 @@ kbd {
   var session = null;
   var inputController = null;
   var keyCaptureDir = null;
+  var rankingClient = createRankingClient();
+  var rankingPlay = null;
+  var pendingRankingPromise = null;
+  var rankingRefreshToken = 0;
   var game = new Game({
     renderer,
     particles,
@@ -3596,6 +4024,9 @@ kbd {
           break;
       }
     },
+    onStart: (mode) => {
+      if (mode === "normal") beginRankingPlay();
+    },
     onCountdown: (n) => {
       playSfx(n > 0 ? "countdown" : "start", n);
       if (n > 0) setCountdown(n);
@@ -3604,6 +4035,7 @@ kbd {
     onResult: (data) => {
       setBestLabel(data.best);
       renderResultShare(data);
+      void recordRankingResult(data);
     },
     onPracticeComplete: () => setTutorialCompleted()
   });
@@ -3611,6 +4043,165 @@ kbd {
     targets: [canvas, $2("controls")],
     isEnabled: () => !!session && session.canHandleAction()
   });
+  void flushPendingRanking();
+  var RANKING_UNAVAILABLE_CODES = /* @__PURE__ */ new Set([
+    "game_not_found",
+    "game_inactive",
+    "game_not_available",
+    "submission_not_allowed"
+  ]);
+  function rankingErrorMessage(error) {
+    const code = String(error?.code || "").toLowerCase();
+    if (RANKING_UNAVAILABLE_CODES.has(code)) return "ランキングは公開準備中です。";
+    if (code === "invalid_name" || code === "invalid_uuid") return "ランキングへの送信をスキップしました。";
+    if (error?.retryable === false) return "ランキングに登録できませんでした。";
+    return "通信に失敗しました。次回起動時に再送します。";
+  }
+  function pendingRankingFrom({ startId, playId = null, submissionId, displayName, score, tier }) {
+    return {
+      version: 1,
+      stage: playId ? "finish" : "start",
+      startId,
+      playId,
+      submissionId,
+      displayName,
+      resultType: "game_over",
+      reachedWave: Math.max(1, Number(tier) || 1),
+      score: Math.max(0, Number(score) || 0)
+    };
+  }
+  async function completePendingRanking(pending) {
+    let current = { ...pending };
+    if (!current.playId) {
+      const started = await rankingClient.startPlay({
+        startId: current.startId,
+        displayName: current.displayName
+      });
+      current = { ...current, playId: started.playId, stage: "finish" };
+      rankingClient.savePendingSubmission(current);
+    }
+    if (current.stage !== "submit") {
+      await rankingClient.finishPlay({
+        playId: current.playId,
+        displayName: current.displayName,
+        resultType: current.resultType,
+        reachedWave: current.reachedWave,
+        score: current.score
+      });
+      current = { ...current, stage: "submit" };
+      rankingClient.savePendingSubmission(current);
+    }
+    const submitted = await rankingClient.submitScore({
+      playId: current.playId,
+      submissionId: current.submissionId,
+      displayName: current.displayName,
+      score: current.score
+    });
+    rankingClient.clearPendingSubmission(current.submissionId);
+    return submitted;
+  }
+  function flushPendingRanking() {
+    if (pendingRankingPromise) return pendingRankingPromise;
+    pendingRankingPromise = (async () => {
+      const pending = rankingClient.loadPendingSubmission();
+      if (!pending || typeof pending !== "object") return null;
+      try {
+        return await completePendingRanking(pending);
+      } catch (error) {
+        if (["invalid_uuid", "invalid_name"].includes(String(error?.code || ""))) {
+          rankingClient.clearPendingSubmission(pending.submissionId);
+        }
+        return null;
+      } finally {
+        pendingRankingPromise = null;
+      }
+    })();
+    return pendingRankingPromise;
+  }
+  async function refreshRanking({ setStatus: setStatus2 = true } = {}) {
+    const token = ++rankingRefreshToken;
+    try {
+      const rows = await rankingClient.fetchTopRanking();
+      if (token !== rankingRefreshToken) return rows;
+      renderRanking(rows);
+      if (setStatus2) setRankingStatus(rows.length ? "最新のTOP10を表示中" : "まだランキングに記録がありません。");
+      return rows;
+    } catch (error) {
+      if (token === rankingRefreshToken && setStatus2) {
+        setRankingStatus(rankingErrorMessage(error), "error");
+      }
+      return null;
+    }
+  }
+  function beginRankingPlay() {
+    const displayName = playerName || getPlayerName();
+    if (!displayName) return;
+    const play = {
+      startId: createRequestId(),
+      displayName,
+      playId: null,
+      startError: null,
+      resultHandled: false
+    };
+    rankingPlay = play;
+    play.startPromise = rankingClient.startPlay({
+      startId: play.startId,
+      displayName: play.displayName
+    }).then((started) => {
+      if (rankingPlay === play) play.playId = started.playId;
+      return started;
+    }).catch((error) => {
+      play.startError = error;
+      return null;
+    });
+  }
+  async function ensureRankingPlay(play) {
+    if (play.playId) return play.playId;
+    const firstAttempt = await play.startPromise;
+    if (firstAttempt?.playId) {
+      play.playId = firstAttempt.playId;
+      return play.playId;
+    }
+    try {
+      const retry = await rankingClient.startPlay({
+        startId: play.startId,
+        displayName: play.displayName
+      });
+      play.playId = retry.playId;
+      return play.playId;
+    } catch (error) {
+      play.startError = error;
+      return null;
+    }
+  }
+  async function recordRankingResult(data) {
+    const play = rankingPlay;
+    setRankingStatus("ランキングへ送信中…", "pending");
+    if (!play || play.resultHandled) {
+      await refreshRanking({ setStatus: false });
+      return;
+    }
+    play.resultHandled = true;
+    await flushPendingRanking();
+    const submissionId = createRequestId();
+    const playId = await ensureRankingPlay(play);
+    const pending = pendingRankingFrom({
+      startId: play.startId,
+      playId,
+      submissionId,
+      displayName: play.displayName,
+      score: data.score,
+      tier: data.tier
+    });
+    rankingClient.savePendingSubmission(pending);
+    try {
+      await completePendingRanking(pending);
+      setRankingStatus("ランキングに登録しました。", "success");
+    } catch (error) {
+      setRankingStatus(rankingErrorMessage(error), "error");
+    }
+    await refreshRanking({ setStatus: false });
+  }
   function shareTextForHome() {
     return [
       "パリパリ：来た方向と反対を、タイミングよく選べ！",
