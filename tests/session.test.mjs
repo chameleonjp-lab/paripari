@@ -8,6 +8,7 @@ import {
 } from '../src/js/session.js';
 import { Game } from '../src/js/game.js';
 import { GameClock } from '../src/js/clock.js';
+import { CONFIG } from '../src/js/config.js';
 
 function makeHarness({ visible = true, portrait = true, operable = true } = {}) {
   const calls = {
@@ -126,7 +127,7 @@ function installRealAttack(game, impactAt = 1_000) {
   game.mode = 'normal';
   game.state = 'PLAYING';
   game.warmupRemaining = 0;
-  game.hp = 3;
+  game.hp = CONFIG.MAX_HP;
   game.nextSpawnAt = Number.POSITIVE_INFINITY;
   game.attack = {
     id: 'session-stall-fixture',
@@ -268,7 +269,7 @@ test('T05: real Game + GameClock + Session stall without advancing judgment or s
   assert.equal(session.state, SESSION_STATES.PAUSED);
   assert.equal(clock.now(2_000), 100, 'clock remains at the last presented game time');
   assert.equal(game.gameTime, 100, 'Game did not fast-forward through the gap');
-  assert.equal(game.hp, 3, 'no timeout or miss was processed during the gap');
+  assert.equal(game.hp, CONFIG.MAX_HP, 'no timeout or miss was processed during the gap');
   assert.equal(game.attack.resolved, false, 'attack remains pending');
   assert.equal(game._inputQueue.length, 0, 'long stall discarded the pending queue');
 });
@@ -288,7 +289,7 @@ test('S01/T05: hidden notification before the delayed rAF also freezes at the la
   assert.equal(session.state, SESSION_STATES.PAUSED);
   assert.equal(clock.now(2_000), 100, 'hidden path freezes at the last frame');
   assert.equal(game.gameTime, 100, 'hidden path does not fast-forward Game');
-  assert.equal(game.hp, 3);
+  assert.equal(game.hp, CONFIG.MAX_HP);
   assert.equal(game.attack.resolved, false);
   assert.equal(game._inputQueue.length, 0, 'hidden long-gap path discards pending queue');
 });

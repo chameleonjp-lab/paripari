@@ -1,6 +1,8 @@
 // localStorage wrapper (best score, settings, player name, tutorial completion).
 // Keep old score keys intact; rule-versioned keys prevent scores from mixing.
-export const RULE_VERSION = 'r4-difficulty-20260927';
+import { normalizeKeyBindings } from './keyboard.js';
+
+export const RULE_VERSION = 'r5-survival-keys-20260928';
 const KEY_BEST = `paripari.best.${RULE_VERSION}`;
 const KEY_SETTINGS = 'paripari.settings';
 const KEY_PLAYER_NAME = 'paripari.player-name';
@@ -10,6 +12,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   vibrate: true,
   sound: true,
   reducedMotion: false,
+  keyboard: Object.freeze(normalizeKeyBindings()),
 });
 
 // Caches belong to this application launch, including failed writes.
@@ -108,7 +111,12 @@ export function setPlayerName(value) {
 }
 
 function copySettings(settings) {
-  return { vibrate: settings.vibrate, sound: settings.sound, reducedMotion: settings.reducedMotion };
+  return {
+    vibrate: settings.vibrate,
+    sound: settings.sound,
+    reducedMotion: settings.reducedMotion,
+    keyboard: normalizeKeyBindings(settings.keyboard),
+  };
 }
 
 function normalizeSettings(value) {
@@ -118,6 +126,7 @@ function normalizeSettings(value) {
     sound: typeof source.sound === 'boolean' ? source.sound : DEFAULT_SETTINGS.sound,
     reducedMotion: typeof source.reducedMotion === 'boolean'
       ? source.reducedMotion : DEFAULT_SETTINGS.reducedMotion,
+    keyboard: normalizeKeyBindings(source.keyboard),
   };
 }
 

@@ -463,6 +463,43 @@ kbd {
 }
 .toggle span { min-width: 0; flex: 1; text-align: left; overflow-wrap: anywhere; }
 .toggle input { flex: 0 0 26px; width: 26px; height: 26px; accent-color: var(--cyan); }
+.keyboard-settings {
+  margin: .85rem 0 .35rem;
+  text-align: left;
+}
+.keyboard-settings h3 { margin: 1rem 0 .35rem; font-size: 1.05rem; }
+.keyboard-settings-help { margin: 0 0 .55rem; color: rgba(233,238,247,.7); font-size: .82rem; line-height: 1.45; }
+.keyboard-bindings { display: grid; gap: .35rem; }
+.keyboard-binding-row {
+  display: grid;
+  grid-template-columns: minmax(3.2rem, 1fr) minmax(5.2rem, 1.2fr) auto;
+  align-items: center;
+  gap: .4rem;
+  min-height: 44px;
+  padding: .18rem 0;
+}
+.keyboard-binding-row > span { color: rgba(233,238,247,.82); }
+.key-bind, .key-reset {
+  min-height: 40px;
+  padding: .35rem .5rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255,255,255,.06);
+  color: var(--ink);
+  font: inherit;
+  font-size: .88rem;
+  font-weight: 700;
+  touch-action: manipulation;
+}
+.key-bind { overflow-wrap: anywhere; }
+.key-bind.capturing {
+  border-color: var(--gold);
+  color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(255,211,91,.18), 0 0 18px rgba(255,211,91,.22);
+}
+.key-reset { color: rgba(233,238,247,.74); font-size: .76rem; }
+.keyboard-reset-all { margin-top: .55rem; font-size: .9rem; }
+#key-bind-status { margin: .35rem 0 0; min-height: 1.5em; }
 
 /* カウントダウン */
 .countdown {
@@ -587,13 +624,12 @@ kbd {
         <ol class="howto-list">
           <li>攻撃は左・右・上・左上・右上の<b>5方向</b>から来ます。線に届く瞬間に、来た方向と反対のボタンを押します。</li>
           <li id="howto-mobile" class="howto-platform">スマホでは、画面下の<b>5つの方向ボタン</b>を使います。攻撃が来た瞬間に、来た方向と反対のボタンをタップします。</li>
-          <li id="howto-pc" class="howto-platform hidden" aria-hidden="true">PCでは、画面のボタンまたはキーボードを使います。攻撃が来た瞬間に、来た方向と反対のキーを押します。左 <kbd>←</kbd>/<kbd>A</kbd>、右 <kbd>→</kbd>/<kbd>D</kbd>、下 <kbd>↓</kbd>/<kbd>S</kbd>、左下 <kbd>Q</kbd>/<kbd>Z</kbd>、右下 <kbd>E</kbd>/<kbd>C</kbd> です。</li>
+          <li id="howto-pc" class="howto-platform hidden" aria-hidden="true">PCでは、画面のボタンまたはキーボードを使います。攻撃が来た瞬間に、来た方向と反対のキーを押します。設定の「PC版キーボード」で任意のキーに変更できます。現在のキーは <span id="howto-pc-keys"></span> です。</li>
           <li>対応は、左→<b>右</b>／右→<b>左</b>／上→<b>下</b>／左上→<b>右下</b>／右上→<b>左下</b>です。</li>
           <li>初回は5方向を1回ずつ成功させる案内付き練習から始まります。練習中はライフが減らず、失敗した方向を成功するまで繰り返します。遊び方から何度でも練習できます。</li>
-          <li>1回の攻撃は1〜3回押すことがあります。失敗しても、ライフが減るのは1回の攻撃につき最大1つです。</li>
-          <li>本番のライフは3つ。なくなると終了です。</li>
+          <li>本番は失敗2回で終了します。1回の攻撃は1〜3回押すことがありますが、失敗して減るのは1回の攻撃につき最大1つです。</li>
           <li>誤差60ミリ秒以内は<b>ぴったり</b>、140ミリ秒以内は<b>成功</b>。それより早い・遅い入力、逆方向、方向が違う入力は失敗です。</li>
-          <li>ぴったり成功を10回連続するとライフが1つ回復します（最大3つ）。</li>
+          <li>ぴったり成功を10回連続するとライフが1つ回復します（最大2つ）。</li>
         </ol>
         <p class="howto-judge">
           <span class="tag perfect">ぴったり</span> 誤差60ミリ秒以内
@@ -612,6 +648,19 @@ kbd {
         <label class="toggle"><span>振動（対応端末のみ）</span><input type="checkbox" id="set-vibrate"></label>
         <label class="toggle"><span>効果音</span><input type="checkbox" id="set-sound"></label>
         <label class="toggle"><span>モーション低減</span><input type="checkbox" id="set-motion"></label>
+        <section id="pc-key-settings" class="keyboard-settings" aria-labelledby="pc-key-settings-title">
+          <h3 id="pc-key-settings-title">PC版キーボード</h3>
+          <p class="keyboard-settings-help">方向ごとのボタンを押してから、割り当てたいキーを1つ押してください。設定したキーは本番中に使えます。</p>
+          <div class="keyboard-bindings">
+            <div class="keyboard-binding-row"><span>左</span><button type="button" class="key-bind" data-key-capture="L" aria-pressed="false"></button><button type="button" class="key-reset" data-key-reset="L">初期値</button></div>
+            <div class="keyboard-binding-row"><span>左下</span><button type="button" class="key-bind" data-key-capture="DL" aria-pressed="false"></button><button type="button" class="key-reset" data-key-reset="DL">初期値</button></div>
+            <div class="keyboard-binding-row"><span>下</span><button type="button" class="key-bind" data-key-capture="D" aria-pressed="false"></button><button type="button" class="key-reset" data-key-reset="D">初期値</button></div>
+            <div class="keyboard-binding-row"><span>右下</span><button type="button" class="key-bind" data-key-capture="DR" aria-pressed="false"></button><button type="button" class="key-reset" data-key-reset="DR">初期値</button></div>
+            <div class="keyboard-binding-row"><span>右</span><button type="button" class="key-bind" data-key-capture="R" aria-pressed="false"></button><button type="button" class="key-reset" data-key-reset="R">初期値</button></div>
+          </div>
+          <button id="btn-key-reset-all" type="button" class="btn keyboard-reset-all">すべて初期値に戻す</button>
+          <p id="key-bind-status" class="platform-status" role="status" aria-live="polite"></p>
+        </section>
         <button id="btn-settings-back" class="btn btn-primary">もどる</button>
       </div>
     </section>
@@ -691,7 +740,7 @@ kbd {
     COMBO_MAX_MULT: 4,
     TIMING_BONUS_MAX: 50,
     // --- ライフ ---
-    MAX_HP: 3,
+    MAX_HP: 2,
     HEAL_EVERY_PERFECT_STREAK: 10,
     // --- 演出 ---
     HITSTOP_PERFECT_MS: 110,
@@ -1685,10 +1734,13 @@ kbd {
     hideAllScreens: () => hideAllScreens,
     hideBanner: () => hideBanner,
     popJudge: () => popJudge,
+    reflectKeyboardBindings: () => reflectKeyboardBindings,
     reflectSettings: () => reflectSettings,
     setBestLabel: () => setBestLabel,
     setCountdown: () => setCountdown,
     setHowtoPlatform: () => setHowtoPlatform,
+    setKeyboardCapture: () => setKeyboardCapture,
+    setKeyboardStatus: () => setKeyboardStatus,
     setPlayUIVisible: () => setPlayUIVisible,
     setPracticeGuide: () => setPracticeGuide,
     setPracticeVisible: () => setPracticeVisible,
@@ -1698,6 +1750,119 @@ kbd {
     updateAttackProgress: () => updateAttackProgress,
     updateHUD: () => updateHUD
   });
+
+  // src/js/keyboard.js
+  var KEYBOARD_DIRECTIONS = Object.freeze(["L", "DL", "D", "DR", "R"]);
+  var KEYBOARD_HELP_DIRECTIONS = Object.freeze(["L", "R", "D", "DL", "DR"]);
+  var KEYBOARD_DIRECTION_LABELS = Object.freeze({
+    L: "左",
+    R: "右",
+    D: "下",
+    DL: "左下",
+    DR: "右下"
+  });
+  var DEFAULT_KEY_TOKENS = Object.freeze({
+    L: Object.freeze(["code:ArrowLeft", "code:KeyA", "key:ArrowLeft", "key:a", "key:A"]),
+    R: Object.freeze(["code:ArrowRight", "code:KeyD", "key:ArrowRight", "key:d", "key:D"]),
+    D: Object.freeze(["code:ArrowDown", "code:KeyS", "key:ArrowDown", "key:s", "key:S"]),
+    DL: Object.freeze(["code:KeyQ", "code:KeyZ", "key:q", "key:Q", "key:z", "key:Z"]),
+    DR: Object.freeze(["code:KeyE", "code:KeyC", "key:e", "key:E", "key:c", "key:C"])
+  });
+  var DEFAULT_KEY_LABELS = Object.freeze({
+    L: "← / A",
+    R: "→ / D",
+    D: "↓ / S",
+    DL: "Q / Z",
+    DR: "E / C"
+  });
+  var DISPLAY_NAMES = Object.freeze({
+    ArrowLeft: "←",
+    ArrowRight: "→",
+    ArrowUp: "↑",
+    ArrowDown: "↓",
+    Space: "Space",
+    Enter: "Enter",
+    Escape: "Esc",
+    Tab: "Tab",
+    Backspace: "Backspace",
+    Delete: "Delete",
+    ShiftLeft: "左Shift",
+    ShiftRight: "右Shift",
+    ControlLeft: "左Ctrl",
+    ControlRight: "右Ctrl",
+    AltLeft: "左Alt",
+    AltRight: "右Alt"
+  });
+  function normalizeKeyToken(value) {
+    if (typeof value !== "string") return null;
+    const raw = value.trim();
+    if (!raw || raw.length > 80) return null;
+    if (raw.startsWith("code:") || raw.startsWith("key:")) return raw;
+    return `code:${raw}`;
+  }
+  function normalizeKeyBindings(value) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    return Object.fromEntries(KEYBOARD_DIRECTIONS.map((dir) => [dir, normalizeKeyToken(source[dir])]));
+  }
+  function keyTokenFromEvent(event) {
+    const code = String(event?.code || "");
+    if (code && code !== "Unidentified") return `code:${code}`;
+    const key = String(event?.key || "");
+    if (key && key !== "Unidentified") return `key:${key}`;
+    return null;
+  }
+  function eventKeyTokens(event) {
+    const tokens = [];
+    const primary = keyTokenFromEvent(event);
+    const key = String(event?.key || "");
+    const code = String(event?.code || "");
+    for (const token of [primary, code ? `code:${code}` : null, key ? `key:${key}` : null]) {
+      if (token && token !== "code:Unidentified" && token !== "key:Unidentified" && !tokens.includes(token)) tokens.push(token);
+    }
+    return tokens;
+  }
+  function buildKeyDirectionMap(bindings = {}) {
+    const custom = normalizeKeyBindings(bindings);
+    const map = /* @__PURE__ */ new Map();
+    for (const dir of KEYBOARD_DIRECTIONS) {
+      if (custom[dir]) map.set(custom[dir], dir);
+    }
+    for (const dir of KEYBOARD_DIRECTIONS) {
+      if (custom[dir]) continue;
+      for (const token of DEFAULT_KEY_TOKENS[dir]) {
+        if (!map.has(token)) map.set(token, dir);
+      }
+    }
+    return map;
+  }
+  function directionForEvent(event, keyMap) {
+    for (const token of eventKeyTokens(event)) {
+      const dir = keyMap?.get(token);
+      if (dir) return dir;
+    }
+    return null;
+  }
+  function keyLabelForToken(token) {
+    const normalized = normalizeKeyToken(token);
+    if (!normalized) return "";
+    const value = normalized.replace(/^(code|key):/, "");
+    if (DISPLAY_NAMES[value]) return DISPLAY_NAMES[value];
+    if (value === " ") return "Space";
+    if (/^Key[A-Z]$/.test(value)) return value.slice(3);
+    if (/^Digit[0-9]$/.test(value)) return value.slice(5);
+    if (/^Numpad/.test(value)) return `Num ${value.slice(6)}`;
+    if (/^F[0-9]+$/.test(value)) return value;
+    return value.length === 1 ? value.toUpperCase() : value;
+  }
+  function keyLabelForDirection(dir, bindings = {}) {
+    const custom = normalizeKeyBindings(bindings)[dir];
+    return custom ? keyLabelForToken(custom) : DEFAULT_KEY_LABELS[dir] || "未設定";
+  }
+  function keyboardHelpText(bindings = {}) {
+    return KEYBOARD_HELP_DIRECTIONS.map((dir) => `${KEYBOARD_DIRECTION_LABELS[dir]} ${keyLabelForDirection(dir, bindings)}`).join("、");
+  }
+
+  // src/js/ui.js
   var $ = (id) => document.getElementById(id);
   var SCREENS = ["title", "howto", "settings", "ready", "pause", "result", "practice-complete"];
   var DIRECTION_NAMES = {
@@ -1800,6 +1965,31 @@ kbd {
       pc.classList.toggle("hidden", showMobile);
       pc.setAttribute("aria-hidden", String(showMobile));
     }
+  }
+  function reflectKeyboardBindings(bindings = {}) {
+    const normalized = normalizeKeyBindings(bindings);
+    KEYBOARD_DIRECTIONS.forEach((dir) => {
+      const button = document.querySelector(`[data-key-capture="${dir}"]`);
+      if (!button) return;
+      const label = keyLabelForDirection(dir, normalized);
+      button.textContent = label;
+      button.setAttribute("aria-label", `${KEYBOARD_DIRECTION_LABELS[dir]}のキー: ${label}`);
+    });
+    const help = $("howto-pc-keys");
+    if (help) help.textContent = keyboardHelpText(normalized);
+  }
+  function setKeyboardCapture(dir = null) {
+    document.querySelectorAll("[data-key-capture]").forEach((button) => {
+      const active = !!dir && button.dataset.keyCapture === dir;
+      button.classList.toggle("capturing", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+  }
+  function setKeyboardStatus(message = "", tone2 = "") {
+    const status = $("key-bind-status");
+    if (!status) return;
+    status.textContent = message;
+    status.classList.toggle("error", tone2 === "error");
   }
   function renderAttackProgress() {
     const el = $("attack-progress");
@@ -1918,10 +2108,11 @@ kbd {
     $("set-vibrate").checked = s.vibrate;
     $("set-sound").checked = s.sound;
     $("set-motion").checked = s.reducedMotion;
+    reflectKeyboardBindings(s.keyboard);
   }
 
   // src/js/storage.js
-  var RULE_VERSION = "r4-difficulty-20260927";
+  var RULE_VERSION = "r5-survival-keys-20260928";
   var KEY_BEST = `paripari.best.${RULE_VERSION}`;
   var KEY_SETTINGS = "paripari.settings";
   var KEY_PLAYER_NAME = "paripari.player-name";
@@ -1929,7 +2120,8 @@ kbd {
   var DEFAULT_SETTINGS = Object.freeze({
     vibrate: true,
     sound: true,
-    reducedMotion: false
+    reducedMotion: false,
+    keyboard: Object.freeze(normalizeKeyBindings())
   });
   var cachedBest = 0;
   var cachedPlayerName = null;
@@ -2008,14 +2200,20 @@ kbd {
     return name;
   }
   function copySettings(settings2) {
-    return { vibrate: settings2.vibrate, sound: settings2.sound, reducedMotion: settings2.reducedMotion };
+    return {
+      vibrate: settings2.vibrate,
+      sound: settings2.sound,
+      reducedMotion: settings2.reducedMotion,
+      keyboard: normalizeKeyBindings(settings2.keyboard)
+    };
   }
   function normalizeSettings(value) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     return {
       vibrate: typeof source.vibrate === "boolean" ? source.vibrate : DEFAULT_SETTINGS.vibrate,
       sound: typeof source.sound === "boolean" ? source.sound : DEFAULT_SETTINGS.sound,
-      reducedMotion: typeof source.reducedMotion === "boolean" ? source.reducedMotion : DEFAULT_SETTINGS.reducedMotion
+      reducedMotion: typeof source.reducedMotion === "boolean" ? source.reducedMotion : DEFAULT_SETTINGS.reducedMotion,
+      keyboard: normalizeKeyBindings(source.keyboard)
     };
   }
   function preferredDefaults() {
@@ -2584,25 +2782,6 @@ kbd {
   };
 
   // src/js/input.js
-  var KEY_DIR = {
-    ArrowLeft: "L",
-    a: "L",
-    A: "L",
-    ArrowRight: "R",
-    d: "R",
-    D: "R",
-    ArrowDown: "D",
-    s: "D",
-    S: "D",
-    q: "DL",
-    Q: "DL",
-    z: "DL",
-    Z: "DL",
-    e: "DR",
-    E: "DR",
-    c: "DR",
-    C: "DR"
-  };
   var EDITABLE_SELECTOR = [
     "input",
     "textarea",
@@ -2693,7 +2872,8 @@ kbd {
   function setupInput({
     onAction,
     onFirstGesture,
-    canHandleAction = () => true
+    canHandleAction = () => true,
+    keyBindings = {}
   } = {}) {
     let firstGestureDone = false;
     let composing = false;
@@ -2704,6 +2884,7 @@ kbd {
     const cancelEvent = pointerSupported ? "pointercancel" : "touchcancel";
     const activePresses = /* @__PURE__ */ new Map();
     const listeners = [];
+    let keyDirectionMap = buildKeyDirectionMap(keyBindings);
     const listen = (target, type, handler, options) => {
       target.addEventListener(type, handler, options);
       listeners.push(() => target.removeEventListener(type, handler, options));
@@ -2813,7 +2994,7 @@ kbd {
     }
     const keydown = (event) => {
       if (event.defaultPrevented || event.repeat) return;
-      const dir = KEY_DIR[event.key];
+      const dir = directionForEvent(event, keyDirectionMap);
       if (!dir) return;
       if (composing || event.isComposing || event.keyCode === 229 || isEditingTarget(event.target)) return;
       if (!safeCanHandleAction(canHandleAction, actionContext(dir, event, "key", null))) return;
@@ -2840,7 +3021,13 @@ kbd {
       clearPressed();
       listeners.splice(0).forEach((remove) => remove());
     };
-    return { clearPressed, destroy };
+    return {
+      clearPressed,
+      setKeyBindings(bindings = {}) {
+        keyDirectionMap = buildKeyDirectionMap(bindings);
+      },
+      destroy
+    };
   }
   function lockGestures({ targets = [], isEnabled = () => true } = {}) {
     const gestureTargets = Array.from(targets).filter(Boolean);
@@ -3322,6 +3509,7 @@ kbd {
   var playerName = getPlayerName();
   var session = null;
   var inputController = null;
+  var keyCaptureDir = null;
   var game = new Game({
     renderer,
     particles,
@@ -3331,6 +3519,7 @@ kbd {
     }
   });
   inputController = setupInput({
+    keyBindings: settings.keyboard,
     canHandleAction: () => !!session && session.canHandleAction(),
     onAction: ({ dir, time }) => {
       if (!session || !session.canHandleAction()) return;
@@ -3372,6 +3561,8 @@ kbd {
           hideBanner();
           setPlayUIVisible(false);
           reflectSettings(settings);
+          cancelKeyboardCapture();
+          setKeyboardStatus("");
           showScreen("settings");
           break;
         case SESSION_STATES.COUNTDOWN:
@@ -3516,7 +3707,10 @@ kbd {
     textElement: $2("result-share-text")
   }));
   $2("btn-settings").addEventListener("click", () => session.navigate(SESSION_STATES.SETTINGS));
-  $2("btn-settings-back").addEventListener("click", () => session.navigate(SESSION_STATES.HOME));
+  $2("btn-settings-back").addEventListener("click", () => {
+    cancelKeyboardCapture();
+    session.navigate(SESSION_STATES.HOME);
+  });
   $2("btn-pause").addEventListener("click", pauseGame);
   $2("btn-resume").addEventListener("click", resumeGame);
   $2("btn-pause-retry").addEventListener("click", beginRetryGame);
@@ -3539,6 +3733,63 @@ kbd {
   bindToggle("set-motion", "reducedMotion", (v) => {
     renderer.reducedMotion = v;
   });
+  function cancelKeyboardCapture() {
+    keyCaptureDir = null;
+    setKeyboardCapture(null);
+  }
+  function saveKeyboardBindings(bindings, status = "") {
+    const keyboard = normalizeKeyBindings(bindings);
+    settings = { ...settings, keyboard };
+    setSettings(settings);
+    game.setSettings(settings);
+    inputController?.setKeyBindings(keyboard);
+    reflectKeyboardBindings(keyboard);
+    setKeyboardCapture(null);
+    keyCaptureDir = null;
+    setKeyboardStatus(status);
+  }
+  function beginKeyboardCapture(dir) {
+    if (!KEYBOARD_DIRECTIONS.includes(dir)) return;
+    keyCaptureDir = dir;
+    setKeyboardCapture(dir);
+    setKeyboardStatus(`${KEYBOARD_DIRECTION_LABELS[dir]}に設定するキーを押してください。Escでキャンセルできます。`);
+  }
+  function handleKeyboardCapture(event) {
+    if (!keyCaptureDir || event.repeat || event.isComposing || event.keyCode === 229) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      cancelKeyboardCapture();
+      setKeyboardStatus("キー設定をキャンセルしました。");
+      return;
+    }
+    const token = keyTokenFromEvent(event);
+    if (!token) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const current = normalizeKeyBindings(settings.keyboard);
+    const conflict = KEYBOARD_DIRECTIONS.find((dir2) => dir2 !== keyCaptureDir && current[dir2] === token);
+    if (conflict) {
+      setKeyboardStatus(`${keyLabelForToken(token)}は「${KEYBOARD_DIRECTION_LABELS[conflict]}」に設定済みです。別のキーを押してください。`, "error");
+      return;
+    }
+    const dir = keyCaptureDir;
+    saveKeyboardBindings({ ...current, [dir]: token }, `${KEYBOARD_DIRECTION_LABELS[dir]}を${keyLabelForToken(token)}に設定しました。`);
+  }
+  document.querySelectorAll("[data-key-capture]").forEach((button) => {
+    button.addEventListener("click", () => beginKeyboardCapture(button.dataset.keyCapture));
+  });
+  document.querySelectorAll("[data-key-reset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const dir = button.dataset.keyReset;
+      const current = normalizeKeyBindings(settings.keyboard);
+      saveKeyboardBindings({ ...current, [dir]: null }, `${KEYBOARD_DIRECTION_LABELS[dir]}を初期値に戻しました。`);
+    });
+  });
+  $2("btn-key-reset-all").addEventListener("click", () => {
+    saveKeyboardBindings({}, "キーボード設定をすべて初期値に戻しました。");
+  });
+  window.addEventListener("keydown", handleKeyboardCapture, { capture: true });
   function pauseGame() {
     if (session) session.pause("manual", { wall: performance.now() });
   }

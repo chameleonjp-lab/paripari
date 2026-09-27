@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 let importId = 0;
+const EMPTY_KEYBOARD = { L: null, DL: null, D: null, DR: null, R: null };
 async function freshStorage() {
   const url = new URL('../src/js/storage.js', import.meta.url);
   return import(`${url.href}?storage-r3-test=${++importId}`);
@@ -45,7 +46,7 @@ test('R4 uses a fresh score namespace and leaves older scores and tutorial keys 
   });
   const storage = await freshStorage();
 
-  assert.equal(storage.RULE_VERSION, 'r4-difficulty-20260927');
+  assert.equal(storage.RULE_VERSION, 'r5-survival-keys-20260928');
   assert.equal(storage.getBest(), 0);
   assert.equal(storage.getTutorialCompleted(), false);
   assert.equal(storage.setBest(420), 420);
@@ -53,28 +54,30 @@ test('R4 uses a fresh score namespace and leaves older scores and tutorial keys 
   assert.equal(h.values.get('paripari.best.r3-practice-20260927'), oldScore);
   assert.equal(h.values.get('paripari.best'), '99999');
   assert.equal(h.values.get('paripari.tutorial-completed'), oldTutorial);
-  assert.deepEqual(JSON.parse(h.values.get('paripari.best.r4-difficulty-20260927')), {
-    version: 'r4-difficulty-20260927',
+  assert.deepEqual(JSON.parse(h.values.get('paripari.best.r5-survival-keys-20260928')), {
+    version: 'r5-survival-keys-20260928',
     score: 420,
   });
 });
 
 test('corrupt saved values are safe, and a cached best survives corruption and removal', async (t) => {
   const h = installStorage(t, {
-    'paripari.best.r4-difficulty-20260927': '{broken',
+    'paripari.best.r5-survival-keys-20260928': '{broken',
     'paripari.settings': '{broken',
     'paripari.tutorial.v1': 'yes',
   });
   const storage = await freshStorage();
 
   assert.equal(storage.getBest(), 0);
-  assert.deepEqual(storage.getSettings(), { vibrate: true, sound: true, reducedMotion: false });
+  assert.deepEqual(storage.getSettings(), {
+    vibrate: true, sound: true, reducedMotion: false, keyboard: EMPTY_KEYBOARD,
+  });
   assert.equal(storage.getTutorialCompleted(), false);
 
   storage.setBest(1750);
-  h.values.set('paripari.best.r4-difficulty-20260927', 'not-json');
+  h.values.set('paripari.best.r5-survival-keys-20260928', 'not-json');
   assert.equal(storage.getBest(), 1750);
-  h.values.delete('paripari.best.r4-difficulty-20260927');
+  h.values.delete('paripari.best.r5-survival-keys-20260928');
   assert.equal(storage.getBest(), 1750);
   assert.equal(storage.setBest(80), 1750);
   assert.equal(storage.getBest(), 1750);
@@ -100,18 +103,18 @@ test('tutorial completion accepts only explicit booleans and falls back to memor
 });
 
 test('best scores merge the cached and cross-tab persisted maxima before writing', async (t) => {
-  const key = 'paripari.best.r4-difficulty-20260927';
+  const key = 'paripari.best.r5-survival-keys-20260928';
   const oldKey = 'paripari.best.r3-practice-20260927';
   const oldValue = JSON.stringify({ version: 'r3-practice-20260927', score: 9000 });
   const h = installStorage(t, {
-    [key]: JSON.stringify({ version: 'r4-difficulty-20260927', score: 1200 }),
+    [key]: JSON.stringify({ version: 'r5-survival-keys-20260928', score: 1200 }),
     [oldKey]: oldValue,
   });
   const storage = await freshStorage();
 
   assert.equal(storage.getBest(), 1200);
   assert.equal(storage.setBest(300), 1200);
-  h.values.set(key, JSON.stringify({ version: 'r4-difficulty-20260927', score: 2600 }));
+  h.values.set(key, JSON.stringify({ version: 'r5-survival-keys-20260928', score: 2600 }));
   assert.equal(storage.setBest(1400), 2600);
   assert.equal(storage.getBest(), 2600);
 
@@ -131,12 +134,15 @@ test('name clearing, validated settings, and read/write exception fallbacks keep
   const storage = await freshStorage();
 
   assert.equal(storage.getPlayerName(), 'Hana');
-  assert.deepEqual(storage.getSettings(), { vibrate: true, sound: true, reducedMotion: false });
+  assert.deepEqual(storage.getSettings(), {
+    vibrate: true, sound: true, reducedMotion: false, keyboard: EMPTY_KEYBOARD,
+  });
   storage.setSettings({ vibrate: false, reducedMotion: true, ignored: true });
   assert.deepEqual(JSON.parse(h.values.get('paripari.settings')), {
     vibrate: false,
     sound: true,
     reducedMotion: true,
+    keyboard: EMPTY_KEYBOARD,
   });
   storage.setPlayerName('');
   assert.equal(storage.getPlayerName(), '');
@@ -147,8 +153,10 @@ test('name clearing, validated settings, and read/write exception fallbacks keep
   assert.equal(storage.getBest(), 730);
   assert.equal(storage.setPlayerName('  Kiri  '), 'Kiri');
   assert.equal(storage.getPlayerName(), 'Kiri');
-    storage.setSettings({ vibrate: 'false', sound: 'false', reducedMotion: 1 });
-    assert.deepEqual(storage.getSettings(), { vibrate: true, sound: true, reducedMotion: false });
+  storage.setSettings({ vibrate: 'false', sound: 'false', reducedMotion: 1 });
+  assert.deepEqual(storage.getSettings(), {
+    vibrate: true, sound: true, reducedMotion: false, keyboard: EMPTY_KEYBOARD,
+  });
   storage.setPlayerName('');
   assert.equal(storage.getPlayerName(), '');
 });
@@ -166,7 +174,9 @@ test('write-only failure cannot replace this launch\'s completed tutorial, name 
   storage.setSettings({ vibrate: false, sound: false, reducedMotion: true });
   assert.equal(storage.getTutorialCompleted(), true);
   assert.equal(storage.getPlayerName(), '新しい名前');
-  assert.deepEqual(storage.getSettings(), { vibrate: false, sound: false, reducedMotion: true });
+  assert.deepEqual(storage.getSettings(), {
+    vibrate: false, sound: false, reducedMotion: true, keyboard: EMPTY_KEYBOARD,
+  });
   assert.equal(h.values.get('paripari.tutorial.v1'), 'false');
   storage.setPlayerName('');
   assert.equal(storage.getPlayerName(), '');

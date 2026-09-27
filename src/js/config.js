@@ -15,7 +15,7 @@ export const CONFIG = {
   TIMING_BONUS_MAX: 50,
 
   // --- ライフ ---
-  MAX_HP: 3,
+  MAX_HP: 2,
   HEAL_EVERY_PERFECT_STREAK: 10,
 
   // --- 演出 ---

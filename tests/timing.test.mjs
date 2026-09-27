@@ -82,7 +82,7 @@ function makeGame({ randomValues = [0.25], onGameOver = () => {} } = {}) {
 function installAttack(game, {
   impacts = [1_000],
   needDir = 'R',
-  hp = 3,
+  hp = CONFIG.MAX_HP,
 } = {}) {
   // This is a test fixture for the existing attack shape. It only installs
   // future impact times; the Game clock remains exclusively update-driven.
@@ -363,7 +363,7 @@ test('T04: +140 input wins the equal-time timeout, while +141 remains MISS', () 
   atDeadline.game.update(1_190.001);
   assert.equal(atDeadline.game.attack.segments[0].result, 'GOOD');
   assert.equal(atDeadline.game.successCount, 1);
-  assert.equal(atDeadline.game.hp, 3);
+  assert.equal(atDeadline.game.hp, CONFIG.MAX_HP);
 
   const afterDeadline = startFixture({ impacts: [1_000], needDir: 'R' });
   advanceTo(afterDeadline.game, 1_190);
@@ -373,7 +373,7 @@ test('T04: +140 input wins the equal-time timeout, while +141 remains MISS', () 
   afterDeadline.game.update(1_191);
   assert.equal(afterDeadline.game.attack.segments[0].result, 'MISS');
   assert.equal(afterDeadline.game.successCount, 0);
-  assert.equal(afterDeadline.game.hp, 2);
+  assert.equal(afterDeadline.game.hp, CONFIG.MAX_HP - 1);
 
   const overGuarantee = startFixture({ impacts: [1_000], needDir: 'R' });
   assert.equal(overGuarantee.game.enqueueAction({
@@ -425,7 +425,7 @@ test('I04/I06: duplicate and pre-acceptance spam cannot consume a future segment
   advanceTo(game, 1_090);
   assert.equal(game.successCount, 1, 'early spam does not consume segment 2');
   assert.equal(game.attack.segIndex, 1, 'early spam leaves segment 2 pending');
-  assert.equal(game.hp, 3, 'early spam is ignored rather than causing a second result');
+  assert.equal(game.hp, CONFIG.MAX_HP, 'early spam is ignored rather than causing a second result');
 
   assert.equal(enqueue(1_180), true);
   advanceTo(game, 1_231);

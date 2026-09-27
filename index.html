@@ -94,13 +94,12 @@
         <ol class="howto-list">
           <li>攻撃は左・右・上・左上・右上の<b>5方向</b>から来ます。線に届く瞬間に、来た方向と反対のボタンを押します。</li>
           <li id="howto-mobile" class="howto-platform">スマホでは、画面下の<b>5つの方向ボタン</b>を使います。攻撃が来た瞬間に、来た方向と反対のボタンをタップします。</li>
-          <li id="howto-pc" class="howto-platform hidden" aria-hidden="true">PCでは、画面のボタンまたはキーボードを使います。攻撃が来た瞬間に、来た方向と反対のキーを押します。左 <kbd>←</kbd>/<kbd>A</kbd>、右 <kbd>→</kbd>/<kbd>D</kbd>、下 <kbd>↓</kbd>/<kbd>S</kbd>、左下 <kbd>Q</kbd>/<kbd>Z</kbd>、右下 <kbd>E</kbd>/<kbd>C</kbd> です。</li>
+          <li id="howto-pc" class="howto-platform hidden" aria-hidden="true">PCでは、画面のボタンまたはキーボードを使います。攻撃が来た瞬間に、来た方向と反対のキーを押します。設定の「PC版キーボード」で任意のキーに変更できます。現在のキーは <span id="howto-pc-keys"></span> です。</li>
           <li>対応は、左→<b>右</b>／右→<b>左</b>／上→<b>下</b>／左上→<b>右下</b>／右上→<b>左下</b>です。</li>
           <li>初回は5方向を1回ずつ成功させる案内付き練習から始まります。練習中はライフが減らず、失敗した方向を成功するまで繰り返します。遊び方から何度でも練習できます。</li>
-          <li>1回の攻撃は1〜3回押すことがあります。失敗しても、ライフが減るのは1回の攻撃につき最大1つです。</li>
-          <li>本番のライフは3つ。なくなると終了です。</li>
+          <li>本番は失敗2回で終了します。1回の攻撃は1〜3回押すことがありますが、失敗して減るのは1回の攻撃につき最大1つです。</li>
           <li>誤差60ミリ秒以内は<b>ぴったり</b>、140ミリ秒以内は<b>成功</b>。それより早い・遅い入力、逆方向、方向が違う入力は失敗です。</li>
-          <li>ぴったり成功を10回連続するとライフが1つ回復します（最大3つ）。</li>
+          <li>ぴったり成功を10回連続するとライフが1つ回復します（最大2つ）。</li>
         </ol>
         <p class="howto-judge">
           <span class="tag perfect">ぴったり</span> 誤差60ミリ秒以内
@@ -119,6 +118,19 @@
         <label class="toggle"><span>振動（対応端末のみ）</span><input type="checkbox" id="set-vibrate"></label>
         <label class="toggle"><span>効果音</span><input type="checkbox" id="set-sound"></label>
         <label class="toggle"><span>モーション低減</span><input type="checkbox" id="set-motion"></label>
+        <section id="pc-key-settings" class="keyboard-settings" aria-labelledby="pc-key-settings-title">
+          <h3 id="pc-key-settings-title">PC版キーボード</h3>
+          <p class="keyboard-settings-help">方向ごとのボタンを押してから、割り当てたいキーを1つ押してください。設定したキーは本番中に使えます。</p>
+          <div class="keyboard-bindings">
+            <div class="keyboard-binding-row"><span>左</span><button type="button" class="key-bind" data-key-capture="L" aria-pressed="false"></button><button type="button" class="key-reset" data-key-reset="L">初期値</button></div>
+            <div class="keyboard-binding-row"><span>左下</span><button type="button" class="key-bind" data-key-capture="DL" aria-pressed="false"></button><button type="button" class="key-reset" data-key-reset="DL">初期値</button></div>
+            <div class="keyboard-binding-row"><span>下</span><button type="button" class="key-bind" data-key-capture="D" aria-pressed="false"></button><button type="button" class="key-reset" data-key-reset="D">初期値</button></div>
+            <div class="keyboard-binding-row"><span>右下</span><button type="button" class="key-bind" data-key-capture="DR" aria-pressed="false"></button><button type="button" class="key-reset" data-key-reset="DR">初期値</button></div>
+            <div class="keyboard-binding-row"><span>右</span><button type="button" class="key-bind" data-key-capture="R" aria-pressed="false"></button><button type="button" class="key-reset" data-key-reset="R">初期値</button></div>
+          </div>
+          <button id="btn-key-reset-all" type="button" class="btn keyboard-reset-all">すべて初期値に戻す</button>
+          <p id="key-bind-status" class="platform-status" role="status" aria-live="polite"></p>
+        </section>
         <button id="btn-settings-back" class="btn btn-primary">もどる</button>
       </div>
     </section>

@@ -1,5 +1,12 @@
 // DOM HUD / メニュー更新 要件 §4.1 §4.3
 import { CONFIG } from './config.js';
+import {
+  KEYBOARD_DIRECTIONS,
+  KEYBOARD_DIRECTION_LABELS,
+  keyboardHelpText,
+  keyLabelForDirection,
+  normalizeKeyBindings,
+} from './keyboard.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -118,6 +125,34 @@ export function setHowtoPlatform(isHandheld) {
     pc.classList.toggle('hidden', showMobile);
     pc.setAttribute('aria-hidden', String(showMobile));
   }
+}
+
+export function reflectKeyboardBindings(bindings = {}) {
+  const normalized = normalizeKeyBindings(bindings);
+  KEYBOARD_DIRECTIONS.forEach((dir) => {
+    const button = document.querySelector(`[data-key-capture="${dir}"]`);
+    if (!button) return;
+    const label = keyLabelForDirection(dir, normalized);
+    button.textContent = label;
+    button.setAttribute('aria-label', `${KEYBOARD_DIRECTION_LABELS[dir]}のキー: ${label}`);
+  });
+  const help = $('howto-pc-keys');
+  if (help) help.textContent = keyboardHelpText(normalized);
+}
+
+export function setKeyboardCapture(dir = null) {
+  document.querySelectorAll('[data-key-capture]').forEach((button) => {
+    const active = !!dir && button.dataset.keyCapture === dir;
+    button.classList.toggle('capturing', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
+export function setKeyboardStatus(message = '', tone = '') {
+  const status = $('key-bind-status');
+  if (!status) return;
+  status.textContent = message;
+  status.classList.toggle('error', tone === 'error');
 }
 
 function renderAttackProgress() {
@@ -254,4 +289,5 @@ export function reflectSettings(s) {
   $('set-vibrate').checked = s.vibrate;
   $('set-sound').checked = s.sound;
   $('set-motion').checked = s.reducedMotion;
+  reflectKeyboardBindings(s.keyboard);
 }

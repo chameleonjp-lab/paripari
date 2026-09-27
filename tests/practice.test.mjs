@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Game, PRACTICE_DIRECTIONS } from '../src/js/game.js';
 import { GameClock } from '../src/js/clock.js';
 import { SessionController } from '../src/js/session.js';
+import { CONFIG } from '../src/js/config.js';
 
 function harness() {
   let wall = 1000;
@@ -56,7 +57,7 @@ function assertClean(game) {
   for (const key of ['score', 'combo', 'maxCombo', 'successCount', 'perfectCount', 'perfectStreak', 'totalAttempts']) {
     assert.equal(game[key], 0, `practice must not affect ${key}`);
   }
-  assert.equal(game.hp, 3);
+  assert.equal(game.hp, CONFIG.MAX_HP);
 }
 
 test('G01/G02: every missed practice repeats; five distinct successes are required and never enter normal stats', () => {
@@ -97,12 +98,12 @@ test('G02/G03: first-use completion enters a fresh countdown and normal death wi
   assert.equal(h.session.state, 'PLAYING');
   assert.equal(h.game.warmupRemaining, 0, 'no second warmup');
   assertClean(h.game);
-  for (let i = 0; i < 3; i++) assert.equal(h.resolve('timeout').warmup, false);
+  for (let i = 0; i < 2; i++) assert.equal(h.resolve('timeout').warmup, false);
   assert.equal(h.session.state, 'RESULT');
   assert.equal(h.results.length, 1);
   assert.deepEqual([h.results[0].score, h.results[0].maxCombo, h.results[0].perfectRate], [0, 0, 0]);
   assert.equal(h.game.perfectStreak, 0);
-  assert.equal(h.game.totalAttempts, 3);
+  assert.equal(h.game.totalAttempts, 2);
   h.session.start('normal', h.wall);
   assert.equal(h.session.state, 'COUNTDOWN');
   h.advance(2200);
