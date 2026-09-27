@@ -458,7 +458,7 @@ kbd {
 }
 .keyboard-binding-row > span { color: rgba(233,238,247,.82); }
 .key-bind, .key-reset {
-  min-height: 40px;
+  min-height: 44px;
   padding: .35rem .5rem;
   border: 1px solid var(--line);
   border-radius: 10px;

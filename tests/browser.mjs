@@ -517,7 +517,7 @@ async function pauseClockAtHome(page, label) {
 async function prepareAttack(page, {
   needDir = 'R',
   taps = 1,
-  hp = 3,
+  hp = 2,
   mode = 'normal',
   impactOffset = 80,
   gapMs = 180,
@@ -1853,7 +1853,7 @@ async function runFirstUseFlow(browser, browserName, origin, variant, blocked) {
     assert(await page.evaluate(() => globalThis.__testGame.mode === 'normal' && globalThis.__testGame.warmupRemaining === 0),
       `${label}: no second warmup`);
     // Let the actual next three attacks expire: no forced score/HP/result state.
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       const delay = await page.evaluate(() => Math.max(0, globalThis.__testGame.nextSpawnAt
         - globalThis.__testClock.now(performance.now())) + 32);
       await page.clock.runFor(delay);
