@@ -7,6 +7,13 @@ import { GameClock } from './clock.js';
 import { SessionController, SESSION_STATES } from './session.js';
 import { setHapticsEnabled } from './haptics.js';
 import { setSoundEnabled, unlockSound, playSfx } from './sound.js';
+import {
+  KEYBOARD_DIRECTIONS,
+  KEYBOARD_DIRECTION_LABELS,
+  keyLabelForToken,
+  keyTokenFromEvent,
+  normalizeKeyBindings,
+} from './keyboard.js';
 import * as ui from './ui.js';
 import * as storage from './storage.js';
 import { shareOrCopy } from './platform.js';
@@ -26,6 +33,7 @@ renderer.reducedMotion = !!settings.reducedMotion;
 let playerName = storage.getPlayerName();
 let session = null;
 let inputController = null;
+let keyCaptureDir = null;
 
 const game = new Game({
   renderer, particles, settings,
@@ -39,6 +47,7 @@ const game = new Game({
 
 // ---------- 入力 ----------
 inputController = setupInput({
+  keyBindings: settings.keyboard,
   canHandleAction: () => !!session && session.canHandleAction(),
   onAction: ({ dir, time }) => {
     if (!session || !session.canHandleAction()) return;
@@ -81,6 +90,8 @@ session = new SessionController({
         ui.hideBanner();
         ui.setPlayUIVisible(false);
         ui.reflectSettings(settings);
+        cancelKeyboardCapture();
+        ui.setKeyboardStatus('');
         ui.showScreen('settings');
         break;
       case SESSION_STATES.COUNTDOWN:
@@ -234,7 +245,10 @@ $('btn-result-share').addEventListener('click', () => shareOrCopy({
   textElement: $('result-share-text'),
 }));
 $('btn-settings').addEventListener('click', () => session.navigate(SESSION_STATES.SETTINGS));
-$('btn-settings-back').addEventListener('click', () => session.navigate(SESSION_STATES.HOME));
+$('btn-settings-back').addEventListener('click', () => {
+  cancelKeyboardCapture();
+  session.navigate(SESSION_STATES.HOME);
+});
 
 $('btn-pause').addEventListener('click', pauseGame);
 $('btn-resume').addEventListener('click', resumeGame);
@@ -259,6 +273,69 @@ bindToggle('set-sound', 'sound', (v) => {
   if (v) unlockSound();
 });
 bindToggle('set-motion', 'reducedMotion', (v) => { renderer.reducedMotion = v; });
+
+function cancelKeyboardCapture() {
+  keyCaptureDir = null;
+  ui.setKeyboardCapture(null);
+}
+
+function saveKeyboardBindings(bindings, status = '') {
+  const keyboard = normalizeKeyBindings(bindings);
+  settings = { ...settings, keyboard };
+  storage.setSettings(settings);
+  game.setSettings(settings);
+  inputController?.setKeyBindings(keyboard);
+  ui.reflectKeyboardBindings(keyboard);
+  ui.setKeyboardCapture(null);
+  keyCaptureDir = null;
+  ui.setKeyboardStatus(status);
+}
+
+function beginKeyboardCapture(dir) {
+  if (!KEYBOARD_DIRECTIONS.includes(dir)) return;
+  keyCaptureDir = dir;
+  ui.setKeyboardCapture(dir);
+  ui.setKeyboardStatus(`${KEYBOARD_DIRECTION_LABELS[dir]}に設定するキーを押してください。Escでキャンセルできます。`);
+}
+
+function handleKeyboardCapture(event) {
+  if (!keyCaptureDir || event.repeat || event.isComposing || event.keyCode === 229) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    event.stopPropagation();
+    cancelKeyboardCapture();
+    ui.setKeyboardStatus('キー設定をキャンセルしました。');
+    return;
+  }
+  const token = keyTokenFromEvent(event);
+  if (!token) return;
+  event.preventDefault();
+  event.stopPropagation();
+
+  const current = normalizeKeyBindings(settings.keyboard);
+  const conflict = KEYBOARD_DIRECTIONS.find((dir) => dir !== keyCaptureDir && current[dir] === token);
+  if (conflict) {
+    ui.setKeyboardStatus(`${keyLabelForToken(token)}は「${KEYBOARD_DIRECTION_LABELS[conflict]}」に設定済みです。別のキーを押してください。`, 'error');
+    return;
+  }
+  const dir = keyCaptureDir;
+  saveKeyboardBindings({ ...current, [dir]: token }, `${KEYBOARD_DIRECTION_LABELS[dir]}を${keyLabelForToken(token)}に設定しました。`);
+}
+
+document.querySelectorAll('[data-key-capture]').forEach((button) => {
+  button.addEventListener('click', () => beginKeyboardCapture(button.dataset.keyCapture));
+});
+document.querySelectorAll('[data-key-reset]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const dir = button.dataset.keyReset;
+    const current = normalizeKeyBindings(settings.keyboard);
+    saveKeyboardBindings({ ...current, [dir]: null }, `${KEYBOARD_DIRECTION_LABELS[dir]}を初期値に戻しました。`);
+  });
+});
+$('btn-key-reset-all').addEventListener('click', () => {
+  saveKeyboardBindings({}, 'キーボード設定をすべて初期値に戻しました。');
+});
+window.addEventListener('keydown', handleKeyboardCapture, { capture: true });
 
 // ---------- ポーズ ----------
 function pauseGame() {

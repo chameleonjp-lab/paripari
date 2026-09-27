@@ -5,14 +5,7 @@
 // GameClock へ渡す。0、負値、非有限値、古い試合の時刻をどう扱うかは
 // GameClock.mapInput の責務であり、この層で現在時刻へ置き換えない。
 
-// PC補助: 受け流し方向（=ボタン）に対応。L/R/D と斜め下DL/DR。
-const KEY_DIR = {
-  ArrowLeft: 'L', a: 'L', A: 'L',
-  ArrowRight: 'R', d: 'R', D: 'R',
-  ArrowDown: 'D', s: 'D', S: 'D',
-  q: 'DL', Q: 'DL', z: 'DL', Z: 'DL',
-  e: 'DR', E: 'DR', c: 'DR', C: 'DR',
-};
+import { buildKeyDirectionMap, directionForEvent } from './keyboard.js';
 
 const EDITABLE_SELECTOR = [
   'input',
@@ -125,6 +118,7 @@ export function setupInput({
   onAction,
   onFirstGesture,
   canHandleAction = () => true,
+  keyBindings = {},
 } = {}) {
   let firstGestureDone = false;
   let composing = false;
@@ -135,6 +129,7 @@ export function setupInput({
   const cancelEvent = pointerSupported ? 'pointercancel' : 'touchcancel';
   const activePresses = new Map();
   const listeners = [];
+  let keyDirectionMap = buildKeyDirectionMap(keyBindings);
 
   const listen = (target, type, handler, options) => {
     target.addEventListener(type, handler, options);
@@ -277,7 +272,7 @@ export function setupInput({
   // browser retains cursor movement and menu semantics in all non-game states.
   const keydown = (event) => {
     if (event.defaultPrevented || event.repeat) return;
-    const dir = KEY_DIR[event.key];
+    const dir = directionForEvent(event, keyDirectionMap);
     if (!dir) return;
     if (composing || event.isComposing || event.keyCode === 229 || isEditingTarget(event.target)) return;
     if (!safeCanHandleAction(canHandleAction, actionContext(dir, event, 'key', null))) return;
@@ -308,7 +303,13 @@ export function setupInput({
     listeners.splice(0).forEach((remove) => remove());
   };
 
-  return { clearPressed, destroy };
+  return {
+    clearPressed,
+    setKeyBindings(bindings = {}) {
+      keyDirectionMap = buildKeyDirectionMap(bindings);
+    },
+    destroy,
+  };
 }
 
 // ゲーム領域のズーム/スクロール/バウンス抑止（要件 §6.3 §6.4）。

@@ -110,8 +110,8 @@
 > 体感を担保。判定が厳しすぎて理不尽にならないこと（プロダクトの明示要件）。
 
 ### 2.5 ライフ / 終了条件 ✅
-- プレイヤーHP = **ハート3**。MISS で 1 減少。0 で **ゲームオーバー**。
-- PERFECT 連続でごく稀に回復（10 PERFECT 連続ごとにハート+1、上限3）🔁。
+- プレイヤーHP = **ハート2**。MISS で 1 減少し、2回目の攻撃単位MISSで **ゲームオーバー**。
+- PERFECT 連続でごく稀に回復（10 PERFECT 連続ごとにハート+1、上限2）🔁。
 - ゲームオーバー → リザルト表示 → ワンタップで即リトライ。
 
 ### 2.6 反則・例外処理 ✅
@@ -288,7 +288,7 @@ TITLE ──tap PLAY──▶ READY(3-2-1) ──▶ PLAYING ──HP0──▶ 
 - `touch-action: none`、`-webkit-touch-callout: none`、`user-select: none`。
 - ダブルタップズーム/ピンチズーム抑止（viewport meta ＋ `touchstart` preventDefault）。
 - スクロール・バウンス抑止（`overscroll-behavior: none`、`position: fixed` body）。
-- PC: 矢印キー/AD・←→キーでも操作可（任意, 🔁）。
+- PC: 画面ボタンまたはキーボードで操作可。設定画面から方向ごとに任意の1キーへ変更できる（🔁）。
 
 ### 6.4 表示・解像度対応 ✅
 - `<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">`

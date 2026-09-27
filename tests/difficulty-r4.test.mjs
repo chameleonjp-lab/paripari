@@ -275,7 +275,7 @@ test('G07: 1,000 fixed-seed perfect-play series produce reproducible distributio
   assert.equal(report.totalMisses, 0);
   assert.equal(report.segmentAccuracy, 1);
   assert.equal(report.recoveriesPerSeries.median, 0);
-  assert.equal(report.recoveryProbeFromHpOnePerSeries.median, 2);
+  assert.equal(report.recoveryProbeFromHpOnePerSeries.median, CONFIG.MAX_HP - 1);
   assert.ok(report.endedByGameOver <= report.count);
   assert.ok(report.segmentAccuracy > 0 && report.segmentAccuracy <= 1);
   // Timing/score/healing distributions are evidence for review. No unproven
@@ -298,9 +298,9 @@ test('G04/G05/G08: split misses lose one HP, recovery has a 9/10/11 boundary, an
   const mixedAttack = mixed.attack;
   assert.equal(mixedAttack.taps, 2);
   resolveSegment(mixed, mixedAttack, 0, wrongDir(mixedAttack.needDir));
-  assert.equal(mixed.hp, 2, 'the first split miss costs one HP');
+  assert.equal(mixed.hp, 1, 'the first split miss costs one HP');
   resolveSegment(mixed, mixedAttack, 1, mixedAttack.needDir, 100);
-  assert.equal(mixed.hp, 2, 'a later success cannot undo the split miss');
+  assert.equal(mixed.hp, 1, 'a later success cannot undo the split miss');
   assert.equal(mixed.successCount, SUCCESS_BOUNDARIES[6] + 1, 'the successful split segment still counts');
   assert.equal(mixedAttack.segments[1].result, 'GOOD', 'a split can contain a GOOD result');
 
@@ -329,7 +329,7 @@ test('G04/G05/G08: split misses lose one HP, recovery has a 9/10/11 boundary, an
   const allMissAttack = allMiss.attack;
   resolveSegment(allMiss, allMissAttack, 0, wrongDir(allMissAttack.needDir));
   resolveSegment(allMiss, allMissAttack, 1, wrongDir(allMissAttack.needDir));
-  assert.equal(allMiss.hp, 2, 'multiple misses in one split attack cost at most one HP');
+  assert.equal(allMiss.hp, 1, 'multiple misses in one split attack cost at most one HP');
   assert.equal(allMiss.successCount, SUCCESS_BOUNDARIES[6]);
   assert.equal(allMiss.state, 'PLAYING');
   assert.ok(missReasons.some(([result, , reason]) => result === 'MISS' && reason === 'wrong-direction'));
@@ -343,7 +343,7 @@ test('G04/G05/G08: split misses lose one HP, recovery has a 9/10/11 boundary, an
   for (let index = 0; index < threeMissAttack.segments.length; index++) {
     resolveSegment(threeMiss, threeMissAttack, index, wrongDir(threeMissAttack.needDir));
   }
-  assert.equal(threeMiss.hp, 2, 'three split misses still cost one HP');
+  assert.equal(threeMiss.hp, 1, 'three split misses still cost one HP');
   assert.equal(threeMiss.successCount, SUCCESS_BOUNDARIES[12]);
 
   const threeMixedReasons = [];
@@ -360,7 +360,7 @@ test('G04/G05/G08: split misses lose one HP, recovery has a 9/10/11 boundary, an
   resolveSegment(threeMixed, threeMixedAttack, 1, threeMixedAttack.needDir, 100);
   resolveSegment(threeMixed, threeMixedAttack, 2, wrongDir(threeMixedAttack.needDir));
   assert.deepEqual(threeMixedAttack.segments.map((segment) => segment.result), ['PERFECT', 'GOOD', 'MISS']);
-  assert.equal(threeMixed.hp, 2);
+  assert.equal(threeMixed.hp, 1);
   assert.equal(threeMixed.successCount, SUCCESS_BOUNDARIES[12] + 2);
   assert.ok(threeMixedReasons.some(([result, , reason]) => result === 'MISS' && reason === 'wrong-direction'));
 
@@ -382,7 +382,7 @@ test('G04/G05/G08: split misses lose one HP, recovery has a 9/10/11 boundary, an
   const maxTierAttack = maxTier.attack;
   assert.equal(maxTierAttack.taps, 1);
   resolveSegment(maxTier, maxTierAttack, 0, wrongDir(maxTierAttack.needDir));
-  assert.equal(maxTier.hp, 2);
+  assert.equal(maxTier.hp, 1);
   assert.equal(maxTier.state, 'PLAYING');
   assert.equal(tierForSuccess(maxTier.successCount), CONFIG.TIERS.at(-1));
   for (let perfect = 0; perfect < CONFIG.HEAL_EVERY_PERFECT_STREAK; perfect++) {
@@ -390,9 +390,40 @@ test('G04/G05/G08: split misses lose one HP, recovery has a 9/10/11 boundary, an
     drivePerfectAttack(maxTier);
   }
   assert.equal(maxTier.state, 'PLAYING');
-  assert.equal(maxTier.hp, 3, 'maximum difficulty can recover after a miss');
+  assert.equal(maxTier.hp, 2, 'maximum difficulty can recover after a miss');
   assert.equal(tierForSuccess(maxTier.successCount), CONFIG.TIERS.at(-1));
   assert.equal(maxTier.successCount, SUCCESS_BOUNDARIES.at(-1) + 500 + CONFIG.HEAL_EVERY_PERFECT_STREAK);
+});
+
+test('G09: normal play ends on the second attack-level miss', () => {
+  const results = [];
+  const game = new Game({
+    settings: { vibrate: false, sound: false },
+    random: () => 0,
+    ui: {},
+    onGameOver: (result) => results.push(result),
+  });
+  game.start('normal');
+
+  const resolveMiss = (attack) => {
+    const eventTime = attack.segments[0].impactAt;
+    const wrongDir = CONFIG.INPUT_DIRECTIONS.find((dir) => dir !== attack.needDir);
+    assert.equal(game.enqueueAction({ dir: wrongDir, time: eventTime, receivedAt: eventTime }), true);
+    game.update(eventTime + 51);
+  };
+  const missOneAttack = () => {
+    game.update(game.nextSpawnAt);
+    const attack = game.attack;
+    resolveMiss(attack);
+  };
+
+  missOneAttack();
+  assert.equal(game.hp, 1);
+  assert.equal(game.state, 'PLAYING');
+  missOneAttack();
+  assert.equal(game.hp, 0);
+  assert.equal(game.state, 'OVER');
+  assert.equal(results.length, 1, 'two misses create one game-over result');
 });
 
 test('G08: success beyond tier 20 keeps spawning at the final tier and gameplay stays active', () => {

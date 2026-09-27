@@ -517,7 +517,7 @@ async function pauseClockAtHome(page, label) {
 async function prepareAttack(page, {
   needDir = 'R',
   taps = 1,
-  hp = 3,
+  hp = 2,
   mode = 'normal',
   impactOffset = 80,
   gapMs = 180,
@@ -716,7 +716,7 @@ async function runInputAndResultFlow(page, label) {
   await waitForPlaying(page, { hook: true, label, clocked: true });
 
   // 単発の成功はGameの内部状態だけを準備し、判定そのものは実キー配線で行う。
-  await prepareAttack(page, { needDir: 'R', taps: 1, hp: 3 });
+  await prepareAttack(page, { needDir: 'R', taps: 1, hp: 2 });
   const beforeSuccess = await currentGameStats(page);
   await pressFixtureSegment(page, 0, label, { clocked: true });
   await page.waitForFunction((previous) => {
@@ -725,26 +725,26 @@ async function runInputAndResultFlow(page, label) {
   }, beforeSuccess.successCount, { timeout: DEFAULT_TIMEOUT });
 
   // 方向違いは同じ実キー配線からMISSになり、ライフを1だけ失う。
-  await prepareAttack(page, { needDir: 'R', taps: 1, hp: 3 });
+  await prepareAttack(page, { needDir: 'R', taps: 1, hp: 2 });
   await withFixtureDiagnostics(page, 0, `${label} wrong direction`, async () => {
     await advanceToFixtureSegment(page, 0, { clocked: true });
     await page.keyboard.press('ArrowLeft');
     await page.clock.runFor(80);
-    await page.waitForFunction(() => globalThis.__testGame && globalThis.__testGame.hp === 2,
+    await page.waitForFunction(() => globalThis.__testGame && globalThis.__testGame.hp === 1,
       undefined, { timeout: DEFAULT_TIMEOUT });
   });
 
   // 制御したブラウザ時間を進め、製品の更新ループでtimeoutを確定させる。
-  await prepareAttack(page, { needDir: 'R', taps: 1, hp: 3 });
+  await prepareAttack(page, { needDir: 'R', taps: 1, hp: 2 });
   await withFixtureDiagnostics(page, 0, `${label} timeout`, async () => {
     await advancePastFixtureTimeout(page);
-    await page.waitForFunction(() => globalThis.__testGame && globalThis.__testGame.hp === 2,
+    await page.waitForFunction(() => globalThis.__testGame && globalThis.__testGame.hp === 1,
       undefined, { timeout: DEFAULT_TIMEOUT });
   });
 
   // 3分割の成功も内部オブジェクトだけを準備し、3回のキー入力は実配線を通す。
   // 再開時の3-2-1カウントダウンを挟んでも、残りの試験用区間が期限切れにならないようにする。
-  await prepareAttack(page, { needDir: 'R', taps: 3, hp: 3, gapMs: 1_000 });
+  await prepareAttack(page, { needDir: 'R', taps: 3, hp: 2, gapMs: 1_000 });
   await page.evaluate(() => globalThis.__testGame
     ._ui('updateAttackProgress', { required: 3, remaining: 3 }));
   const progress = page.locator('#attack-progress');
@@ -1140,6 +1140,63 @@ async function runHookFlow(browser, browserName, origin, variant) {
       await runLongGapRegression(page, label);
       // 描画取得後はこのpageで入力時刻の検査を続けない。
       await saveScreenshot(page, label, 'playing');
+      assertHealthy(observation, label);
+    } finally {
+      await closeObservedPage(page);
+    }
+  } finally {
+    await context.close();
+  }
+}
+
+async function runKeyboardSettingsRegression(browser, browserName, origin, variant) {
+  const context = await newContext(browser);
+  try {
+    const page = await context.newPage();
+    const observation = observe(page, origin);
+    const label = `${browserName}-${variant}-keyboard-settings`;
+    try {
+      await page.goto(`${origin}${variant === 'split' ? '/' : '/dist.html'}`, {
+        waitUntil: 'domcontentloaded',
+        timeout: DEFAULT_TIMEOUT,
+      });
+      await waitForReady(page, label);
+      await page.locator('#btn-settings').click();
+      await firstVisible(page, ['#screen-settings'], `${label}の設定画面`);
+
+      const left = page.locator('[data-key-capture="L"]');
+      assert((await left.textContent()).includes('← / A'), `${label}: 初期キー表示がありません`);
+      await left.click();
+      await page.keyboard.press('f');
+      await page.waitForFunction(() => {
+        const saved = JSON.parse(localStorage.getItem('paripari.settings') || '{}');
+        return document.querySelector('[data-key-capture="L"]')?.textContent === 'F'
+          && saved.keyboard?.L === 'code:KeyF';
+      }, undefined, { timeout: DEFAULT_TIMEOUT });
+
+      const down = page.locator('[data-key-capture="D"]');
+      await down.click();
+      await page.keyboard.press('f');
+      assert((await page.locator('#key-bind-status').textContent()).includes('設定済み'),
+        `${label}: 重複キーを拒否できません`);
+      assert((await down.textContent()).includes('↓ / S'), `${label}: 重複入力で設定が変わりました`);
+
+      await page.keyboard.press('Space');
+      await page.waitForFunction(() => document.querySelector('[data-key-capture="D"]')?.textContent === 'Space',
+        undefined, { timeout: DEFAULT_TIMEOUT });
+      await page.locator('#btn-key-reset-all').click();
+      await page.waitForFunction(() => {
+        const saved = JSON.parse(localStorage.getItem('paripari.settings') || '{}');
+        return document.querySelector('[data-key-capture="L"]')?.textContent.includes('← / A')
+          && document.querySelector('[data-key-capture="D"]')?.textContent.includes('↓ / S')
+          && saved.keyboard?.L === null && saved.keyboard?.D === null;
+      }, undefined, { timeout: DEFAULT_TIMEOUT });
+
+      await page.locator('#btn-settings-back').click();
+      await page.locator('#btn-howto').click();
+      await firstVisible(page, ['#screen-howto'], `${label}の遊び方`);
+      assert((await page.locator('#howto-pc').textContent()).includes('左 ← / A'),
+        `${label}: 遊び方へ現在キーを反映できません`);
       assertHealthy(observation, label);
     } finally {
       await closeObservedPage(page);
@@ -1760,7 +1817,7 @@ async function playPracticeStep(page, index, success, label) {
       stats: [g.score, g.combo, g.maxCombo, g.successCount, g.perfectCount, g.perfectStreak, g.totalAttempts] };
   });
   assert(after.remaining === 5 - index - (success ? 1 : 0), `${label}: success-only progress ${JSON.stringify(after)}`);
-  assert(after.hp === 3 && after.stats.every((value) => value === 0), `${label}: practice polluted normal stats ${JSON.stringify(after)}`);
+    assert(after.hp === 2 && after.stats.every((value) => value === 0), `${label}: practice polluted normal stats ${JSON.stringify(after)}`);
 }
 
 async function runFirstUseFlow(browser, browserName, origin, variant, blocked) {
@@ -1796,7 +1853,7 @@ async function runFirstUseFlow(browser, browserName, origin, variant, blocked) {
     assert(await page.evaluate(() => globalThis.__testGame.mode === 'normal' && globalThis.__testGame.warmupRemaining === 0),
       `${label}: no second warmup`);
     // Let the actual next three attacks expire: no forced score/HP/result state.
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       const delay = await page.evaluate(() => Math.max(0, globalThis.__testGame.nextSpawnAt
         - globalThis.__testClock.now(performance.now())) + 32);
       await page.clock.runFor(delay);
@@ -2055,6 +2112,8 @@ async function main() {
             () => runMenuLayoutRegression(browser, browserName, hookOrigin, variant));
           await runCase(`${browserName}: ${variant}の名前→成功/誤方向/timeout→結果→retry`,
             () => runHookFlow(browser, browserName, hookOrigin, variant));
+          await runCase(`${browserName}: ${variant}のPCキーボード任意設定・重複拒否・初期化`,
+            () => runKeyboardSettingsRegression(browser, browserName, hookOrigin, variant));
           await runCase(`${browserName}: ${variant}のR5 100回再挑戦ストレス`,
             () => runReleaseRetryStress(browser, browserName, hookOrigin, variant));
           await runCase(`${browserName}: ${variant}のR2初期countdown/pagehide/縦横復帰`,
