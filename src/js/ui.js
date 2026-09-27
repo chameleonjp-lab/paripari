@@ -106,6 +106,20 @@ export function setPracticeVisible(visible) {
   syncPracticeGuide();
 }
 
+export function setHowtoPlatform(isHandheld) {
+  const mobile = $('howto-mobile');
+  const pc = $('howto-pc');
+  const showMobile = !!isHandheld;
+  if (mobile) {
+    mobile.classList.toggle('hidden', !showMobile);
+    mobile.setAttribute('aria-hidden', String(!showMobile));
+  }
+  if (pc) {
+    pc.classList.toggle('hidden', showMobile);
+    pc.setAttribute('aria-hidden', String(showMobile));
+  }
+}
+
 function renderAttackProgress() {
   const el = $('attack-progress');
   if (!el) return;
@@ -199,7 +213,9 @@ export function popJudge(result, delta, reason) {
   else {
     const fallbackReason = delta < 0 ? 'early' : delta > 0 ? 'late' : '';
     const missMessage = {
-      direction: '逆方向！',
+      reverse: '逆方向！',
+      direction: '方向が違う！',
+      'wrong-direction': '方向が違う！',
       early: '早すぎ！',
       late: '遅すぎ！',
       timeout: '時間切れ！',
@@ -236,5 +252,6 @@ export function setBestLabel(best) {
 
 export function reflectSettings(s) {
   $('set-vibrate').checked = s.vibrate;
+  $('set-sound').checked = s.sound;
   $('set-motion').checked = s.reducedMotion;
 }

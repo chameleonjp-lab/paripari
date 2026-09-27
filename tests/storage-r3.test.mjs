@@ -68,7 +68,7 @@ test('corrupt saved values are safe, and a cached best survives corruption and r
   const storage = await freshStorage();
 
   assert.equal(storage.getBest(), 0);
-  assert.deepEqual(storage.getSettings(), { vibrate: true, reducedMotion: false });
+  assert.deepEqual(storage.getSettings(), { vibrate: true, sound: true, reducedMotion: false });
   assert.equal(storage.getTutorialCompleted(), false);
 
   storage.setBest(1750);
@@ -125,16 +125,17 @@ test('best scores merge the cached and cross-tab persisted maxima before writing
 
 test('name clearing, validated settings, and read/write exception fallbacks keep the API usable', async (t) => {
   const h = installStorage(t, {
-    'paripari.settings': JSON.stringify({ vibrate: 'yes', reducedMotion: 1 }),
+    'paripari.settings': JSON.stringify({ vibrate: 'yes', sound: 'yes', reducedMotion: 1 }),
     'paripari.player-name': '  Hana  ',
   });
   const storage = await freshStorage();
 
   assert.equal(storage.getPlayerName(), 'Hana');
-  assert.deepEqual(storage.getSettings(), { vibrate: true, reducedMotion: false });
+  assert.deepEqual(storage.getSettings(), { vibrate: true, sound: true, reducedMotion: false });
   storage.setSettings({ vibrate: false, reducedMotion: true, ignored: true });
   assert.deepEqual(JSON.parse(h.values.get('paripari.settings')), {
     vibrate: false,
+    sound: true,
     reducedMotion: true,
   });
   storage.setPlayerName('');
@@ -146,8 +147,8 @@ test('name clearing, validated settings, and read/write exception fallbacks keep
   assert.equal(storage.getBest(), 730);
   assert.equal(storage.setPlayerName('  Kiri  '), 'Kiri');
   assert.equal(storage.getPlayerName(), 'Kiri');
-  storage.setSettings({ vibrate: 'false', reducedMotion: 1 });
-  assert.deepEqual(storage.getSettings(), { vibrate: true, reducedMotion: false });
+    storage.setSettings({ vibrate: 'false', sound: 'false', reducedMotion: 1 });
+    assert.deepEqual(storage.getSettings(), { vibrate: true, sound: true, reducedMotion: false });
   storage.setPlayerName('');
   assert.equal(storage.getPlayerName(), '');
 });
@@ -156,16 +157,16 @@ test('write-only failure cannot replace this launch\'s completed tutorial, name 
   const h = installStorage(t, {
     'paripari.tutorial.v1': 'false',
     'paripari.player-name': '古い名前',
-    'paripari.settings': JSON.stringify({ vibrate: true, reducedMotion: false }),
+    'paripari.settings': JSON.stringify({ vibrate: true, sound: true, reducedMotion: false }),
   });
   h.failWrites();
   const storage = await freshStorage();
   storage.setTutorialCompleted();
   storage.setPlayerName('新しい名前');
-  storage.setSettings({ vibrate: false, reducedMotion: true });
+  storage.setSettings({ vibrate: false, sound: false, reducedMotion: true });
   assert.equal(storage.getTutorialCompleted(), true);
   assert.equal(storage.getPlayerName(), '新しい名前');
-  assert.deepEqual(storage.getSettings(), { vibrate: false, reducedMotion: true });
+  assert.deepEqual(storage.getSettings(), { vibrate: false, sound: false, reducedMotion: true });
   assert.equal(h.values.get('paripari.tutorial.v1'), 'false');
   storage.setPlayerName('');
   assert.equal(storage.getPlayerName(), '');

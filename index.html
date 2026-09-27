@@ -6,6 +6,18 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0a0a12">
   <title>パリパリ - PariPari</title>
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="パリパリ｜来た方向と反対を、タイミングよく選べ！">
+  <meta property="og:description" content="攻撃が来た瞬間に、反対方向を選ぶタイミングゲーム。">
+  <meta property="og:url" content="https://chameleonjp-lab.github.io/paripari/">
+  <meta property="og:image" content="https://chameleonjp-lab.github.io/paripari/og-image.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="パリパリ｜来た方向と反対を、タイミングよく選べ！">
+  <meta name="twitter:description" content="攻撃が来た瞬間に、反対方向を選ぶタイミングゲーム。">
+  <meta name="twitter:image" content="https://chameleonjp-lab.github.io/paripari/og-image.png">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9A%94%EF%B8%8F%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="src/css/style.css">
 </head>
@@ -81,18 +93,19 @@
         <h2 tabindex="-1">遊び方</h2>
         <ol class="howto-list">
           <li>攻撃は左・右・上・左上・右上の<b>5方向</b>から来ます。線に届く瞬間に、来た方向と反対のボタンを押します。</li>
+          <li id="howto-mobile" class="howto-platform">スマホでは、画面下の<b>5つの方向ボタン</b>を使います。攻撃が来た瞬間に、来た方向と反対のボタンをタップします。</li>
+          <li id="howto-pc" class="howto-platform hidden" aria-hidden="true">PCでは、画面のボタンまたはキーボードを使います。攻撃が来た瞬間に、来た方向と反対のキーを押します。左 <kbd>←</kbd>/<kbd>A</kbd>、右 <kbd>→</kbd>/<kbd>D</kbd>、下 <kbd>↓</kbd>/<kbd>S</kbd>、左下 <kbd>Q</kbd>/<kbd>Z</kbd>、右下 <kbd>E</kbd>/<kbd>C</kbd> です。</li>
           <li>対応は、左→<b>右</b>／右→<b>左</b>／上→<b>下</b>／左上→<b>右下</b>／右上→<b>左下</b>です。</li>
           <li>初回は5方向を1回ずつ成功させる案内付き練習から始まります。練習中はライフが減らず、失敗した方向を成功するまで繰り返します。遊び方から何度でも練習できます。</li>
           <li>1回の攻撃は1〜3回押すことがあります。失敗しても、ライフが減るのは1回の攻撃につき最大1つです。</li>
           <li>本番のライフは3つ。なくなると終了です。</li>
-          <li>誤差60ミリ秒以内は<b>ぴったり</b>、140ミリ秒以内は<b>成功</b>。それより早い・遅い入力や逆方向は失敗です。</li>
+          <li>誤差60ミリ秒以内は<b>ぴったり</b>、140ミリ秒以内は<b>成功</b>。それより早い・遅い入力、逆方向、方向が違う入力は失敗です。</li>
           <li>ぴったり成功を10回連続するとライフが1つ回復します（最大3つ）。</li>
-          <li class="howto-keys">PCキー：左 <kbd>←</kbd>/<kbd>A</kbd>、右 <kbd>→</kbd>/<kbd>D</kbd>、下 <kbd>↓</kbd>/<kbd>S</kbd>、左下 <kbd>Q</kbd>/<kbd>Z</kbd>、右下 <kbd>E</kbd>/<kbd>C</kbd></li>
         </ol>
         <p class="howto-judge">
           <span class="tag perfect">ぴったり</span> 誤差60ミリ秒以内
           <span class="tag good">成功</span> 誤差140ミリ秒以内
-          <span class="tag miss">失敗</span> 早い・遅い・逆方向
+          <span class="tag miss">失敗</span> 早い・遅い・逆方向・方向が違う
         </p>
         <button id="btn-howto-try" class="btn btn-primary">練習してみる</button>
         <button id="btn-howto-back" class="btn">もどる</button>
@@ -104,6 +117,7 @@
       <div class="panel">
         <h2 tabindex="-1">設定</h2>
         <label class="toggle"><span>振動（対応端末のみ）</span><input type="checkbox" id="set-vibrate"></label>
+        <label class="toggle"><span>効果音</span><input type="checkbox" id="set-sound"></label>
         <label class="toggle"><span>モーション低減</span><input type="checkbox" id="set-motion"></label>
         <button id="btn-settings-back" class="btn btn-primary">もどる</button>
       </div>
@@ -128,7 +142,7 @@
     <!-- リザルト -->
     <section id="screen-result" class="screen hidden">
       <div class="panel result-panel">
-        <div id="result-rank" class="result-rank">A</div>
+        <div id="result-rank" class="result-rank">E</div>
         <div class="result-score-label">スコア</div>
         <div id="result-score" class="result-score">0</div>
         <div id="result-best-badge" class="best-badge hidden">★ ベスト更新！</div>
