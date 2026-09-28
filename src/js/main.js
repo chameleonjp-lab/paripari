@@ -352,8 +352,13 @@ function shareTextForHome() {
 
 function shareTextForResult(data) {
   return [
-    `${playerName || 'プレイヤー'}さんのパリパリ結果：${data.score.toLocaleString()}点、ランク${data.rank}！`,
-    `最大連続成功${data.maxCombo}・成功のうち、ぴったりの割合${data.perfectRate}%・到達した難しさ${data.tier}`,
+    `${playerName || 'プレイヤー'}さんのパリパリ結果`,
+    `${data.score.toLocaleString('ja-JP')}点`,
+    `ランク${data.rank}`,
+    `最大連続成功${data.maxCombo}`,
+    `成功のうち、ぴったりの割合${data.perfectRate}%`,
+    `到達した難しさ${data.tier}`,
+    '',
     'パリパリ：来た方向と反対を、タイミングよく選べ！',
     'https://chameleonjp-lab.github.io/paripari/',
   ].join('\n');
