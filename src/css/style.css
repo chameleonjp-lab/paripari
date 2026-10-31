@@ -297,3 +297,11 @@ html, body {
   .controls { min-height: 200px; }
   .ctl { font-size: 34px; }
 }
+
+#btn-home-share, #btn-result-share { background: #000; color: #fff; min-height: 44px; white-space: normal; overflow-wrap: anywhere; }
+[hidden] { display: none !important; }
+
+/* Keep all home controls reachable with a short viewport or an open keyboard. */
+.screen { overflow-y: auto; align-items: flex-start; padding: max(16px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); }
+.screen > .title-wrap, .screen > .panel { margin-block: auto; }
+.ranking-box li { overflow-wrap: anywhere; }

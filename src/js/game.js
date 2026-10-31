@@ -10,10 +10,11 @@ import { getBest, setBest } from './storage.js';
 const PRACTICE_GOAL = 3;
 
 export class Game {
-  constructor({ renderer, particles, settings, onGameOver }) {
+  constructor({ renderer, particles, settings, onGameOver, onSound }) {
     this.r = renderer;
     this.particles = particles;
     this.settings = settings;
+    this.onSound = onSound || (() => {});
     this.onGameOver = onGameOver || (() => {});
 
     this.state = 'IDLE';       // IDLE | PLAYING | OVER
@@ -44,6 +45,7 @@ export class Game {
   }
 
   start(mode = 'normal') {
+    this.onSound('start');
     this.mode = mode;
     this.state = 'PLAYING';
     this._resetStats();
@@ -95,6 +97,7 @@ export class Game {
   }
 
   _resolve(a, result, delta) {
+    this.onSound(result === 'MISS' ? 'miss' : result === 'PERFECT' ? 'perfect' : 'good');
     a.resolved = true;
     a.resolvedAt = this.gameTime;
     a.result = result;
@@ -170,6 +173,7 @@ export class Game {
     } else if (this.mode === 'practice' && this.successCount >= PRACTICE_GOAL) {
       this.state = 'IDLE';
       this.attack = null;
+      this.onSound('complete');
       this.onGameOver({ practiceDone: true });
     }
   }
@@ -183,6 +187,7 @@ export class Game {
     this.attack = null;
     const best = getBest();
     const isBest = this.score > best;
+    this.onSound(isBest ? 'best' : 'result');
     if (isBest) setBest(this.score);
     const perfectRate = this.totalAttempts > 0
       ? Math.round((this.perfectCount / Math.max(1, this.successCount)) * 100) : 0;
