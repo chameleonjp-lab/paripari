@@ -49,7 +49,8 @@ try {
     async (route) => {
       const rpc = route.request().url().split("/").at(-1),
         data = route.request().postDataJSON();
-      let response = { accepted: true, play_id: "fixture-play" };
+      let response = { accepted: true, play_id: 'fixture-play',game_slug:data.p_game_slug,client_version:data.p_client_version };
+      if (rpc==='submit_score_idempotent_v1') response={accepted:true,result_submission_id:data.p_submission_id,result_play_id:data.p_play_id,was_duplicate:false};
       if (rpc === "get_best_score_ranking") {
         reads.push(data);
         response = Array.from({ length: 30 }, (_, i) => ({

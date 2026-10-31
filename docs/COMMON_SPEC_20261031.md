@@ -80,3 +80,5 @@ GitHub Pages Source は `GitHub Actions`（workflow）をAPIで確認。
 4. 問題があればこのPRをrevertする新PRを作成し通常の検証/マージで戻す。DB行/設定/自己ベストを消さない。Pages設定を変更した場合は元の `workflow` / `claude/paripari-game-spec-2dc0tr` 設定と既存公開artifactを記録して戻す。元の実行が新しい公開を後から上書きしないよう、古い実行を再実行しない。
 
 現時点: **実装・ローカル検証済みの範囲と未完了を上記に区別 / ユーザーのマージ待ち / 必要な設定と権限は上記 / 本番公開後確認待ち**。共通仕様全体の完了報告ではない。
+
+追加確認: 不正なaccepted値、欠落/不一致の開始・終了・送信IDを成功扱いにしない。開始のgame/clientVersion、終了play ID、送信submission/play IDとwas_duplicateを確認し、不明な応答でも元のUUID/payloadを保持して再試行する。Nodeの不正ACK回帰とChromium/WebKit全15言語テストを再実施して成功。

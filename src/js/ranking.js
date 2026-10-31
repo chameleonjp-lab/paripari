@@ -21,8 +21,9 @@ export function createRun(rawName, uuid = createSubmissionId) {
   });
 }
 function accepted(value) {
+  if (Array.isArray(value) && value.length !== 1) throw new Error("Ranking response is malformed");
   const result = Array.isArray(value) ? value[0] : value;
-  if (!result?.accepted) throw new Error("Ranking request was rejected");
+  if (result?.accepted !== true) throw new Error("Ranking request was rejected");
   return result;
 }
 export async function startRun(run, rpc) {
@@ -36,7 +37,11 @@ export async function startRun(run, rpc) {
       p_game_slug: GAME,
       p_client_version: run.clientVersion ?? "paripari-20261031-common",
     })
-      .then(accepted)
+      .then(value => {
+        const result = accepted(value);
+        if (typeof result.play_id !== 'string' || !result.play_id || result.game_slug !== GAME || result.client_version !== (run.clientVersion ?? VERSION)) throw Error('Ranking start response is malformed');
+        return result;
+      })
       .catch((error) => {
         starts.delete(run.startId);
         throw error;
@@ -58,7 +63,7 @@ export async function submitRun(run, score, rpc) {
       p_game_slug: GAME,
       p_client_version: run.clientVersion ?? "paripari-20261031-common",
     };
-    accepted(
+    const finished = accepted(
       await rpc("finish_game_play_v1", {
         ...payload,
         p_result_type: "game_over",
@@ -67,13 +72,15 @@ export async function submitRun(run, score, rpc) {
         p_ranking_score: score,
       }),
     );
-    accepted(
+    if (finished.play_id !== start.play_id) throw Error('Ranking finish response is malformed');
+    const submitted = accepted(
       await rpc("submit_score_idempotent_v1", {
         ...payload,
         p_submission_id: run.submissionId,
         p_score: score,
       }),
     );
+    if (submitted.result_submission_id !== run.submissionId || submitted.result_play_id !== start.play_id || typeof submitted.was_duplicate !== 'boolean') throw Error('Ranking submission response is malformed');
     sent.add(run.submissionId);
     starts.delete(run.startId);
     if (sent.size > 1000) sent.delete(sent.values().next().value);
