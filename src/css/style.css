@@ -305,3 +305,12 @@ html, body {
 .screen { overflow-y: auto; align-items: flex-start; padding: max(16px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); }
 .screen > .title-wrap, .screen > .panel { margin-block: auto; }
 .ranking-box li { overflow-wrap: anywhere; }
+
+/* Translation length and short viewports must not hide actions. */
+.btn { min-height:44px; height:auto; white-space:normal; overflow-wrap:anywhere; }
+.name-label,.language-label { display:block; margin-top:12px; }
+.title-wrap,.panel { overflow-wrap:anywhere; }
+.howto-judge { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:center; }
+.judge-pop { max-width:90vw; font-size:clamp(18px,5vw,38px); text-align:center; }
+.result-stats small { overflow-wrap:anywhere; }
+#language { max-width:100%; color:inherit; background:#191924; }

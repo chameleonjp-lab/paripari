@@ -1,3 +1,5 @@
+import {setLanguage} from '../src/js/i18n.js';
+setLanguage('ja',{persist:false});
 import assert from 'node:assert/strict';
 import { currentGameUrl, shareOrCopy } from '../src/js/platform.js';
 let opened = null;
