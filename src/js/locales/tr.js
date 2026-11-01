@@ -1,4 +1,5 @@
 export const catalog = {
+  "savedInvalid": "Kaydedilen sonuç doğrulanamadı. Orijinal veriler korunuyor.",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "Kalan can",
@@ -77,3 +78,4 @@ export const catalog = {
   "copied": "Paylaşım metni kopyalandı.",
   "copyManually": "Paylaşım metni seçildi. Paylaşmak için kopyalayın."
 };
+

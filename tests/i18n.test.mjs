@@ -11,7 +11,7 @@ import {
 } from "../src/js/i18n.js";
 const placeholders = (text) =>
   [...text.matchAll(/\{[A-Za-z]+\}/g)].map((x) => x[0]).sort();
-test("every supported language translates all 77 required keys with matching placeholders", () => {
+test("every supported language translates all 78 required keys with matching placeholders", () => {
   assert.deepEqual(
     languages.map(([id]) => id),
     [
@@ -32,7 +32,7 @@ test("every supported language translates all 77 required keys with matching pla
       "th",
     ],
   );
-  assert.equal(Object.keys(catalogs.en).length, 77);
+  assert.equal(Object.keys(catalogs.en).length, 78);
   for (const [locale, catalog] of Object.entries(catalogs)) {
     assert.deepEqual(
       Object.keys(catalog).sort(),
@@ -109,3 +109,4 @@ test("ranking requests time out without altering the retry payload", async () =>
   );
   assert.deepEqual(observed, payload);
 });
+

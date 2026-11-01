@@ -1,4 +1,5 @@
 export const catalog = {
+  "savedInvalid": "Hasil tersimpan tidak dapat diverifikasi. Data asli tetap disimpan.",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "Nyawa tersisa",
@@ -77,3 +78,4 @@ export const catalog = {
   "copied": "Teks untuk dibagikan telah disalin.",
   "copyManually": "Teks untuk dibagikan telah dipilih. Salin teks tersebut untuk membagikannya."
 };
+

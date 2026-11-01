@@ -49,8 +49,9 @@ try {
     async (route) => {
       const rpc = route.request().url().split("/").at(-1),
         data = route.request().postDataJSON();
-      let response = { accepted: true, play_id: 'fixture-play',game_slug:data.p_game_slug,client_version:data.p_client_version };
-      if (rpc==='submit_score_idempotent_v1') response={accepted:true,result_submission_id:data.p_submission_id,result_play_id:data.p_play_id,was_duplicate:false};
+      let response = { accepted: true, play_id: '11111111-1111-4111-8111-111111111111',game_slug:data.p_game_slug,client_version:data.p_client_version,start_id:data.p_start_id,display_name:data.p_display_name,normalized_name:data.p_display_name,duplicate:false };
+      if (rpc==='finish_game_play_v1') response={accepted:true,play_id:data.p_play_id,game_slug:data.p_game_slug,result_type:data.p_result_type,reached_wave:data.p_reached_wave,score:data.p_score,duplicate:false};
+      if (rpc==='submit_score_idempotent_v1') response=[{accepted:true,result_submission_id:data.p_submission_id,result_play_id:data.p_play_id,was_duplicate:false,result_normalized_name:data.p_display_name,result_display_name:data.p_display_name,result_first_score:data.p_score,result_best_score:data.p_score,result_play_count:1,is_first_play:true,is_new_best:true}];
       if (rpc === "get_best_score_ranking") {
         reads.push(data);
         response = Array.from({ length: 30 }, (_, i) => ({
@@ -314,7 +315,7 @@ try {
   assert.equal(await page.isChecked("#set-sound"), true);
   assert.equal(await page.inputValue("#set-volume"), "0.35");
   await page.uncheck("#set-sound");
-  await page.fill("#set-volume", "0");
+  await page.locator("#set-volume").evaluate(el => { el.value = "0"; el.dispatchEvent(new Event("input",{bubbles:true})); });
   await page.reload();
   await page.click("#btn-settings");
   assert.equal(await page.isChecked("#set-sound"), false);
@@ -357,6 +358,33 @@ try {
       true,
     );
   }
+  // Quota loss must not publish an undurable result; later recovery uses the same play.
+  await page.setViewportSize({width:393,height:852});
+  await page.selectOption('#language','ja');
+  await page.fill('#player-name','保存失敗');
+  await page.click('#btn-play');
+  await page.waitForFunction(()=>window.PariPari.game.isPlaying());
+  const beforeQuota=writes.filter(x=>x.rpc==='submit_score_idempotent_v1').length;
+  const beforeQuotaFinish=writes.filter(x=>x.rpc==='finish_game_play_v1').length;
+  await page.evaluate(()=>{
+    window.originalSetItem=Storage.prototype.setItem;
+    Storage.prototype.setItem=function(key,value){if(key.startsWith('paripari.pending'))throw Error('quota');return window.originalSetItem.call(this,key,value)};
+    window.PariPari.game.score=17;window.PariPari.game._gameOver();
+  });
+  await page.waitForFunction(()=>document.querySelector('#result-submit-status').textContent.includes('送信できません'));
+  assert.equal(writes.filter(x=>x.rpc==='submit_score_idempotent_v1').length,beforeQuota);
+  assert.equal(writes.filter(x=>x.rpc==='finish_game_play_v1').length,beforeQuotaFinish);
+  assert.equal(await page.locator('#result-save-warning').isVisible(),true);
+  await page.evaluate(()=>{Storage.prototype.setItem=window.originalSetItem});
+  await page.click('#btn-ranking-retry');
+  await page.waitForFunction(()=>document.querySelector('#result-submit-status').textContent.includes('送信しました'));
+  assert.equal(await page.locator('#result-save-warning').isVisible(),false,'successful snapshot retry clears only current warning');
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('paripari.pending-result:v1')).result.score),17);
+  const quotaAfter=writes.filter(x=>x.rpc==='submit_score_idempotent_v1').length;
+  assert.equal(quotaAfter,beforeQuota+1);
+  await page.reload();await page.click('#btn-last-result');
+  await page.waitForFunction(()=>document.querySelector('#result-submit-status').textContent.includes('送信しました'));
+  assert.equal(writes.filter(x=>x.rpc==='submit_score_idempotent_v1').length,quotaAfter);
   await page.goto(url.replace("/index.html", "/dist/paripari.html"));
   await page.waitForFunction(() => window.PariPari);
   assert.equal(
@@ -373,3 +401,4 @@ try {
   await browser.close();
   await new Promise((r) => server.close(r));
 }
+

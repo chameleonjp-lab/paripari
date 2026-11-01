@@ -1,4 +1,5 @@
 export const catalog = {
+  "savedInvalid": "저장된 결과를 확인할 수 없습니다. 원본 데이터는 보존됩니다.",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "남은 목숨",
@@ -77,3 +78,4 @@ export const catalog = {
   "copied": "공유 문구를 복사했습니다.",
   "copyManually": "공유 문구를 선택했습니다. 복사해서 공유해 주세요."
 };
+

@@ -1,4 +1,5 @@
 export const catalog = {
+  "savedInvalid": "Không thể xác minh kết quả đã lưu. Dữ liệu gốc được giữ lại.",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "Mạng còn lại",
@@ -77,3 +78,4 @@ export const catalog = {
   "copied": "Đã sao chép nội dung chia sẻ.",
   "copyManually": "Đã chọn nội dung chia sẻ. Hãy sao chép để chia sẻ."
 };
+

@@ -1,4 +1,5 @@
 export const catalog = {
+  "savedInvalid": "保存結果を確認できません。元データは残しています。",
   "gameName": "パリパリ",
   "pageTitle": "パリパリ - PariPari",
   "remainingLife": "残ライフ",
@@ -77,3 +78,4 @@ export const catalog = {
   "copied": "シェア文をコピーしました。",
   "copyManually": "シェア文を選択しました。コピーしてご利用ください。"
 };
+

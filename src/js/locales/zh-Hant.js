@@ -1,4 +1,5 @@
 export const catalog = {
+  "savedInvalid": "無法驗證儲存的結果。原始資料已保留。",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "剩餘生命",
@@ -77,3 +78,4 @@ export const catalog = {
   "copied": "已複製分享文字。",
   "copyManually": "已選取分享文字，請複製後分享。"
 };
+

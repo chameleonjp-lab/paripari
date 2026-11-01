@@ -1,4 +1,5 @@
 export const catalog = {
+  "savedInvalid": "Не удалось проверить сохранённый результат. Исходные данные сохранены.",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "Осталось жизней",
@@ -77,3 +78,4 @@ export const catalog = {
   "copied": "Текст для публикации скопирован.",
   "copyManually": "Текст для публикации выделен. Скопируйте его, чтобы поделиться."
 };
+

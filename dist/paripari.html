@@ -329,6 +329,7 @@ html, body {
 .result-stats small { overflow-wrap:anywhere; }
 #language { max-width:100%; color:inherit; background:#191924; }
 
+
 </style>
 </head>
 <body>
@@ -488,6 +489,7 @@ html, body {
   }
   def('locales/ja', function(module, exports, require){
 const catalog = {
+  "savedInvalid": "保存結果を確認できません。元データは残しています。",
   "gameName": "パリパリ",
   "pageTitle": "パリパリ - PariPari",
   "remainingLife": "残ライフ",
@@ -568,11 +570,13 @@ const catalog = {
 };
 
 
+
   Object.assign(exports, { catalog });
   });
 
   def('locales/en', function(module, exports, require){
 const catalog = {
+  "savedInvalid": "Saved result could not be verified. Original data is kept.",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "Remaining lives",
@@ -653,11 +657,13 @@ const catalog = {
 };
 
 
+
   Object.assign(exports, { catalog });
   });
 
   def('locales/es', function(module, exports, require){
 const catalog = {
+  "savedInvalid": "No se pudo verificar el resultado guardado. Se conservan los datos originales.",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "Vidas restantes",
@@ -738,11 +744,13 @@ const catalog = {
 };
 
 
+
   Object.assign(exports, { catalog });
   });
 
   def('locales/pt-BR', function(module, exports, require){
 const catalog = {
+  "savedInvalid": "Não foi possível verificar o resultado salvo. Os dados originais foram mantidos.",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "Vidas restantes",
@@ -823,11 +831,13 @@ const catalog = {
 };
 
 
+
   Object.assign(exports, { catalog });
   });
 
   def('locales/zh-Hans', function(module, exports, require){
 const catalog = {
+  "savedInvalid": "无法验证保存的结果。原始数据已保留。",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "剩余生命",
@@ -908,11 +918,13 @@ const catalog = {
 };
 
 
+
   Object.assign(exports, { catalog });
   });
 
   def('locales/fr', function(module, exports, require){
 const catalog = {
+  "savedInvalid": "Le résultat enregistré ne peut pas être vérifié. Les données originales sont conservées.",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "Vies restantes",
@@ -993,11 +1005,13 @@ const catalog = {
 };
 
 
+
   Object.assign(exports, { catalog });
   });
 
   def('locales/de', function(module, exports, require){
 const catalog = {
+  "savedInvalid": "Das gespeicherte Ergebnis konnte nicht geprüft werden. Die Originaldaten bleiben erhalten.",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "Verbleibende Leben",
@@ -1078,11 +1092,13 @@ const catalog = {
 };
 
 
+
   Object.assign(exports, { catalog });
   });
 
   def('locales/ko', function(module, exports, require){
 const catalog = {
+  "savedInvalid": "저장된 결과를 확인할 수 없습니다. 원본 데이터는 보존됩니다.",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "남은 목숨",
@@ -1163,11 +1179,13 @@ const catalog = {
 };
 
 
+
   Object.assign(exports, { catalog });
   });
 
   def('locales/ru', function(module, exports, require){
 const catalog = {
+  "savedInvalid": "Не удалось проверить сохранённый результат. Исходные данные сохранены.",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "Осталось жизней",
@@ -1248,11 +1266,13 @@ const catalog = {
 };
 
 
+
   Object.assign(exports, { catalog });
   });
 
   def('locales/it', function(module, exports, require){
 const catalog = {
+  "savedInvalid": "Impossibile verificare il risultato salvato. I dati originali sono conservati.",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "Vite rimanenti",
@@ -1333,11 +1353,13 @@ const catalog = {
 };
 
 
+
   Object.assign(exports, { catalog });
   });
 
   def('locales/zh-Hant', function(module, exports, require){
 const catalog = {
+  "savedInvalid": "無法驗證儲存的結果。原始資料已保留。",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "剩餘生命",
@@ -1418,11 +1440,13 @@ const catalog = {
 };
 
 
+
   Object.assign(exports, { catalog });
   });
 
   def('locales/id', function(module, exports, require){
 const catalog = {
+  "savedInvalid": "Hasil tersimpan tidak dapat diverifikasi. Data asli tetap disimpan.",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "Nyawa tersisa",
@@ -1503,11 +1527,13 @@ const catalog = {
 };
 
 
+
   Object.assign(exports, { catalog });
   });
 
   def('locales/tr', function(module, exports, require){
 const catalog = {
+  "savedInvalid": "Kaydedilen sonuç doğrulanamadı. Orijinal veriler korunuyor.",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "Kalan can",
@@ -1588,11 +1614,13 @@ const catalog = {
 };
 
 
+
   Object.assign(exports, { catalog });
   });
 
   def('locales/vi', function(module, exports, require){
 const catalog = {
+  "savedInvalid": "Không thể xác minh kết quả đã lưu. Dữ liệu gốc được giữ lại.",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "Mạng còn lại",
@@ -1673,11 +1701,13 @@ const catalog = {
 };
 
 
+
   Object.assign(exports, { catalog });
   });
 
   def('locales/th', function(module, exports, require){
 const catalog = {
+  "savedInvalid": "ไม่สามารถตรวจสอบผลที่บันทึกไว้ได้ ข้อมูลต้นฉบับยังคงอยู่",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "ชีวิตที่เหลือ",
@@ -1756,6 +1786,7 @@ const catalog = {
   "copied": "คัดลอกข้อความสำหรับแชร์แล้ว",
   "copyManually": "เลือกข้อความสำหรับแชร์แล้ว โปรดคัดลอกเพื่อนำไปแชร์"
 };
+
 
 
   Object.assign(exports, { catalog });
@@ -1927,6 +1958,7 @@ function initLanguage(root = globalThis.document) {
 }
 
 
+
   Object.assign(exports, { LANGUAGE_KEY, catalogs, languages, languageFromTag, chooseLanguage, getLanguage, t, formatNumber, setMessage, renderLanguage, setLanguage, initLanguage });
   });
 
@@ -2003,6 +2035,7 @@ function rankForScore(score) {
 }
 
 
+
   Object.assign(exports, { CONFIG, OPPOSITE, tierForSuccess, rankForScore });
   });
 
@@ -2022,6 +2055,7 @@ function judgeTiming(deltaMs, dirOk, cfg = CONFIG) {
   if (a <= cfg.GOOD_WINDOW) return 'GOOD';
   return 'MISS';
 }
+
 
 
   Object.assign(exports, { judgeTiming });
@@ -2052,6 +2086,7 @@ function calcGain(judge, combo, deltaMs, cfg = CONFIG) {
   if (base === 0) return 0;
   return Math.round(base * comboMultiplier(combo, cfg) + timingBonus(deltaMs, cfg));
 }
+
 
 
   Object.assign(exports, { comboMultiplier, timingBonus, calcGain });
@@ -2099,6 +2134,7 @@ function setSettings(s) {
 }
 
 
+
   Object.assign(exports, { getBest, setBest, getSettings, setSettings });
   });
 
@@ -2120,6 +2156,7 @@ const HAPTICS = {
   good: [15],
   miss: [40],
 };
+
 
 
   Object.assign(exports, { setHapticsEnabled, vibrate, HAPTICS });
@@ -2211,12 +2248,14 @@ async function shareOrCopy({ text, statusElement, textElement }) {
 }
 
 
+
   Object.assign(exports, { currentGameUrl, callRankingRpc, escapeHtml, shareOrCopy });
   });
 
   def('outbox', function(module, exports, require){
 const OUTBOX_KEY = "paripari.pending-submissions.v1";
 const PREFIX = `${OUTBOX_KEY}:`;
+const unsaved = new WeakMap();
 const validSubmissionId = (value) =>
   typeof value === "string" &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -2256,75 +2295,126 @@ function legacyEntries(storage) {
   const value = JSON.parse(raw);
   if (
     value?.version !== 1 ||
-    !Array.isArray(value.entries) ||
-    value.entries.some((entry) => !validEntry(entry))
+    !Array.isArray(value.entries)
   )
     throw Error("Unrecognized outbox; preserve stored data");
   return value.entries;
 }
-function readOutbox(storage) {
-  const entries = new Map(
-    legacyEntries(storage).map((entry) => [entry.run.submissionId, entry]),
-  );
-  const keys = Array.from({ length: storage?.length ?? 0 }, (_, i) =>
-    storage.key(i),
-  );
-  for (const key of keys) {
-    if (
-      !key?.startsWith(PREFIX) ||
-      !validSubmissionId(key.slice(PREFIX.length))
-    )
-      continue;
-    const raw = storage.getItem(key);
-    if (raw == null) continue;
-    const value = JSON.parse(raw),
-      id = key.slice(PREFIX.length);
-    if (value?.acknowledged === true) {
-      entries.delete(id);
-      continue;
-    }
-    if (!validEntry(value) || value.run.submissionId !== id)
-      throw Error("Unrecognized receipt; preserve stored data");
-    entries.set(id, value);
-  }
-  return [...entries.values()];
+function sameEntry(a,b) {
+ return ['name','startId','submissionId','clientVersion'].every(k=>a.run[k]===b.run[k]) && JSON.stringify(a.result)===JSON.stringify(b.result);
 }
+function scan(storage) {
+ const entries=new Map(), blocked=new Set();
+ const add=(entry)=>{
+   if(!validEntry(entry)) { if(validSubmissionId(entry?.run?.submissionId))blocked.add(entry.run.submissionId); return; }
+   const id=entry.run.submissionId;
+   if(entries.has(id)&&!sameEntry(entries.get(id),entry))blocked.add(id);
+   else entries.set(id,entry);
+ };
+ for(const entry of legacyEntries(storage))add(entry);
+ const keys=Array.from({length:storage?.length??0},(_,i)=>storage.key(i));
+ for(const key of keys){
+   if(!key?.startsWith(PREFIX)||!validSubmissionId(key.slice(PREFIX.length)))continue;
+   const id=key.slice(PREFIX.length), raw=storage.getItem(key); if(raw==null)continue;
+   let value;try{value=JSON.parse(raw)}catch{blocked.add(id);continue}
+   if(value?.acknowledged===true){entries.delete(id);blocked.add(id);continue}
+   if(!validEntry(value)||value.run.submissionId!==id){blocked.add(id);continue}
+   add(value);
+ }
+ for(const [id,entry] of unsaved.get(storage)??[])if(!blocked.has(id))add(entry);
+ for(const id of blocked)entries.delete(id);
+ return {entries,blocked};
+}
+function readOutbox(storage) { return [...scan(storage).entries.values()]; }
 function queueResult(storage, run, result) {
   if (!run.name || !validSubmissionId(run.submissionId)) return;
   if (!storage) throw Error("Storage unavailable");
   const key = PREFIX + run.submissionId;
-  const existing = readOutbox(storage).find(
-    (entry) => entry.run.submissionId === run.submissionId,
-  );
+  const raw = storage.getItem(key);
+  if (raw != null) {
+    let value;
+    try { value = JSON.parse(raw); } catch { throw Error("Receipt conflict; preserve stored data"); }
+    if (value?.acknowledged === true) {
+      if (!validEntry(value) || !sameEntry(value,{run,result})) throw Error("Receipt conflict");
+      return;
+    }
+    if (!validEntry(value) || value.run.submissionId !== run.submissionId)
+      throw Error("Receipt conflict; preserve stored data");
+  }
+  const scanned = scan(storage);
+  if (scanned.blocked.has(run.submissionId)) throw Error("Receipt conflict");
+  const existing = scanned.entries.get(run.submissionId);
   if (existing) {
     if (
       JSON.stringify(existing.run) !== JSON.stringify(run) ||
       existing.result.score !== result.score
     )
       throw Error("Receipt conflict");
-    return;
+    if (raw != null) return;
   }
   // Each play owns one key. Concurrent tabs never rewrite another play's receipt.
-  storage.setItem(key, JSON.stringify({ run, result }));
+  const serialized = JSON.stringify({ run, result });
+  if (!unsaved.has(storage)) unsaved.set(storage, new Map());
+  unsaved.get(storage).set(run.submissionId, JSON.parse(serialized));
+  storage.setItem(key, serialized);
+  if (storage.getItem(key) !== serialized) throw Error("Storage did not persist result");
+  unsaved.get(storage).delete(run.submissionId);
 }
-function acknowledgeResult(storage, id) {
+function acknowledgeResult(storage, id, expected = null) {
   if (!storage || !validSubmissionId(id)) return;
-  // Keep old array data untouched. A per-ID tombstone acknowledges legacy entries.
-  if (legacyEntries(storage).some((entry) => entry.run.submissionId === id))
-    storage.setItem(PREFIX + id, JSON.stringify({ acknowledged: true }));
-  else storage.removeItem(PREFIX + id);
+  // Keep both old array data and the exact acknowledged payload for recovery.
+  const key = PREFIX + id;
+  const raw = storage.getItem(key);
+  let prior = null;
+  if (raw != null) {
+    try { prior = JSON.parse(raw); } catch { throw Error("Receipt conflict"); }
+    if (expected && !sameEntry(prior, expected)) throw Error("Receipt conflict");
+    if (prior?.acknowledged === true) return;
+    if (!validEntry(prior) || prior.run.submissionId !== id) throw Error("Receipt conflict");
+  }
+  if (!prior) prior = legacyEntries(storage).find(entry => validEntry(entry) && entry.run.submissionId === id) ?? null;
+  if (expected && (!prior || !sameEntry(prior,expected))) throw Error("Receipt conflict");
+  const serialized = JSON.stringify({ ...(prior || {}), acknowledged: true });
+  storage.setItem(key, serialized);
+  if (storage.getItem(key) !== serialized) throw Error("Storage did not persist acknowledgement");
+}
+
+function isAcknowledged(storage, id) {
+  try { return JSON.parse(storage.getItem(PREFIX + id))?.acknowledged === true; }
+  catch { return false; }
 }
 
 
-  Object.assign(exports, { OUTBOX_KEY, validSubmissionId, createSubmissionId, readOutbox, queueResult, acknowledgeResult });
+  Object.assign(exports, { OUTBOX_KEY, validSubmissionId, createSubmissionId, readOutbox, queueResult, acknowledgeResult, isAcknowledged });
+  });
+
+  def('result', function(module, exports, require){
+const {CONFIG, rankForScore} = require('config');
+const {validSubmissionId} = require('outbox');
+function validResult(value) {
+ return Boolean(value && value.practiceDone === false && Number.isSafeInteger(value.score) && value.score >= 0 && Number.isSafeInteger(value.best) && value.best >= value.score && typeof value.isBest === 'boolean' && Number.isSafeInteger(value.maxCombo) && value.maxCombo >= 0 && Number.isInteger(value.perfectRate) && value.perfectRate >= 0 && value.perfectRate <= 100 && Number.isInteger(value.tier) && value.tier >= 1 && value.tier <= CONFIG.TIERS.length && value.rank === rankForScore(value.score));
+}
+function validSnapshot(value) {
+ const run=value?.run;
+ return validResult(value?.result) && typeof run?.name === 'string' && typeof run.clientVersion === 'string' && (validSubmissionId(run.startId) || run.startId === null) && (validSubmissionId(run.submissionId) || run.submissionId === null);
+}
+function saveResult(storage,key,value) {
+ const serialized=JSON.stringify(value);
+ storage.setItem(key,serialized);
+ if(storage.getItem(key)!==serialized)throw Error('Storage did not persist snapshot');
+}
+
+
+  Object.assign(exports, { validResult, validSnapshot, saveResult });
   });
 
   def('ranking', function(module, exports, require){
-const {createSubmissionId} = require('outbox');
+const {createSubmissionId, validSubmissionId, queueResult, acknowledgeResult, isAcknowledged} = require('outbox');
 const GAME = "paripari";
 const VERSION = "paripari-20261031-common";
 const inflight = new Map();
-const sent = new Set();
+const sent = new Map();
+const payloads = new Map();
 const starts = new Map();
 
 function createRun(rawName, uuid = createSubmissionId) {
@@ -2342,9 +2432,9 @@ function createRun(rawName, uuid = createSubmissionId) {
     clientVersion: VERSION,
   });
 }
-function accepted(value) {
-  if (Array.isArray(value) && value.length !== 1) throw new Error("Ranking response is malformed");
-  const result = Array.isArray(value) ? value[0] : value;
+function accepted(value, table = false) {
+  if (table ? !Array.isArray(value) || value.length !== 1 : Array.isArray(value)) throw new Error("Ranking response is malformed");
+  const result = table ? value[0] : value;
   if (result?.accepted !== true) throw new Error("Ranking request was rejected");
   return result;
 }
@@ -2361,7 +2451,7 @@ async function startRun(run, rpc) {
     })
       .then(value => {
         const result = accepted(value);
-        if (typeof result.play_id !== 'string' || !result.play_id || result.game_slug !== GAME || result.client_version !== (run.clientVersion ?? VERSION)) throw Error('Ranking start response is malformed');
+        if (!validSubmissionId(result.play_id) || result.start_id !== run.startId || result.display_name !== run.name || result.normalized_name !== run.name || typeof result.duplicate !== 'boolean' || result.game_slug !== GAME || result.client_version !== (run.clientVersion ?? VERSION)) throw Error('Ranking start response is malformed');
         return result;
       })
       .catch((error) => {
@@ -2375,7 +2465,14 @@ async function startRun(run, rpc) {
   return starts.get(run.startId);
 }
 async function submitRun(run, score, rpc) {
-  if (!run?.name || sent.has(run.submissionId)) return;
+  if (!run?.name) return;
+  const fingerprint = JSON.stringify([run.name,run.startId,run.submissionId,run.clientVersion,score]);
+  if (payloads.has(run.submissionId) && payloads.get(run.submissionId) !== fingerprint) throw Error('Receipt conflict');
+  if (sent.has(run.submissionId)) {
+    if (sent.get(run.submissionId) !== fingerprint) throw Error('Receipt conflict');
+    return;
+  }
+  payloads.set(run.submissionId, fingerprint);
   if (inflight.has(run.submissionId)) return inflight.get(run.submissionId);
   const task = (async () => {
     const start = await startRun(run, rpc);
@@ -2394,32 +2491,46 @@ async function submitRun(run, score, rpc) {
         p_ranking_score: score,
       }),
     );
-    if (finished.play_id !== start.play_id) throw Error('Ranking finish response is malformed');
+    if (finished.play_id !== start.play_id || finished.game_slug !== GAME || finished.result_type !== 'game_over' || finished.reached_wave !== 1 || finished.score !== score || typeof finished.duplicate !== 'boolean') throw Error('Ranking finish response is malformed');
     const submitted = accepted(
       await rpc("submit_score_idempotent_v1", {
         ...payload,
         p_submission_id: run.submissionId,
         p_score: score,
-      }),
+      }), true,
     );
-    if (submitted.result_submission_id !== run.submissionId || submitted.result_play_id !== start.play_id || typeof submitted.was_duplicate !== 'boolean') throw Error('Ranking submission response is malformed');
-    sent.add(run.submissionId);
+    if (submitted.result_submission_id !== run.submissionId || submitted.result_play_id !== start.play_id || typeof submitted.was_duplicate !== 'boolean' || submitted.result_normalized_name !== run.name || submitted.result_display_name !== run.name || !Number.isSafeInteger(submitted.result_first_score) || !Number.isSafeInteger(submitted.result_best_score) || !Number.isSafeInteger(submitted.result_play_count) || submitted.result_play_count < 1 || typeof submitted.is_first_play !== 'boolean' || typeof submitted.is_new_best !== 'boolean') throw Error('Ranking submission response is malformed');
+    sent.set(run.submissionId, fingerprint);
     starts.delete(run.startId);
-    if (sent.size > 1000) sent.delete(sent.values().next().value);
+    if (sent.size > 1000) sent.delete(sent.keys().next().value);
   })();
   inflight.set(run.submissionId, task);
   try {
     await task;
   } finally {
     inflight.delete(run.submissionId);
+    payloads.delete(run.submissionId);
   }
 }
-function loadTopRanking(rpc) {
-  return rpc("get_best_score_ranking", { p_game_slug: GAME, p_limit: 30 });
+async function loadTopRanking(rpc) {
+  const rows = await rpc("get_best_score_ranking", { p_game_slug: GAME, p_limit: 30 });
+  if (!Array.isArray(rows) || rows.some(row => !row || !Number.isSafeInteger(row.rank_no) || row.rank_no < 1 || typeof row.display_name !== 'string' || !Number.isSafeInteger(row.best_score)))
+    throw Error('Ranking response is malformed');
+  return rows.slice(0, 30);
 }
 
 
-  Object.assign(exports, { createRun, startRun, submitRun, loadTopRanking });
+// Durable, exact play receipt precedes every public result request.
+async function submitSavedResult(storage, run, result, rpc) {
+  if (!run?.name) return;
+  queueResult(storage, run, result);
+  if (isAcknowledged(storage, run.submissionId)) return;
+  await submitRun(run, result.score, rpc);
+  acknowledgeResult(storage, run.submissionId, {run,result});
+}
+
+
+  Object.assign(exports, { createRun, startRun, submitRun, loadTopRanking, submitSavedResult });
   });
 
   def('sound', function(module, exports, require){
@@ -2444,8 +2555,11 @@ class GameSound {
   async unlock() {
     if (!this.enabled || this.volume === 0 || globalThis.document?.hidden) return;
     try {
-      this.context ??= this.factory();
-      if (this.context.state === 'suspended') await this.context.resume();
+      if (!this.context) {
+        this.context = this.factory();
+        this.context.onstatechange = () => { if (this.context.state !== 'running') this.stop(); };
+      }
+      if (this.context.state === 'suspended' || this.context.state === 'interrupted') { this.stop(); await this.context.resume(); }
     } catch { /* Audio is optional; do not delay starting or retry old cues. */ }
   }
   play(event) {
@@ -2459,24 +2573,29 @@ class GameSound {
     this.lastAt = context.currentTime;
     try {
       notes.forEach((frequency, index) => {
-        const oscillator = context.createOscillator(), gain = context.createGain();
+        const voice = { oscillator: context.createOscillator(), gain: null };
+        this.voices.add(voice);
+        const oscillator = voice.oscillator, gain = voice.gain = context.createGain();
         const at = context.currentTime + index * 0.075;
         oscillator.type = 'sine'; oscillator.frequency.value = frequency;
         gain.gain.setValueAtTime(0, at);
         gain.gain.linearRampToValueAtTime(this.volume * 0.12, at + 0.008);
         gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.14);
         oscillator.connect(gain); gain.connect(context.destination);
-        const voice = { oscillator, gain }; this.voices.add(voice);
-        oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); this.voices.delete(voice); };
+        oscillator.onended = () => { this.cleanup(voice); this.voices.delete(voice); };
         oscillator.start(at); oscillator.stop(at + 0.15);
       });
     } catch { this.stop(); }
   }
+  cleanup({oscillator, gain}) {
+    if (oscillator) oscillator.onended = null;
+    try { oscillator?.stop(); } catch {}
+    try { oscillator?.disconnect(); } catch {}
+    try { gain?.disconnect(); } catch {}
+  }
   stop() {
     if (!this.voices) return;
-    for (const {oscillator, gain} of this.voices) {
-      try { oscillator.stop(); oscillator.disconnect(); gain.disconnect(); } catch { /* Already ended. */ }
-    }
+    for (const voice of this.voices) this.cleanup(voice);
     this.voices.clear();
   }
   suspend() {
@@ -2484,6 +2603,7 @@ class GameSound {
     if (this.context?.state === 'running') void this.context.suspend().catch(() => {});
   }
 }
+
 
 
   Object.assign(exports, { soundPreferences, GameSound });
@@ -2556,6 +2676,7 @@ class ParticlePool {
     for (const p of this.pool) p.active = false;
   }
 }
+
 
 
   Object.assign(exports, { ParticlePool });
@@ -2655,6 +2776,7 @@ function lockGestures() {
 }
 
 
+
   Object.assign(exports, { setupInput, lockGestures });
   });
 
@@ -2698,6 +2820,7 @@ function nextInterval(tier) {
   const factor = 1 + (Math.random() * 2 - 1) * j;
   return tier.intervalMs * factor;
 }
+
 
 
   Object.assign(exports, { createAttack, attackProgress, nextInterval });
@@ -3187,6 +3310,7 @@ class Renderer {
 }
 
 
+
   Object.assign(exports, { Renderer });
   });
 
@@ -3267,6 +3391,7 @@ function reflectSettings(s) {
   $('set-vibrate').checked = s.vibrate;
   $('set-motion').checked = s.reducedMotion;
 }
+
 
 
   Object.assign(exports, { showScreen, hideAllScreens, setPlayUIVisible, setFourDir, updateHUD, bumpCombo, popJudge, setCountdown, showResult, setBestLabel, reflectSettings });
@@ -3484,15 +3609,17 @@ class Game {
 }
 
 
+
   Object.assign(exports, { Game });
   });
 
   def('main', function(module, exports, require){
+const {validSnapshot, saveResult} = require('result');
 const {initLanguage, t, formatNumber, setMessage} = require('i18n');
-const {queueResult, readOutbox, acknowledgeResult} = require('outbox');
+const {queueResult, readOutbox} = require('outbox');
 const {GameSound} = require('sound');
 // エントリポイント: 起動・rAFループ・状態遷移の配線 要件 §4.1 §6.2
-const {createRun, startRun, submitRun, loadTopRanking} = require('ranking');
+const {createRun, startRun, submitSavedResult, loadTopRanking} = require('ranking');
 const {CONFIG} = require('config');
 const {Renderer} = require('renderer');
 const {ParticlePool} = require('particles');
@@ -3545,10 +3672,7 @@ const game = new Game({
     $("result-save-warning").hidden = true;
     try {
       queueResult(localStorage, resultRun, data);
-      localStorage.setItem(
-        PENDING_KEY,
-        JSON.stringify({ run: resultRun, result: data }),
-      );
+      saveResult(localStorage, PENDING_KEY, { run: resultRun, result: data });
     } catch (_) {
       $("result-save-warning").hidden = false;
     }
@@ -3672,17 +3796,18 @@ function renderRanking(rows) {
 }
 async function submitAndLoadRanking(data, sequence) {
   const run = resultRun;
+  if (sequence === resultSequence) {
+    try {
+      saveResult(localStorage, PENDING_KEY, {run, result:data});
+      $("result-save-warning").hidden = true;
+    } catch { $("result-save-warning").hidden = false; }
+  }
   const status = $("result-submit-status");
   setMessage($("result-ranking-status"), "loading");
   setMessage(status, "updating");
   try {
-    await submitRun(run, Math.trunc(data.score), callRankingRpc);
-    try {
-      acknowledgeResult(localStorage, run?.submissionId);
-      refreshPendingResults();
-    } catch (_) {
-      /* A retained receipt can safely be retried. */
-    }
+    await submitSavedResult(localStorage, run, data, callRankingRpc);
+    refreshPendingResults();
     if (sequence === resultSequence) {
       setMessage(status, run?.name ? "sent" : "guest");
     }
@@ -3872,14 +3997,7 @@ $("btn-last-result").addEventListener("click", () => {
 });
 try {
   const saved = JSON.parse(localStorage.getItem(PENDING_KEY) || "null");
-  if (
-    saved?.run &&
-    typeof saved.run.name === "string" &&
-    typeof saved.run.startId === "string" &&
-    typeof saved.run.submissionId === "string" &&
-    Number.isSafeInteger(saved.result?.score) &&
-    saved.result.score >= 0
-  ) {
+  if (validSnapshot(saved)) {
     pendingResult = saved.result;
     resultRun = Object.freeze({
       ...saved.run,
@@ -3908,6 +4026,12 @@ function refreshPendingResults() {
     return;
   }
   for (const saved of entries) {
+    if (!validSnapshot(saved)) {
+      const note = document.createElement('p');
+      note.textContent = t('savedInvalid');
+      host.append(note);
+      continue; // Preserve raw data, but never display or submit an invalid saved result.
+    }
     const button = document.createElement("button");
     button.className = "btn";
     button.type = "button";
@@ -3940,6 +4064,7 @@ document.addEventListener("paripari:language", () => {
 });
 
 
+
   });
 
   require('main');
@@ -3947,3 +4072,4 @@ document.addEventListener("paripari:language", () => {
 </script>
 </body>
 </html>
+

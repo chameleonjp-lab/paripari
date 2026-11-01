@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {acknowledgeResult,OUTBOX_KEY} from '../src/js/outbox.js';
+const id='00000000-0000-4000-8000-000000000099',expected={run:{name:'A',startId:'00000000-0000-4000-8000-000000000098',submissionId:id,clientVersion:'v1'},result:{score:1}};
+test('missing per-ID raw cannot acknowledge different fallback legacy payload',()=>{const raw=JSON.stringify({version:1,entries:[{...expected,result:{score:2}}]}),m=new Map([[OUTBOX_KEY,raw]]),s={getItem:k=>m.get(k)??null,setItem:(k,v)=>m.set(k,v)};assert.throws(()=>acknowledgeResult(s,id,expected),/conflict/i);assert.equal(m.get(OUTBOX_KEY),raw);assert.equal(m.has(OUTBOX_KEY+':'+id),false)});

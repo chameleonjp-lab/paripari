@@ -1,8 +1,9 @@
+import { validSnapshot, saveResult } from './result.js';
 import { initLanguage, t, formatNumber, setMessage } from "./i18n.js";
-import { queueResult, readOutbox, acknowledgeResult } from "./outbox.js";
+import { queueResult, readOutbox } from "./outbox.js";
 import { GameSound } from "./sound.js";
 // エントリポイント: 起動・rAFループ・状態遷移の配線 要件 §4.1 §6.2
-import { createRun, startRun, submitRun, loadTopRanking } from "./ranking.js";
+import { createRun, startRun, submitSavedResult, loadTopRanking } from "./ranking.js";
 import { CONFIG } from "./config.js";
 import { Renderer } from "./renderer.js";
 import { ParticlePool } from "./particles.js";
@@ -56,10 +57,7 @@ const game = new Game({
     $("result-save-warning").hidden = true;
     try {
       queueResult(localStorage, resultRun, data);
-      localStorage.setItem(
-        PENDING_KEY,
-        JSON.stringify({ run: resultRun, result: data }),
-      );
+      saveResult(localStorage, PENDING_KEY, { run: resultRun, result: data });
     } catch (_) {
       $("result-save-warning").hidden = false;
     }
@@ -183,17 +181,18 @@ function renderRanking(rows) {
 }
 async function submitAndLoadRanking(data, sequence) {
   const run = resultRun;
+  if (sequence === resultSequence) {
+    try {
+      saveResult(localStorage, PENDING_KEY, {run, result:data});
+      $("result-save-warning").hidden = true;
+    } catch { $("result-save-warning").hidden = false; }
+  }
   const status = $("result-submit-status");
   setMessage($("result-ranking-status"), "loading");
   setMessage(status, "updating");
   try {
-    await submitRun(run, Math.trunc(data.score), callRankingRpc);
-    try {
-      acknowledgeResult(localStorage, run?.submissionId);
-      refreshPendingResults();
-    } catch (_) {
-      /* A retained receipt can safely be retried. */
-    }
+    await submitSavedResult(localStorage, run, data, callRankingRpc);
+    refreshPendingResults();
     if (sequence === resultSequence) {
       setMessage(status, run?.name ? "sent" : "guest");
     }
@@ -383,14 +382,7 @@ $("btn-last-result").addEventListener("click", () => {
 });
 try {
   const saved = JSON.parse(localStorage.getItem(PENDING_KEY) || "null");
-  if (
-    saved?.run &&
-    typeof saved.run.name === "string" &&
-    typeof saved.run.startId === "string" &&
-    typeof saved.run.submissionId === "string" &&
-    Number.isSafeInteger(saved.result?.score) &&
-    saved.result.score >= 0
-  ) {
+  if (validSnapshot(saved)) {
     pendingResult = saved.result;
     resultRun = Object.freeze({
       ...saved.run,
@@ -419,6 +411,12 @@ function refreshPendingResults() {
     return;
   }
   for (const saved of entries) {
+    if (!validSnapshot(saved)) {
+      const note = document.createElement('p');
+      note.textContent = t('savedInvalid');
+      host.append(note);
+      continue; // Preserve raw data, but never display or submit an invalid saved result.
+    }
     const button = document.createElement("button");
     button.className = "btn";
     button.type = "button";
@@ -449,3 +447,4 @@ document.addEventListener("paripari:language", () => {
   renderRanking();
   refreshPendingResults();
 });
+

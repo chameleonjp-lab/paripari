@@ -19,8 +19,11 @@ export class GameSound {
   async unlock() {
     if (!this.enabled || this.volume === 0 || globalThis.document?.hidden) return;
     try {
-      this.context ??= this.factory();
-      if (this.context.state === 'suspended') await this.context.resume();
+      if (!this.context) {
+        this.context = this.factory();
+        this.context.onstatechange = () => { if (this.context.state !== 'running') this.stop(); };
+      }
+      if (this.context.state === 'suspended' || this.context.state === 'interrupted') { this.stop(); await this.context.resume(); }
     } catch { /* Audio is optional; do not delay starting or retry old cues. */ }
   }
   play(event) {
@@ -34,24 +37,29 @@ export class GameSound {
     this.lastAt = context.currentTime;
     try {
       notes.forEach((frequency, index) => {
-        const oscillator = context.createOscillator(), gain = context.createGain();
+        const voice = { oscillator: context.createOscillator(), gain: null };
+        this.voices.add(voice);
+        const oscillator = voice.oscillator, gain = voice.gain = context.createGain();
         const at = context.currentTime + index * 0.075;
         oscillator.type = 'sine'; oscillator.frequency.value = frequency;
         gain.gain.setValueAtTime(0, at);
         gain.gain.linearRampToValueAtTime(this.volume * 0.12, at + 0.008);
         gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.14);
         oscillator.connect(gain); gain.connect(context.destination);
-        const voice = { oscillator, gain }; this.voices.add(voice);
-        oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); this.voices.delete(voice); };
+        oscillator.onended = () => { this.cleanup(voice); this.voices.delete(voice); };
         oscillator.start(at); oscillator.stop(at + 0.15);
       });
     } catch { this.stop(); }
   }
+  cleanup({oscillator, gain}) {
+    if (oscillator) oscillator.onended = null;
+    try { oscillator?.stop(); } catch {}
+    try { oscillator?.disconnect(); } catch {}
+    try { gain?.disconnect(); } catch {}
+  }
   stop() {
     if (!this.voices) return;
-    for (const {oscillator, gain} of this.voices) {
-      try { oscillator.stop(); oscillator.disconnect(); gain.disconnect(); } catch { /* Already ended. */ }
-    }
+    for (const voice of this.voices) this.cleanup(voice);
     this.voices.clear();
   }
   suspend() {
@@ -59,3 +67,4 @@ export class GameSound {
     if (this.context?.state === 'running') void this.context.suspend().catch(() => {});
   }
 }
+

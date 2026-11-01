@@ -9,7 +9,7 @@ const r = (p) => resolve(root, p);
 
 // 依存順（require は遅延評価なので順不同でも動くが、可読性のため整列）
 const MODULES = [
-  'locales/ja', 'locales/en', 'locales/es', 'locales/pt-BR', 'locales/zh-Hans', 'locales/fr', 'locales/de', 'locales/ko', 'locales/ru', 'locales/it', 'locales/zh-Hant', 'locales/id', 'locales/tr', 'locales/vi', 'locales/th', 'i18n', 'config', 'judge', 'scoring', 'storage', 'haptics', 'platform', 'outbox', 'ranking', 'sound',
+  'locales/ja', 'locales/en', 'locales/es', 'locales/pt-BR', 'locales/zh-Hans', 'locales/fr', 'locales/de', 'locales/ko', 'locales/ru', 'locales/it', 'locales/zh-Hant', 'locales/id', 'locales/tr', 'locales/vi', 'locales/th', 'i18n', 'config', 'judge', 'scoring', 'storage', 'haptics', 'platform', 'outbox', 'result', 'ranking', 'sound',
   'particles', 'input', 'enemy', 'renderer', 'ui', 'game', 'main',
 ];
 
@@ -70,3 +70,4 @@ html = html
 mkdirSync(r('dist'), { recursive: true });
 writeFileSync(r('dist/paripari.html'), html);
 console.log('built dist/paripari.html (' + Math.round(html.length / 1024) + ' KB)');
+

@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {readOutbox,OUTBOX_KEY} from '../src/js/outbox.js';
+const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+const entry=(n,score=1)=>({run:{name:'A',startId:id(n+100),submissionId:id(n),clientVersion:'v1'},result:{score}});
+function store(pairs){const m=new Map(pairs);return {m,get length(){return m.size},key:i=>[...m.keys()][i],getItem:k=>m.get(k)??null,setItem:(k,v)=>m.set(k,v)}}
+test('malformed legacy sibling does not block valid entry and preserves raw',()=>{const raw=JSON.stringify({version:1,entries:[null,entry(1)]}),s=store([[OUTBOX_KEY,raw]]);assert.deepEqual(readOutbox(s).map(e=>e.run.submissionId),[id(1)]);assert.equal(s.getItem(OUTBOX_KEY),raw)});
+test('same UUID different legacy payload is quarantined not last wins',()=>{const raw=JSON.stringify({version:1,entries:[entry(1),entry(1,2),entry(2)]}),s=store([[OUTBOX_KEY,raw]]);assert.deepEqual(readOutbox(s).map(e=>e.run.submissionId),[id(2)]);assert.equal(s.getItem(OUTBOX_KEY),raw)});
+test('same UUID different per-key and legacy payload is quarantined not newer wins',()=>{const raw=JSON.stringify({version:1,entries:[entry(1),entry(2)]}),s=store([[OUTBOX_KEY,raw],[`${OUTBOX_KEY}:${id(1)}`,JSON.stringify(entry(1,2))]]);assert.deepEqual(readOutbox(s).map(e=>e.run.submissionId),[id(2)]);assert.equal(s.getItem(OUTBOX_KEY),raw)});
+test('acknowledged UUID cannot silently acknowledge a different result payload',async()=>{const {queueResult,acknowledgeResult}=await import('../src/js/outbox.js');const {submitSavedResult}=await import('../src/js/ranking.js');const s=store([]),e=entry(9);queueResult(s,e.run,e.result);acknowledgeResult(s,e.run.submissionId);const raw=s.getItem(`${OUTBOX_KEY}:${id(9)}`);let calls=0;await assert.rejects(submitSavedResult(s,e.run,{score:2},async()=>calls++),/conflict/i);assert.equal(calls,0);assert.equal(s.getItem(`${OUTBOX_KEY}:${id(9)}`),raw)});

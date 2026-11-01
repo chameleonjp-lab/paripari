@@ -82,3 +82,18 @@ GitHub Pages Source は `GitHub Actions`（workflow）をAPIで確認。
 現時点: **実装・ローカル検証済みの範囲と未完了を上記に区別 / ユーザーのマージ待ち / 必要な設定と権限は上記 / 本番公開後確認待ち**。共通仕様全体の完了報告ではない。
 
 追加確認: 不正なaccepted値、欠落/不一致の開始・終了・送信IDを成功扱いにしない。開始のgame/clientVersion、終了play ID、送信submission/play IDとwas_duplicateを確認し、不明な応答でも元のUUID/payloadを保持して再試行する。Nodeの不正ACK回帰とChromium/WebKit全15言語テストを再実施して成功。
+
+
+## 2026-11-02 04:54 JST 後続検証（以前の記録とは別時点）
+
+基準 PR #20 head `28287e6c3e2129d0ba5e93f4b41b007ebc2e9825`。現公開ホームと実験場のパリパリカード/遊ぶリンク/詳細ランキングリンクをこの時点でブラウザ読取確認した。公開先は上記のまま。今回の修正はまだ公開されていない。Pages Source 管理設定は今回 API が対象 endpoint 非対応で再確認できず、以前の確認を最新確認へ読み替えない。
+
+- 仕様 2: `config/game/judge/scoring/enemy` のゲームルールは変更しない。HP3、PERFECT ±60ms/GOOD ±140ms、10連続PERFECTで回復、HP0で終了。累計3MISSや60秒制に変更しない。
+- 仕様 5: 保存読戻し成功前の finish/score 送信を停止。quota失敗した結果も開いたページ内で別結果に消されない。破損行・同UUID異payloadは原文を残し隔離、正常な兄弟結果は継続。受理済payloadを保持し同UUID復活を防ぐ。送信中に保存内容が変わった場合も別結果を消し込まない。snapshot失敗の再試行と警告解除を現在結果だけに適用。
+- 仕様 5/6: 現DB定義を読取照合した専用 `start_game_play_v1` / `finish_game_play_v1`（JSONB）→`submit_score_idempotent_v1`（11列TABLE）を維持。開始ID・playID・名前・game/version、終了結果・score、送信ID・本人名・各型を照合。未適用の通常ゲーム用RPCへ変更しない。匿名の公開登録なしを維持。
+- 仕様 4/6/10: ランキング不正応答を空や架空順位へ変換しない。破損した保存結果の表示・再送を防ぎ、原データ保全の案内を15言語へ追加（78キー）。旧記録の名前単位集計と厳密な本人30人の違いは引き続き未解決。
+- 仕様 8/9: native interruption時に古い音を破棄し、stop例外でも各ノードを独立解放。onended再入を防ぎ、interrupted/suspended復帰は古い音を再生しない。
+- 仕様 11: PR配備なし/検証済artifactの既存gateを維持。公開stage準備は強制再帰削除せず、新規ディレクトリで開始し既存stageがあれば失敗させる。
+- 仕様 12: 既存22ゲームunitと共有/ランキング/音声スクリプト、追加Node回帰が成功。独立レビューの破損legacy・UUID競合・ACK競合race・開始応答・audio interruptionを再現し修正。buildと単一HTML依存閉包成功。今回ローカルのブラウザ実行体がないためChromium/WebKitは既存PR CIで実行予定（確定head結果はPRに追記）。以前のブラウザ成功を今回修正の成功とは扱わない。
+
+残る制限: 安定した本人識別方式・既存同名/改名記録の移行判断、厳密な本人30人、母語話者確認、音の聞こえ方、iPhone17 Pro実機、ユーザーマージ後の本番反映確認。ストレージ自体が書込み不可の間は未保存結果はページを閉じると失われ得るため警告を維持する。破損/競合 raw を削除・再ID・自動再送しない。DB変更・試験スコア送信・権限変更・本番配備は実施していない。以前の適用順/切戻し手順は維持する。

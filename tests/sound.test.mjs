@@ -19,3 +19,12 @@ context.currentTime+=10; sound.play('perfect'); assert.equal(starts,6,'old cues 
 await sound.unlock(); assert.equal(starts,6); sound.play('perfect'); assert.equal(starts,8);
 await new GameSound({},()=>{throw Error('unsupported');}).unlock();
 console.log('Audio preferences, bounded voices, priority, suspend and unavailable audio verified');
+
+let disconnected=0;
+const broken = new GameSound();
+broken.voices.add({oscillator:{stop(){throw Error('ended')},disconnect(){disconnected++}},gain:{disconnect(){disconnected++}}});
+broken.stop();
+assert.equal(disconnected,2,'one ended oscillator must not prevent either disconnect');
+let resumed=0;
+broken.context={state:'interrupted',resume:async()=>{resumed++}};
+await broken.unlock();assert.equal(resumed,1,'interrupted context is resumable');

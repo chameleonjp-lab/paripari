@@ -1,8 +1,9 @@
-import { createSubmissionId } from "./outbox.js";
+import { createSubmissionId, validSubmissionId, queueResult, acknowledgeResult, isAcknowledged } from "./outbox.js";
 const GAME = "paripari";
 const VERSION = "paripari-20261031-common";
 const inflight = new Map();
-const sent = new Set();
+const sent = new Map();
+const payloads = new Map();
 const starts = new Map();
 
 export function createRun(rawName, uuid = createSubmissionId) {
@@ -20,9 +21,9 @@ export function createRun(rawName, uuid = createSubmissionId) {
     clientVersion: VERSION,
   });
 }
-function accepted(value) {
-  if (Array.isArray(value) && value.length !== 1) throw new Error("Ranking response is malformed");
-  const result = Array.isArray(value) ? value[0] : value;
+function accepted(value, table = false) {
+  if (table ? !Array.isArray(value) || value.length !== 1 : Array.isArray(value)) throw new Error("Ranking response is malformed");
+  const result = table ? value[0] : value;
   if (result?.accepted !== true) throw new Error("Ranking request was rejected");
   return result;
 }
@@ -39,7 +40,7 @@ export async function startRun(run, rpc) {
     })
       .then(value => {
         const result = accepted(value);
-        if (typeof result.play_id !== 'string' || !result.play_id || result.game_slug !== GAME || result.client_version !== (run.clientVersion ?? VERSION)) throw Error('Ranking start response is malformed');
+        if (!validSubmissionId(result.play_id) || result.start_id !== run.startId || result.display_name !== run.name || result.normalized_name !== run.name || typeof result.duplicate !== 'boolean' || result.game_slug !== GAME || result.client_version !== (run.clientVersion ?? VERSION)) throw Error('Ranking start response is malformed');
         return result;
       })
       .catch((error) => {
@@ -53,7 +54,14 @@ export async function startRun(run, rpc) {
   return starts.get(run.startId);
 }
 export async function submitRun(run, score, rpc) {
-  if (!run?.name || sent.has(run.submissionId)) return;
+  if (!run?.name) return;
+  const fingerprint = JSON.stringify([run.name,run.startId,run.submissionId,run.clientVersion,score]);
+  if (payloads.has(run.submissionId) && payloads.get(run.submissionId) !== fingerprint) throw Error('Receipt conflict');
+  if (sent.has(run.submissionId)) {
+    if (sent.get(run.submissionId) !== fingerprint) throw Error('Receipt conflict');
+    return;
+  }
+  payloads.set(run.submissionId, fingerprint);
   if (inflight.has(run.submissionId)) return inflight.get(run.submissionId);
   const task = (async () => {
     const start = await startRun(run, rpc);
@@ -72,26 +80,40 @@ export async function submitRun(run, score, rpc) {
         p_ranking_score: score,
       }),
     );
-    if (finished.play_id !== start.play_id) throw Error('Ranking finish response is malformed');
+    if (finished.play_id !== start.play_id || finished.game_slug !== GAME || finished.result_type !== 'game_over' || finished.reached_wave !== 1 || finished.score !== score || typeof finished.duplicate !== 'boolean') throw Error('Ranking finish response is malformed');
     const submitted = accepted(
       await rpc("submit_score_idempotent_v1", {
         ...payload,
         p_submission_id: run.submissionId,
         p_score: score,
-      }),
+      }), true,
     );
-    if (submitted.result_submission_id !== run.submissionId || submitted.result_play_id !== start.play_id || typeof submitted.was_duplicate !== 'boolean') throw Error('Ranking submission response is malformed');
-    sent.add(run.submissionId);
+    if (submitted.result_submission_id !== run.submissionId || submitted.result_play_id !== start.play_id || typeof submitted.was_duplicate !== 'boolean' || submitted.result_normalized_name !== run.name || submitted.result_display_name !== run.name || !Number.isSafeInteger(submitted.result_first_score) || !Number.isSafeInteger(submitted.result_best_score) || !Number.isSafeInteger(submitted.result_play_count) || submitted.result_play_count < 1 || typeof submitted.is_first_play !== 'boolean' || typeof submitted.is_new_best !== 'boolean') throw Error('Ranking submission response is malformed');
+    sent.set(run.submissionId, fingerprint);
     starts.delete(run.startId);
-    if (sent.size > 1000) sent.delete(sent.values().next().value);
+    if (sent.size > 1000) sent.delete(sent.keys().next().value);
   })();
   inflight.set(run.submissionId, task);
   try {
     await task;
   } finally {
     inflight.delete(run.submissionId);
+    payloads.delete(run.submissionId);
   }
 }
-export function loadTopRanking(rpc) {
-  return rpc("get_best_score_ranking", { p_game_slug: GAME, p_limit: 30 });
+export async function loadTopRanking(rpc) {
+  const rows = await rpc("get_best_score_ranking", { p_game_slug: GAME, p_limit: 30 });
+  if (!Array.isArray(rows) || rows.some(row => !row || !Number.isSafeInteger(row.rank_no) || row.rank_no < 1 || typeof row.display_name !== 'string' || !Number.isSafeInteger(row.best_score)))
+    throw Error('Ranking response is malformed');
+  return rows.slice(0, 30);
+}
+
+
+// Durable, exact play receipt precedes every public result request.
+export async function submitSavedResult(storage, run, result, rpc) {
+  if (!run?.name) return;
+  queueResult(storage, run, result);
+  if (isAcknowledged(storage, run.submissionId)) return;
+  await submitRun(run, result.score, rpc);
+  acknowledgeResult(storage, run.submissionId, {run,result});
 }

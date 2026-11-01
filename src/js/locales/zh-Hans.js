@@ -1,4 +1,5 @@
 export const catalog = {
+  "savedInvalid": "无法验证保存的结果。原始数据已保留。",
   "gameName": "PariPari",
   "pageTitle": "PariPari",
   "remainingLife": "剩余生命",
@@ -77,3 +78,4 @@ export const catalog = {
   "copied": "已复制分享文字。",
   "copyManually": "已选中分享文字，请复制后分享。"
 };
+
