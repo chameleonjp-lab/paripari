@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import {createHash} from 'node:crypto';
+const root=new URL('../',import.meta.url),url='https://chameleonjp-lab.github.io/paripari/',imageURL=url+'assets/paripari-og-v1.png';
+function attr(html,key){return html.match(new RegExp(`<meta (?:property|name)="${key}" content="([^"]+)"`))?.[1]}
+test('source and standalone package declare the exact actual-scene social thumbnail',()=>{
+ const png=readFileSync(new URL('assets/paripari-og-v1.png',root));assert.equal(png.subarray(1,4).toString(),'PNG');assert.equal(png.readUInt32BE(16),1200);assert.equal(png.readUInt32BE(20),630);assert.equal(createHash('sha256').update(png).digest('hex'),'688969390693ade95047bb3778ad4eee9d531e6d8d094a33eaf1ade8d63fb92c');
+ for(const path of ['index.html','dist/paripari.html']){const html=readFileSync(new URL(path,root),'utf8');assert.ok(html.includes(`<link rel="canonical" href="${url}">`));assert.equal(attr(html,'og:url'),url);assert.equal(attr(html,'og:image'),imageURL);assert.equal(attr(html,'twitter:image'),imageURL);assert.equal(attr(html,'twitter:card'),'summary_large_image');assert.equal(attr(html,'og:image:type'),'image/png');assert.equal(attr(html,'og:image:width'),'1200');assert.equal(attr(html,'og:image:height'),'630');assert.ok(attr(html,'og:image:alt').includes('パリパリ'));assert.equal(attr(html,'twitter:image:alt'),attr(html,'og:image:alt'));}
+});
+test('composition embeds only the verified actual Canvas without external image references',()=>{
+ const svg=readFileSync(new URL('docs/share-assets/paripari-og-v1.svg',root),'utf8');const hrefs=[...svg.matchAll(/href="([^"]+)"/g)].map(m=>m[1]);assert.equal(hrefs.length,1);assert.ok(hrefs[0].startsWith('data:image/png;base64,'));assert.equal(createHash('sha256').update(Buffer.from(hrefs[0].split(',')[1],'base64')).digest('hex'),'4abfa8e013cd573cf2a5bf76d235bbcc8ebaf85159e6927ed11875b7cdf49a89');assert.ok(!/https?:\/\//.test(svg.replace('http://www.w3.org/2000/svg','')));
+});

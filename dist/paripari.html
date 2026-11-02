@@ -9,6 +9,18 @@
   <link rel="canonical" href="https://chameleonjp-lab.github.io/paripari/">
   <meta property="og:url" content="https://chameleonjp-lab.github.io/paripari/">
   <meta property="og:title" content="パリパリ - PariPari">
+  <meta property="og:type" content="website">
+  <meta property="og:description" content="来た方向と反対を、ちょうどの瞬間に弾くタイミングゲーム。">
+  <meta property="og:image" content="https://chameleonjp-lab.github.io/paripari/assets/paripari-og-v1.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="パリパリ。青い中心と白いタイミングリングへ、橙色の攻撃が迫る実ゲーム画面。">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="パリパリ - PariPari">
+  <meta name="twitter:description" content="来た方向と反対を、ちょうどの瞬間に弾くタイミングゲーム。">
+  <meta name="twitter:image" content="https://chameleonjp-lab.github.io/paripari/assets/paripari-og-v1.png">
+  <meta name="twitter:image:alt" content="パリパリ。青い中心と白いタイミングリングへ、橙色の攻撃が迫る実ゲーム画面。">
   <meta name="description" content="来た方向と反対を、ちょうどの瞬間に弾くタイミングゲーム。">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9A%94%EF%B8%8F%3C/text%3E%3C/svg%3E">
   <style>
@@ -328,6 +340,10 @@ html, body {
 .judge-pop { max-width:90vw; font-size:clamp(18px,5vw,38px); text-align:center; }
 .result-stats small { overflow-wrap:anywhere; }
 #language { max-width:100%; color:inherit; background:#191924; }
+
+/* Sharing menus remain usable in landscape; gameplay keeps its portrait guard. */
+#screen-title:not(.hidden) ~ #rotate-hint,
+#screen-result:not(.hidden) ~ #rotate-hint { display: none; }
 
 </style>
 </head>
@@ -3752,10 +3768,10 @@ function startNamedGame() {
 }
 
 function shareTextForResult(data) {
-  return `${t("resultShareText", { score: formatNumber(data.score), rank: data.rank, combo: formatNumber(data.maxCombo), rate: formatNumber(data.perfectRate), tier: formatNumber(data.tier) })}\n${currentGameUrl()}`;
+  return `${t("resultShareText", { score: formatNumber(data.score), rank: data.rank, combo: formatNumber(data.maxCombo), rate: formatNumber(data.perfectRate), tier: formatNumber(data.tier) })}\n#パリパリ #ゲーム制作\n${currentGameUrl()}`;
 }
 function shareTextForHome() {
-  return `${t("homeShare")}\n${currentGameUrl()}`;
+  return `${t("homeShare")}\n#パリパリ #ゲーム制作\n${currentGameUrl()}`;
 }
 function renderRanking(rows) {
   if (rows !== undefined) {

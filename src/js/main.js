@@ -150,10 +150,10 @@ function startNamedGame() {
 }
 
 function shareTextForResult(data) {
-  return `${t("resultShareText", { score: formatNumber(data.score), rank: data.rank, combo: formatNumber(data.maxCombo), rate: formatNumber(data.perfectRate), tier: formatNumber(data.tier) })}\n${currentGameUrl()}`;
+  return `${t("resultShareText", { score: formatNumber(data.score), rank: data.rank, combo: formatNumber(data.maxCombo), rate: formatNumber(data.perfectRate), tier: formatNumber(data.tier) })}\n#パリパリ #ゲーム制作\n${currentGameUrl()}`;
 }
 function shareTextForHome() {
-  return `${t("homeShare")}\n${currentGameUrl()}`;
+  return `${t("homeShare")}\n#パリパリ #ゲーム制作\n${currentGameUrl()}`;
 }
 function renderRanking(rows) {
   if (rows !== undefined) {

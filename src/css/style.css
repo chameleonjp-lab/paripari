@@ -314,3 +314,7 @@ html, body {
 .judge-pop { max-width:90vw; font-size:clamp(18px,5vw,38px); text-align:center; }
 .result-stats small { overflow-wrap:anywhere; }
 #language { max-width:100%; color:inherit; background:#191924; }
+
+/* Sharing menus remain usable in landscape; gameplay keeps its portrait guard. */
+#screen-title:not(.hidden) ~ #rotate-hint,
+#screen-result:not(.hidden) ~ #rotate-hint { display: none; }

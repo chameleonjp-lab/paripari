@@ -2,12 +2,12 @@ name: Verify and deploy game
 on:
   pull_request:
   push:
-    branches: [claude/paripari-game-spec-2dc0tr]
+    branches: [claude/paripari-game-spec-2dc0tr, work/paripari-share-acceptance-20261102]
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: game-${{ github.event_name == 'pull_request' && github.ref || 'production' }}
+  group: game-${{ github.event_name == 'pull_request' && github.ref || github.ref == 'refs/heads/work/paripari-share-acceptance-20261102' && github.ref || 'production' }}
   cancel-in-progress: true
 jobs:
   verify:
@@ -23,6 +23,14 @@ jobs:
         run: npm test && npm run build && node tests/bundle.test.mjs && node scripts/prepare-pages.mjs
       - run: npm run test:browser
       - run: PW_BROWSER=webkit npm run test:browser
+      - name: Preserve isolated share acceptance screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: share-acceptance-${{ github.sha }}
+          path: test-artifacts/share/*.png
+          if-no-files-found: warn
+          retention-days: 7
       - name: Upload verified game
         if: github.ref == 'refs/heads/claude/paripari-game-spec-2dc0tr' && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3

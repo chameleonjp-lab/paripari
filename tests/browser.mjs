@@ -3,6 +3,8 @@ import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { resolve, extname } from "node:path";
 import { chromium, webkit } from "playwright";
+import { isolateBrowserNetwork } from "./browser-network-safety.mjs";
+import { checkShareAcceptance, captureShareMaterial } from "./share-acceptance.mjs";
 const root = resolve(new URL("..", import.meta.url).pathname);
 const server = http.createServer(async (req, res) => {
   const file = resolve(
@@ -31,6 +33,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
+const baseURL = `http://127.0.0.1:${server.address().port}/`;
 const browserType = process.env.PW_BROWSER === "webkit" ? webkit : chromium;
 const browser = await browserType.launch();
 try {
@@ -39,16 +42,19 @@ try {
     isMobile: true,
     hasTouch: true,
     locale: "ja-JP",
+    serviceWorkers: "block",
   });
   const writes = [],
     reads = [],
     errors = [];
   let loseReceipt = false;
+  await isolateBrowserNetwork(context, baseURL);
   await context.route(
     "https://mlpnjgezrnhdxsxolyzj.supabase.co/**",
     async (route) => {
       const rpc = route.request().url().split("/").at(-1),
         data = route.request().postDataJSON();
+      assert.ok(['start_game_play_v1','finish_game_play_v1','submit_score_idempotent_v1','get_best_score_ranking'].includes(rpc), 'Unknown RPC must not pass the fixture');
       let response = { accepted: true, play_id: '11111111-1111-4111-8111-111111111111',game_slug:data.p_game_slug,client_version:data.p_client_version,start_id:data.p_start_id,display_name:data.p_display_name,normalized_name:data.p_display_name,duplicate:false };
       if (rpc==='finish_game_play_v1') response={accepted:true,play_id:data.p_play_id,game_slug:data.p_game_slug,result_type:data.p_result_type,reached_wave:data.p_reached_wave,score:data.p_score,duplicate:false};
       if (rpc==='submit_score_idempotent_v1') response=[{accepted:true,result_submission_id:data.p_submission_id,result_play_id:data.p_play_id,was_duplicate:false,result_normalized_name:data.p_display_name,result_display_name:data.p_display_name,result_first_score:data.p_score,result_best_score:data.p_score,result_play_count:1,is_first_play:true,is_new_best:true}];
@@ -397,6 +403,8 @@ try {
     `${browserType.name()}: 15 languages, actual missed-attack game over, language without reset, optional name, multi-result lost ACK retries, top30 ties, X, sound persistence and viewport checks passed`,
   );
   await context.close();
+  await checkShareAcceptance(browser,browserType.name(),baseURL);
+  if(process.env.PARIPARI_CAPTURE_SHARE_MATERIAL==='1')await captureShareMaterial(browser,browserType.name(),baseURL);
 } finally {
   await browser.close();
   await new Promise((r) => server.close(r));
