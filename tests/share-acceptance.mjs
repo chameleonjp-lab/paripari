@@ -9,7 +9,7 @@ async function fixture(browser,baseURL,viewport){
  await context.route(rankingURL,route=>route.fulfill({json:Array.from({length:30},(_,i)=>({rank_no:i+1,display_name:`Mock Player ${i+1}`,best_score:9000-i}))}));
  const page=await context.newPage(),errors=[],writes=[];
  page.on('pageerror',error=>errors.push(error.message));page.on('request',request=>{if(request.method()==='POST'&&request.url()!==rankingURL)writes.push('unexpected-write');});
- await page.addInitScript(()=>{window.__shareIntents=[];window.open=url=>{window.__shareIntents.push(url);return {opener:null}};});
+ await page.addInitScript(()=>{window.__shareIntents=[];window.__shareLastTouchEnd=0;window.__shareTouches=[];window.addEventListener('touchend',event=>{const at=Date.now(),gap=at-window.__shareLastTouchEnd;window.__shareLastTouchEnd=at;window.__shareTouches.push({gap,prevented:event.defaultPrevented});});window.open=url=>{window.__shareIntents.push(url);return {opener:null}};});
  await page.goto(baseURL+'index.html');await page.waitForFunction(()=>window.PariPari);await page.locator('#screen-title').waitFor({state:'visible'});
  return {context,page,errors,writes};
 }
@@ -37,7 +37,9 @@ async function accept(page,selector,lang,screen,engine,dir){
   assert.ok(m.visible&&m.opacity===1&&!m.disabled&&m.hit,JSON.stringify(m));assert.ok(m.width>=44&&m.height>=44,JSON.stringify(m));assert.ok(m.left>=0&&m.right<=m.vw+1&&m.top>=0&&m.bottom<=m.vh+1);assert.equal(m.clipped,false);assert.equal(m.background,'rgb(0, 0, 0)');assert.equal(m.color,'rgb(255, 255, 255)');if(lang==='ja')assert.equal(m.text,'Xでシェア');
   await button.focus();await page.mouse.move((m.left+m.right)/2,(m.top+m.bottom)/2);await page.mouse.down();const pressed=await button.evaluate(el=>({background:getComputedStyle(el).backgroundColor,color:getComputedStyle(el).color}));
   if(['ja','en','de'].includes(lang))await page.screenshot({path:prefix+'-pressed.png'});await page.mouse.move(0,0);await page.mouse.up();assert.equal(pressed.background,'rgb(0, 0, 0)');assert.equal(pressed.color,'rgb(255, 255, 255)');
-  const count=await page.evaluate(()=>window.__shareIntents.length);await button.tap();await page.waitForFunction(n=>window.__shareIntents.length===n+1,count);
+  // Respect the product's existing 300 ms double-tap zoom guard, without changing its clock or input.
+  await page.waitForFunction(()=>Date.now()-window.__shareLastTouchEnd>300,{},{timeout:2000});
+  const count=await page.evaluate(()=>window.__shareIntents.length);await button.tap();try{await page.waitForFunction(n=>window.__shareIntents.length===n+1,count,{timeout:3000});}catch(error){console.log(JSON.stringify({engine,lang,screen,expectedIntents:count+1,...await page.evaluate(()=>({actualIntents:window.__shareIntents.length,touches:window.__shareTouches.slice(-3)}))}));await page.screenshot({path:prefix+'-intent-failure.png'});throw error;}
   const url=new URL(await page.evaluate(()=>window.__shareIntents.at(-1)));assert.equal(url.origin,'https://x.com');assert.ok(['/intent/post','/intent/tweet'].includes(url.pathname));const text=url.searchParams.get('text');assert.match(text,/#パリパリ #ゲーム制作/u);assert.ok(text.includes('https://chameleonjp-lab.github.io/paripari/'));
   if(screen==='result')assert.ok(text.includes((await page.locator('#result-score').textContent()).trim()));
  }
