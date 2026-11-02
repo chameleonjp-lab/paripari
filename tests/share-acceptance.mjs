@@ -17,7 +17,7 @@ function targetMetrics(el){
  const rect=el.getBoundingClientRect(),style=getComputedStyle(el);let opacity=1,visible=true;
  for(let node=el;node;node=node.parentElement){const s=getComputedStyle(node);opacity*=Number(s.opacity);if(node.hidden||s.display==='none'||['hidden','collapse'].includes(s.visibility))visible=false;}
  const hit=document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2);
- return {width:rect.width,height:rect.height,left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,vw:innerWidth,vh:innerHeight,visible,opacity,hit:hit===el||el.contains(hit),disabled:el.disabled,text:el.textContent.trim(),background:style.backgroundColor,color:style.color,clipped:el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+1};
+ return {width:rect.width,height:rect.height,left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,vw:innerWidth,vh:innerHeight,visible,opacity,hit:hit===el||el.contains(hit),disabled:el.disabled,hitElement:hit?.id||hit?.tagName||null,text:el.textContent.trim(),background:style.backgroundColor,color:style.color,clipped:el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+1};
 }
 async function settle(el){
  let previous='',stable=0;
@@ -60,7 +60,7 @@ export async function checkShareAcceptance(browser,engine,baseURL){
 }
 export async function captureShareMaterial(browser,engine,baseURL){
  const dir=resolve(process.env.PARIPARI_TEST_ARTIFACTS||'test-artifacts/share');mkdirSync(dir,{recursive:true});
- const {context,page,errors,writes}=await fixture(browser,baseURL,{width:1200,height:800});
+ const {context,page,errors,writes}=await fixture(browser,baseURL,{width:600,height:900});
  try{
   await page.selectOption('#language','ja');await page.fill('#player-name','');await page.click('#btn-play');await page.waitForFunction(()=>window.PariPari.game.isPlaying());
   await page.waitForFunction(()=>{const g=window.PariPari.game,a=g.attack;if(!a||a.resolved)return false;const progress=(g.gameTime-a.spawnAt)/(a.impactAt-a.spawnAt);return progress>=0.45&&progress<0.85;},{},{timeout:15000});

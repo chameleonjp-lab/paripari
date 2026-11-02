@@ -329,6 +329,10 @@ html, body {
 .result-stats small { overflow-wrap:anywhere; }
 #language { max-width:100%; color:inherit; background:#191924; }
 
+/* Sharing menus remain usable in landscape; gameplay keeps its portrait guard. */
+#screen-title:not(.hidden) ~ #rotate-hint,
+#screen-result:not(.hidden) ~ #rotate-hint { display: none; }
+
 </style>
 </head>
 <body>
