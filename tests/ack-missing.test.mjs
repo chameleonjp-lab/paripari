@@ -21,3 +21,6 @@ for(const [label,patch]of Object.entries({firstOverflow:{result_first_score:2147
  });
 }
 for(const first of [-2147483648,-1,0,2147483647])test(`dedicated submit preserves signed historical first ${first}`,async()=>{const storage=memory(),run=createRun('A');await submitSavedResult(storage,run,{score:100},async(n,p)=>responses(n,p,{result_first_score:first,result_best_score:2147483647,result_play_count:2147483647}));assert.equal(isAcknowledged(storage,run.submissionId),true)});
+
+test('valid duplicate may return the current aggregate display without changing receipt identity',async()=>{const storage=memory(),run=createRun('Alice');await submitSavedResult(storage,run,{score:100},async(n,p)=>responses(n,p,{was_duplicate:true,result_display_name:'Current display'}));assert.equal(isAcknowledged(storage,run.submissionId),true)});
+for(const display of [null,undefined,'   ','a'.repeat(21),123])test(`duplicate display must be a valid string: ${String(display)}`,async()=>{const storage=memory(),run=createRun('Alice');await assert.rejects(submitSavedResult(storage,run,{score:100},async(n,p)=>responses(n,p,{was_duplicate:true,result_display_name:display})),/malformed/);assert.equal(readOutbox(storage).length,1);assert.equal(isAcknowledged(storage,run.submissionId),false)});

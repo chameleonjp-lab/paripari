@@ -103,3 +103,5 @@ GitHub Pages Source は `GitHub Actions`（workflow）をAPIで確認。
 `submit_score_idempotent_v1` の11列受領契約（lab PR43固定b06135eeのSQL）に対し、first/best/countがinteger範囲外でも送信済みにする漏れを修正。既存UUID・名前・列検査は維持し、first/bestはsigned int4、countは1..2147483647を検証する。異常ACKでも確定結果と同一submission/play IDを保持して再送できる。正常なfirst0・負値・int4最大履歴を一律排除しない。
 
 実outbox経路の追加9回帰は修正前5失敗/合法4成功、修正後すべて成功。全npm test、build、bundle、Pagesパッケージ検査成功。Chromium/WebKitは変更headのCIで別途確認する。DB・採点・参加者ID・本番公開は変更せず、13項目の既存未完了は維持。
+
+同日追加照合: 専用SQLのduplicate分岐は現在のaggregate displayを返すため、既存のrequest表示名との一律一致を初回だけに限定。duplicateでもnormalized nameと2受領IDは厳密一致、displayはstring/非空白/20文字以内を先に検査する。合法表示名変更の回帰は修正前失敗→成功、null/欠落/空白/超過/非文字列の5回帰は拒否・pending保持を確認。int4補修とは別headのCIを追跡する。
