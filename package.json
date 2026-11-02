@@ -4,7 +4,7 @@
   "description": "敵の攻撃に合わせて反対方向を弾く、ジャストタイミング受け流しゲーム",
   "type": "module",
   "scripts": {
-    "test": "node tests/test.mjs && node tests/share.test.mjs && node tests/ranking.test.mjs && node tests/sound.test.mjs && node --test tests/outbox.test.mjs tests/i18n.test.mjs tests/result.test.mjs tests/native-audio.test.mjs tests/legacy-outbox.test.mjs tests/start-ack.test.mjs tests/ack-race.test.mjs tests/main-race.test.mjs tests/ack-missing.test.mjs tests/share-tags.test.mjs tests/browser-network-safety.test.mjs",
+    "test": "node tests/test.mjs && node tests/share.test.mjs && node tests/ranking.test.mjs && node tests/sound.test.mjs && node --test tests/outbox.test.mjs tests/i18n.test.mjs tests/result.test.mjs tests/native-audio.test.mjs tests/legacy-outbox.test.mjs tests/start-ack.test.mjs tests/ack-race.test.mjs tests/main-race.test.mjs tests/ack-missing.test.mjs tests/share-tags.test.mjs tests/browser-network-safety.test.mjs tests/share-metadata.test.mjs",
     "build": "node build.mjs",
     "test:browser": "node tests/browser.mjs"
   },

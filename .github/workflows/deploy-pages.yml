@@ -22,11 +22,7 @@ jobs:
       - name: Verify and package
         run: npm test && npm run build && node tests/bundle.test.mjs && node scripts/prepare-pages.mjs
       - run: npm run test:browser
-        env:
-          PARIPARI_CAPTURE_SHARE_MATERIAL: ${{ github.ref == 'refs/heads/work/paripari-share-acceptance-20261102' && '1' || '0' }}
       - run: PW_BROWSER=webkit npm run test:browser
-        env:
-          PARIPARI_CAPTURE_SHARE_MATERIAL: ${{ github.ref == 'refs/heads/work/paripari-share-acceptance-20261102' && '1' || '0' }}
       - name: Preserve isolated share acceptance screenshots
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
