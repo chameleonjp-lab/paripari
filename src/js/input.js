@@ -57,7 +57,8 @@ export function setupInput({ onAction, onFirstGesture }) {
 
   // キーボード（PC）
   window.addEventListener('keydown', (e) => {
-    if (e.repeat) return;
+    if (e.repeat || e.isComposing || e.keyCode === 229 || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
     const dir = KEY_DIR[e.key];
     if (!dir) return;
     e.preventDefault();

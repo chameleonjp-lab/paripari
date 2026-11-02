@@ -6,6 +6,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0a0a12">
   <title>パリパリ - PariPari</title>
+  <link rel="canonical" href="https://chameleonjp-lab.github.io/paripari/">
+  <meta property="og:url" content="https://chameleonjp-lab.github.io/paripari/">
+  <meta property="og:title" content="パリパリ - PariPari">
+  <meta name="description" content="来た方向と反対を、ちょうどの瞬間に弾くタイミングゲーム。">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9A%94%EF%B8%8F%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="src/css/style.css">
 </head>
@@ -17,14 +21,14 @@
     <!-- プレイ中HUD -->
     <header id="hud" class="hud hidden">
       <div class="hud-left">
-        <div id="hearts" class="hearts" aria-label="残ライフ"></div>
+        <div id="hearts" class="hearts" aria-label="残ライフ" data-i18n-aria-label="remainingLife"></div>
       </div>
       <div class="hud-center">
         <div id="score" class="score">0</div>
         <div id="combo" class="combo"></div>
       </div>
       <div class="hud-right">
-        <button id="btn-pause" class="icon-btn" aria-label="ポーズ">⏸</button>
+        <button id="btn-pause" class="icon-btn" aria-label="ポーズ" data-i18n-aria-label="pause">⏸</button>
       </div>
     </header>
 
@@ -33,17 +37,17 @@
 
     <!-- 操作ボタン（下半分） -->
     <div id="controls" class="controls hidden">
-      <button class="ctl ctl-l" data-dir="L" aria-label="左で受け流す">
+      <button class="ctl ctl-l" data-dir="L" aria-label="左で受け流す" data-i18n-aria-label="parryLeft">
         <span class="ctl-arrow">◀</span>
       </button>
-      <button class="ctl ctl-r" data-dir="R" aria-label="右で受け流す">
+      <button class="ctl ctl-r" data-dir="R" aria-label="右で受け流す" data-i18n-aria-label="parryRight">
         <span class="ctl-arrow">▶</span>
       </button>
       <!-- 上下（高難度で有効化） -->
-      <button class="ctl ctl-u hidden-dir" data-dir="U" aria-label="上で受け流す">
+      <button class="ctl ctl-u hidden-dir" data-dir="U" aria-label="上で受け流す" data-i18n-aria-label="parryUp">
         <span class="ctl-arrow">▲</span>
       </button>
-      <button class="ctl ctl-d hidden-dir" data-dir="D" aria-label="下で受け流す">
+      <button class="ctl ctl-d hidden-dir" data-dir="D" aria-label="下で受け流す" data-i18n-aria-label="parryDown">
         <span class="ctl-arrow">▼</span>
       </button>
     </div>
@@ -51,74 +55,72 @@
     <!-- タイトル -->
     <section id="screen-title" class="screen">
       <div class="title-wrap">
-        <h1 class="logo">パリパリ</h1>
-        <p class="tagline">来た方向と<b>反対</b>を、ちょうどで弾け。</p>
-        <div class="best">BEST <span id="title-best">0</span></div>
-        <button id="btn-play" class="btn btn-primary">プレイ</button>
-        <button id="btn-howto" class="btn">遊び方</button>
-        <button id="btn-settings" class="btn">設定</button>
-        <button id="btn-home-share" class="btn">ゲームをシェア</button>
+        <h1 class="logo" data-i18n="gameName">パリパリ</h1>
+        <p class="tagline" data-i18n="tagline">来た方向と<b>反対</b>を、ちょうどで弾け。</p>
+        <div class="best"><span data-i18n="best">自己ベスト</span> <span id="title-best">0</span></div>
+        <label class="language-label" for="language" data-i18n="language">言語</label>
+        <select id="language" class="name-input"></select>
+        <label class="name-label" for="player-name" data-i18n="optionalName">名前（任意）</label>
+        <input id="player-name" class="name-input" type="text" autocomplete="nickname" placeholder="空欄でも遊べます" data-i18n-placeholder="namePlaceholder" aria-describedby="name-help">
+        <p id="name-help" class="name-help" data-i18n="nameHelp">名前を入力すると、名前と記録がランキングに公開されます。空欄でも遊べます。</p>
+        <button id="btn-play" class="btn btn-primary" data-i18n="play">プレイ</button>
+        <button id="btn-last-result" class="btn" hidden data-i18n="lastResult">前回の結果</button>
+        <div id="pending-results"></div>
+        <button id="btn-howto" class="btn" data-i18n="howTo">遊び方</button>
+        <button id="btn-settings" class="btn" data-i18n="settings">設定</button>
+        <a class="btn" href="https://chameleonjp-lab.github.io/chameleonjp_lab/ranking.html?game=paripari" target="_blank" rel="noopener" data-i18n="ranking">ランキング</a>
+        <textarea id="home-share-text" class="result-share-text" readonly hidden aria-label="シェア文" data-i18n-aria-label="shareText"></textarea>
+        <button id="btn-home-share" class="btn" data-i18n="shareX">Xでシェア</button>
         <p id="home-share-status" class="platform-status" role="status" aria-live="polite"></p>
-        <a class="platform-link" href="https://chameleonjp-lab.github.io/chameleonjp_lab/" target="_blank" rel="noopener noreferrer">カメレオンJPの実験場へ</a>
-      </div>
-    </section>
-
-    <!-- 名前確認（ランキング送信の前提） -->
-    <section id="screen-name" class="screen hidden">
-      <div class="panel name-panel">
-        <h2>名前を入力</h2>
-        <p class="name-help">ランキングに表示する名前を入力してください。</p>
-        <label class="name-label" for="player-name">表示名</label>
-        <input id="player-name" class="name-input" type="text" maxlength="20" autocomplete="nickname" placeholder="名前を入力してください">
-        <p id="name-error" class="platform-status error" role="alert"></p>
-        <button id="btn-name-start" class="btn btn-primary">この名前で開始</button>
-        <button id="btn-name-back" class="btn">もどる</button>
+        <a class="platform-link" href="https://chameleonjp-lab.github.io/chameleonjp_lab/" target="_blank" rel="noopener noreferrer" data-i18n="lab">カメレオンJPの実験場へ</a>
       </div>
     </section>
 
     <!-- 遊び方 -->
     <section id="screen-howto" class="screen hidden">
       <div class="panel">
-        <h2>遊び方</h2>
+        <h2 data-i18n="howTo">遊び方</h2>
         <ol class="howto-list">
-          <li>敵の攻撃が<b>来る方向</b>が光ります。</li>
-          <li>攻撃が線に届く<b>ちょうど</b>その瞬間に…</li>
-          <li>来た方向と<b>反対</b>のボタンを1回タップ！</li>
-          <li>早すぎ・遅すぎ・逆方向は失敗。3回ミスで終了。</li>
+          <li data-i18n="how1">敵の攻撃が<b>来る方向</b>が光ります。</li>
+          <li data-i18n="how2">攻撃が線に届く<b>ちょうど</b>その瞬間に…</li>
+          <li data-i18n="how3">来た方向と<b>反対</b>のボタンを1回タップ！</li>
+          <li data-i18n="how4">早すぎ・遅すぎ・逆方向は失敗。3回ミスで終了。</li>
         </ol>
         <p class="howto-judge">
-          <span class="tag perfect">PERFECT</span> ど真ん中
-          <span class="tag good">GOOD</span> セーフ
-          <span class="tag miss">MISS</span> 失敗
+          <span class="tag perfect" data-i18n="perfect">PERFECT</span> <span data-i18n="perfectHelp">ど真ん中</span>
+          <span class="tag good" data-i18n="good">GOOD</span> <span data-i18n="goodHelp">セーフ</span>
+          <span class="tag miss" data-i18n="miss">MISS</span> <span data-i18n="missHelp">失敗</span>
         </p>
-        <button id="btn-howto-try" class="btn btn-primary">練習してみる</button>
-        <button id="btn-howto-back" class="btn">もどる</button>
+        <button id="btn-howto-try" class="btn btn-primary" data-i18n="practice">練習してみる</button>
+        <button id="btn-howto-back" class="btn" data-i18n="back">もどる</button>
       </div>
     </section>
 
     <!-- 設定 -->
     <section id="screen-settings" class="screen hidden">
       <div class="panel">
-        <h2>設定</h2>
-        <label class="toggle"><span>振動（対応端末のみ）</span><input type="checkbox" id="set-vibrate"></label>
-        <label class="toggle"><span>モーション低減</span><input type="checkbox" id="set-motion"></label>
-        <button id="btn-settings-back" class="btn btn-primary">もどる</button>
+        <h2 data-i18n="settings">設定</h2>
+        <label class="toggle"><span data-i18n="sound">効果音</span><input type="checkbox" id="set-sound"></label>
+        <label class="toggle"><span data-i18n="volume">音量</span><input type="range" id="set-volume" min="0" max="1" step="0.05" aria-label="効果音の音量" data-i18n-aria-label="soundVolume"></label>
+        <label class="toggle"><span data-i18n="vibration">振動（対応端末のみ）</span><input type="checkbox" id="set-vibrate"></label>
+        <label class="toggle"><span data-i18n="reducedMotion">モーション低減</span><input type="checkbox" id="set-motion"></label>
+        <button id="btn-settings-back" class="btn btn-primary" data-i18n="back">もどる</button>
       </div>
     </section>
 
     <!-- カウントダウン -->
     <section id="screen-ready" class="screen hidden">
       <div id="countdown" class="countdown">3</div>
-      <p class="ready-hint">来た方向と<b>反対</b>を押す！</p>
+      <p class="ready-hint" data-i18n="readyHint">来た方向と<b>反対</b>を押す！</p>
     </section>
 
     <!-- ポーズ -->
     <section id="screen-pause" class="screen hidden">
       <div class="panel">
-        <h2>ポーズ</h2>
-        <button id="btn-resume" class="btn btn-primary">再開</button>
-        <button id="btn-pause-retry" class="btn">リトライ</button>
-        <button id="btn-pause-home" class="btn">ホーム</button>
+        <h2 data-i18n="pause">ポーズ</h2>
+        <button id="btn-resume" class="btn btn-primary" data-i18n="resume">再開</button>
+        <button id="btn-pause-retry" class="btn" data-i18n="retry">リトライ</button>
+        <button id="btn-pause-home" class="btn" data-i18n="home">ホーム</button>
       </div>
     </section>
 
@@ -126,30 +128,34 @@
     <section id="screen-result" class="screen hidden">
       <div class="panel result-panel">
         <div id="result-rank" class="result-rank">A</div>
-        <div class="result-score-label">SCORE</div>
+        <div class="result-score-label" data-i18n="score">SCORE</div>
         <div id="result-score" class="result-score">0</div>
-        <div id="result-best-badge" class="best-badge hidden">★ ベスト更新！</div>
+        <div id="result-best-badge" class="best-badge hidden" data-i18n="newBest">★ ベスト更新！</div>
         <div class="result-stats">
-          <div><span id="result-combo">0</span><small>最大コンボ</small></div>
-          <div><span id="result-perfect">0%</span><small>PERFECT率</small></div>
-          <div><span id="result-tier">1</span><small>到達ティア</small></div>
+          <div><span id="result-combo">0</span><small data-i18n="maxCombo">最大コンボ</small></div>
+          <div><span id="result-perfect">0%</span><small data-i18n="perfectRate">PERFECT率</small></div>
+          <div><span id="result-tier">1</span><small data-i18n="tier">到達ティア</small></div>
         </div>
+        <p id="result-save-warning" hidden role="status" data-i18n="saveWarning">結果を保存できませんでした。この画面で再試行できます。</p>
+        <p id="result-submit-status" class="platform-status" role="status" aria-live="polite"></p>
         <p id="result-player" class="platform-status"></p>
-        <textarea id="result-share-text" class="result-share-text" readonly aria-label="結果のシェア文"></textarea>
-        <button id="btn-result-share" class="btn">結果をシェア（文面をコピー）</button>
+        <textarea id="result-share-text" class="result-share-text" readonly aria-label="結果のシェア文" data-i18n-aria-label="resultShare"></textarea>
+        <a class="btn" href="https://chameleonjp-lab.github.io/chameleonjp_lab/ranking.html?game=paripari" target="_blank" rel="noopener" data-i18n="ranking">ランキング</a>
+        <button id="btn-result-share" class="btn" data-i18n="shareX">Xでシェア</button>
         <p id="result-share-status" class="platform-status" role="status" aria-live="polite"></p>
         <section class="ranking-box" aria-labelledby="result-ranking-title">
-          <h3 id="result-ranking-title">スコアランキング TOP10</h3>
-          <ol id="result-ranking-list"><li>ランキングを読み込み中…</li></ol>
+          <h3 id="result-ranking-title" data-i18n="top30">スコアランキング TOP30</h3>
+          <button id="btn-ranking-retry" class="btn" type="button" data-i18n="retryNetwork">通信を再試行</button>
+          <ol id="result-ranking-list"><li data-i18n="loading">ランキングを読み込み中…</li></ol>
           <p id="result-ranking-status" class="platform-status" role="status" aria-live="polite"></p>
         </section>
-        <button id="btn-retry" class="btn btn-primary">もう一回</button>
-        <button id="btn-result-home" class="btn">ホーム</button>
-        <a class="platform-link" href="https://chameleonjp-lab.github.io/chameleonjp_lab/" target="_blank" rel="noopener noreferrer">カメレオンJPの実験場へ</a>
+        <button id="btn-retry" class="btn btn-primary" data-i18n="playAgain">もう一回</button>
+        <button id="btn-result-home" class="btn" data-i18n="home">ホーム</button>
+        <a class="platform-link" href="https://chameleonjp-lab.github.io/chameleonjp_lab/" target="_blank" rel="noopener noreferrer" data-i18n="lab">カメレオンJPの実験場へ</a>
       </div>
     </section>
 
-    <div id="rotate-hint" class="rotate-hint hidden">📱 縦向きでプレイしてください</div>
+    <div id="rotate-hint" class="rotate-hint hidden" data-i18n="portrait">📱 縦向きでプレイしてください</div>
   </div>
 
   <script type="module" src="src/js/main.js"></script>

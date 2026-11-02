@@ -1,0 +1,55 @@
+name: Verify and deploy game
+on:
+  pull_request:
+  push:
+    branches: [claude/paripari-game-spec-2dc0tr]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: game-${{ github.event_name == 'pull_request' && github.ref || 'production' }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - name: Verify and package
+        run: npm test && npm run build && node tests/bundle.test.mjs && node scripts/prepare-pages.mjs
+      - run: npm run test:browser
+      - run: PW_BROWSER=webkit npm run test:browser
+      - name: Upload verified game
+        if: github.ref == 'refs/heads/claude/paripari-game-spec-2dc0tr' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+  deploy:
+    if: github.ref == 'refs/heads/claude/paripari-game-spec-2dc0tr' && github.event_name != 'pull_request'
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check this is still the production branch head
+        id: current
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ref = await github.rest.git.getRef({
+              ...context.repo, ref: 'heads/claude/paripari-game-spec-2dc0tr'
+            });
+            core.setOutput('current', ref.data.object.sha === context.sha);
+      - name: Publish verified game
+        if: steps.current.outputs.current == 'true'
+        id: deployment
+        uses: actions/deploy-pages@v4
