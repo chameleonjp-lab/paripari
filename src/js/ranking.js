@@ -21,6 +21,7 @@ export function createRun(rawName, uuid = createSubmissionId) {
     clientVersion: VERSION,
   });
 }
+const isInt4 = value => Number.isInteger(value) && value >= -2147483648 && value <= 2147483647;
 function accepted(value, table = false) {
   if (table ? !Array.isArray(value) || value.length !== 1 : Array.isArray(value)) throw new Error("Ranking response is malformed");
   const result = table ? value[0] : value;
@@ -88,7 +89,7 @@ export async function submitRun(run, score, rpc) {
         p_score: score,
       }), true,
     );
-    if (submitted.result_submission_id !== run.submissionId || submitted.result_play_id !== start.play_id || typeof submitted.was_duplicate !== 'boolean' || submitted.result_normalized_name !== run.name || submitted.result_display_name !== run.name || !Number.isSafeInteger(submitted.result_first_score) || !Number.isSafeInteger(submitted.result_best_score) || !Number.isSafeInteger(submitted.result_play_count) || submitted.result_play_count < 1 || typeof submitted.is_first_play !== 'boolean' || typeof submitted.is_new_best !== 'boolean') throw Error('Ranking submission response is malformed');
+    if (submitted.result_submission_id !== run.submissionId || submitted.result_play_id !== start.play_id || typeof submitted.was_duplicate !== 'boolean' || submitted.result_normalized_name !== run.name || submitted.result_display_name !== run.name || !isInt4(submitted.result_first_score) || !isInt4(submitted.result_best_score) || !isInt4(submitted.result_play_count) || submitted.result_play_count < 1 || typeof submitted.is_first_play !== 'boolean' || typeof submitted.is_new_best !== 'boolean') throw Error('Ranking submission response is malformed');
     sent.set(run.submissionId, fingerprint);
     starts.delete(run.startId);
     if (sent.size > 1000) sent.delete(sent.keys().next().value);

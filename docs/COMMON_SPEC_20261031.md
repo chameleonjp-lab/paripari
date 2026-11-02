@@ -97,3 +97,9 @@ GitHub Pages Source は `GitHub Actions`（workflow）をAPIで確認。
 - 仕様 12: 既存22ゲームunitと共有/ランキング/音声スクリプト、追加Node回帰が成功。独立レビューの破損legacy・UUID競合・ACK競合race・開始応答・audio interruptionを再現し修正。buildと単一HTML依存閉包成功。今回ローカルのブラウザ実行体がないためChromium/WebKitは既存PR CIで実行予定（確定head結果はPRに追記）。以前のブラウザ成功を今回修正の成功とは扱わない。
 
 残る制限: 安定した本人識別方式・既存同名/改名記録の移行判断、厳密な本人30人、母語話者確認、音の聞こえ方、iPhone17 Pro実機、ユーザーマージ後の本番反映確認。ストレージ自体が書込み不可の間は未保存結果はページを閉じると失われ得るため警告を維持する。破損/競合 raw を削除・再ID・自動再送しない。DB変更・試験スコア送信・権限変更・本番配備は実施していない。以前の適用順/切戻し手順は維持する。
+
+## 2026-11-02 専用 submit ACK の整数境界
+
+`submit_score_idempotent_v1` の11列受領契約（lab PR43固定b06135eeのSQL）に対し、first/best/countがinteger範囲外でも送信済みにする漏れを修正。既存UUID・名前・列検査は維持し、first/bestはsigned int4、countは1..2147483647を検証する。異常ACKでも確定結果と同一submission/play IDを保持して再送できる。正常なfirst0・負値・int4最大履歴を一律排除しない。
+
+実outbox経路の追加9回帰は修正前5失敗/合法4成功、修正後すべて成功。全npm test、build、bundle、Pagesパッケージ検査成功。Chromium/WebKitは変更headのCIで別途確認する。DB・採点・参加者ID・本番公開は変更せず、13項目の既存未完了は維持。
