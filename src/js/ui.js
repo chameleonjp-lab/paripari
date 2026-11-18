@@ -68,7 +68,7 @@ export function showResult({ score, best, isBest, maxCombo, perfectRate, tier, r
 }
 
 export function setBestLabel(best) {
-  $('title-best').textContent = formatNumber(best);
+  $('title-best').textContent = best === null ? '—' : formatNumber(best);
 }
 
 export function reflectSettings(s) {
