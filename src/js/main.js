@@ -45,7 +45,7 @@ const game = new Game({
   particles,
   settings,
   onSound: (event) => sound.play(event),
-  onGameOver: (data) => {
+  onGameOver: (data, savedBest) => {
     if (data.practiceDone) {
       // 練習完了 → 本番カウントダウンへ
       startCountdown(startNormalRun);
@@ -62,7 +62,7 @@ const game = new Game({
       $("result-save-warning").hidden = false;
     }
     ui.setPlayUIVisible(false);
-    ui.setBestLabel(data.best);
+    ui.setBestLabel(savedBest?.best ?? null);
     ui.showResult(data);
     renderResultPlatform(data);
   },
@@ -87,7 +87,7 @@ function gotoTitle() {
   game.state = "IDLE";
   game.attack = null;
   ui.setPlayUIVisible(false);
-  ui.setBestLabel(storage.getBest());
+  ui.setBestLabel(storage.getBestState().best);
   ui.showScreen("title");
   refreshPendingResults();
 }
@@ -435,7 +435,7 @@ function refreshPendingResults() {
 
 // Language changes update presentation only; never restart, reroll or submit a run.
 document.addEventListener("paripari:language", () => {
-  ui.setBestLabel(storage.getBest());
+  ui.setBestLabel(storage.getBestState().best);
   ui.updateHUD(game);
   if (pendingResult) {
     const showingResult = !$("screen-result").classList.contains("hidden");
