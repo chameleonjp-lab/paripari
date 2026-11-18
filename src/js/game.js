@@ -5,7 +5,7 @@ import { calcGain } from './scoring.js';
 import { createAttack, nextInterval } from './enemy.js';
 import { vibrate, HAPTICS } from './haptics.js';
 import * as ui from './ui.js';
-import { getBest, setBest } from './storage.js';
+import { getBest, saveBest } from './storage.js';
 
 const PRACTICE_GOAL = 3;
 
@@ -185,23 +185,25 @@ export class Game {
   _gameOver() {
     this.state = 'OVER';
     this.attack = null;
-    const best = getBest();
-    const isBest = this.score > best;
+    const legacyBest = getBest();
+    // Unknown legacy records must not invalidate the result snapshot.
+    const best = Number.isSafeInteger(legacyBest) && legacyBest >= 0 ? legacyBest : 0;
+    const savedBest = saveBest(this.score);
+    const isBest = savedBest.status === 'saved';
     this.onSound(isBest ? 'best' : 'result');
-    if (isBest) setBest(this.score);
     const perfectRate = this.totalAttempts > 0
       ? Math.round((this.perfectCount / Math.max(1, this.successCount)) * 100) : 0;
     const tierNum = CONFIG.TIERS.indexOf(tierForSuccess(this.successCount)) + 1;
     this.onGameOver({
       practiceDone: false,
       score: this.score,
-      best: Math.max(best, this.score),
+      best: Math.max(best, savedBest.best ?? 0, this.score),
       isBest,
       maxCombo: this.maxCombo,
       perfectRate,
       tier: tierNum,
       rank: rankForScore(this.score),
-    });
+    }, savedBest);
   }
 
   getRenderState() {
