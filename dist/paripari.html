@@ -2123,19 +2123,31 @@ function safeSet(key, val) {
 function getBest() {
   return parseInt(safeGet(KEY_BEST) || '0', 10) || 0;
 }
-function setBest(n) {
-  if (typeof n !== 'number' || !Number.isFinite(n)) return;
-  const score = Math.max(0, Math.floor(n));
-  if (!Number.isSafeInteger(score)) return;
+// Unlike getBest's legacy fallback, null means the stored best is unknown.
+function getBestState() {
   let raw;
-  try { raw = localStorage.getItem(KEY_BEST); } catch { return; }
-  if (raw !== null) {
-    // Preserve unreadable/unknown records rather than treating them as zero.
-    if (typeof raw !== 'string' || !/^\s*\d+\s*$/.test(raw)) return;
-    const persisted = Number(raw);
-    if (!Number.isSafeInteger(persisted) || persisted < 0 || score <= persisted) return;
-  }
-  safeSet(KEY_BEST, String(score));
+  try { raw = localStorage.getItem(KEY_BEST); } catch { return { status: 'unavailable', best: null }; }
+  if (raw === null) return { status: 'known', best: 0 };
+  if (typeof raw !== 'string' || !/^\s*\d+\s*$/.test(raw)) return { status: 'invalid', best: null };
+  const best = Number(raw);
+  return Number.isSafeInteger(best) && best >= 0
+    ? { status: 'known', best }
+    : { status: 'invalid', best: null };
+}
+function saveBest(n) {
+  const before = getBestState();
+  if (typeof n !== 'number' || !Number.isFinite(n)) return { ...before, status: 'invalid-score' };
+  const score = Math.max(0, Math.floor(n));
+  if (!Number.isSafeInteger(score)) return { ...before, status: 'invalid-score' };
+  if (before.best === null) return before;
+  if (score <= before.best) return { status: 'unchanged', best: before.best };
+  try { localStorage.setItem(KEY_BEST, String(score)); }
+  catch { return { status: 'write-failed', best: getBestState().best }; }
+  const after = getBestState();
+  return { status: after.best === score ? 'saved' : 'unconfirmed', best: after.best };
+}
+function setBest(n) {
+  saveBest(n);
 }
 
 function getSettings() {
@@ -2156,7 +2168,7 @@ function setSettings(s) {
 }
 
 
-  Object.assign(exports, { getBest, setBest, getSettings, setSettings });
+  Object.assign(exports, { getBest, getBestState, saveBest, setBest, getSettings, setSettings });
   });
 
   def('haptics', function(module, exports, require){
@@ -3400,7 +3412,7 @@ function showResult({ score, best, isBest, maxCombo, perfectRate, tier, rank }) 
 }
 
 function setBestLabel(best) {
-  $('title-best').textContent = formatNumber(best);
+  $('title-best').textContent = best === null ? '—' : formatNumber(best);
 }
 
 function reflectSettings(s) {
@@ -3420,7 +3432,7 @@ const {calcGain} = require('scoring');
 const {createAttack, nextInterval} = require('enemy');
 const {vibrate, HAPTICS} = require('haptics');
 const ui = require('ui');
-const {getBest, setBest} = require('storage');
+const {getBest, saveBest} = require('storage');
 const PRACTICE_GOAL = 3;
 
 class Game {
@@ -3599,23 +3611,25 @@ class Game {
   _gameOver() {
     this.state = 'OVER';
     this.attack = null;
-    const best = getBest();
-    const isBest = this.score > best;
+    const legacyBest = getBest();
+    // Unknown legacy records must not invalidate the result snapshot.
+    const best = Number.isSafeInteger(legacyBest) && legacyBest >= 0 ? legacyBest : 0;
+    const savedBest = saveBest(this.score);
+    const isBest = savedBest.status === 'saved';
     this.onSound(isBest ? 'best' : 'result');
-    if (isBest) setBest(this.score);
     const perfectRate = this.totalAttempts > 0
       ? Math.round((this.perfectCount / Math.max(1, this.successCount)) * 100) : 0;
     const tierNum = CONFIG.TIERS.indexOf(tierForSuccess(this.successCount)) + 1;
     this.onGameOver({
       practiceDone: false,
       score: this.score,
-      best: Math.max(best, this.score),
+      best: Math.max(best, savedBest.best ?? 0, this.score),
       isBest,
       maxCombo: this.maxCombo,
       perfectRate,
       tier: tierNum,
       rank: rankForScore(this.score),
-    });
+    }, savedBest);
   }
 
   getRenderState() {
@@ -3674,7 +3688,7 @@ const game = new Game({
   particles,
   settings,
   onSound: (event) => sound.play(event),
-  onGameOver: (data) => {
+  onGameOver: (data, savedBest) => {
     if (data.practiceDone) {
       // 練習完了 → 本番カウントダウンへ
       startCountdown(startNormalRun);
@@ -3691,7 +3705,7 @@ const game = new Game({
       $("result-save-warning").hidden = false;
     }
     ui.setPlayUIVisible(false);
-    ui.setBestLabel(data.best);
+    ui.setBestLabel(savedBest?.best ?? null);
     ui.showResult(data);
     renderResultPlatform(data);
   },
@@ -3716,7 +3730,7 @@ function gotoTitle() {
   game.state = "IDLE";
   game.attack = null;
   ui.setPlayUIVisible(false);
-  ui.setBestLabel(storage.getBest());
+  ui.setBestLabel(storage.getBestState().best);
   ui.showScreen("title");
   refreshPendingResults();
 }
@@ -4064,7 +4078,7 @@ function refreshPendingResults() {
 
 // Language changes update presentation only; never restart, reroll or submit a run.
 document.addEventListener("paripari:language", () => {
-  ui.setBestLabel(storage.getBest());
+  ui.setBestLabel(storage.getBestState().best);
   ui.updateHUD(game);
   if (pendingResult) {
     const showingResult = !$("screen-result").classList.contains("hidden");
